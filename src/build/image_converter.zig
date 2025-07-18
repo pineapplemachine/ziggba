@@ -8,7 +8,7 @@ const std = @import("std");
 
 pub const ImageConverterError = error{InvalidPixelData};
 
-const GBAColor = @import("../color.zig").Color;
+const GBAColor = @import("../gba/color.zig").Color;
 
 pub const ImageSourceTarget = struct {
     source: []const u8,

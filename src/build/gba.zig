@@ -1,3 +1,5 @@
+//! This module provides helpers for building Zig code as a GBA ROM.
+
 const std = @import("std");
 const ImageConverter = @import("image_converter.zig").ImageConverter;
 const ArrayList = std.ArrayList;
@@ -7,14 +9,18 @@ const builtin = std.builtin;
 const fmt = std.fmt;
 const fs = std.fs;
 
-pub const GBAColor = @import("../color.zig").Color;
+pub const GBAColor = @import("../gba/color.zig").Color;
 pub const tiles = @import("tiles.zig");
 pub const ImageSourceTarget = @import("image_converter.zig").ImageSourceTarget;
 
-const gba_linker_script = libRoot() ++ "/../gba.ld";
-const gba_crt0_asm = libRoot() ++ "/../gba_crt0.s";
-const gba_start_zig_file = libRoot() ++ "/../gba_start.zig";
-const gba_lib_file = libRoot() ++ "/../gba.zig";
+fn libRoot() []const u8 {
+    return std.fs.path.dirname(@src().file) orelse ".";
+}
+
+const gba_linker_script = libRoot() ++ "/../gba/gba.ld";
+const gba_crt0_asm = libRoot() ++ "/../gba/crt0.s";
+const gba_start_zig_file = libRoot() ++ "/../gba/start.zig";
+const gba_lib_file = libRoot() ++ "/../gba/gba.zig";
 
 var is_debug: ?bool = null;
 var use_gdb_option: ?bool = null;
@@ -29,33 +35,35 @@ const gba_thumb_target_query = blk: {
     break :blk target;
 };
 
-fn libRoot() []const u8 {
-    return std.fs.path.dirname(@src().file) orelse ".";
-}
-
-pub fn addGBAStaticLibrary(b: *std.Build, lib_name: []const u8, source_file: []const u8, debug: bool) *std.Build.Step.Compile {
+/// Add a build step to compile a static library.
+/// The library will be compiled to run on the GBA.
+pub fn addGBAStaticLibrary(
+    b: *std.Build,
+    lib_name: []const u8,
+    source_file: []const u8,
+    debug: bool,
+) *std.Build.Step.Compile {
     const lib = b.addStaticLibrary(.{
         .name = lib_name,
         .root_source_file = .{ .src_path = .{ .owner = b, .sub_path = source_file } },
         .target = b.resolveTargetQuery(gba_thumb_target_query),
         .optimize = if (debug) .Debug else .ReleaseFast,
     });
-
     lib.setLinkerScript(.{
         .src_path = .{
             .owner = b,
             .sub_path = gba_linker_script,
         },
     });
-
     return lib;
 }
 
-pub fn createGBALib(b: *std.Build, debug: bool) *std.Build.Step.Compile {
-    return addGBAStaticLibrary(b, "ZigGBA", gba_lib_file, debug);
-}
-
-pub fn addGBAExecutable(b: *std.Build, rom_name: []const u8, source_file: []const u8) *std.Build.Step.Compile {
+/// Add a build step to compile an executable, i.e. a GBA ROM.
+pub fn addGBAExecutable(
+    b: *std.Build,
+    rom_name: []const u8,
+    source_file: []const u8,
+) *std.Build.Step.Compile {
     const debug = is_debug orelse blk: {
         const dbg = b.option(bool, "debug", "Generate a debug build") orelse false;
         is_debug = dbg;
@@ -112,13 +120,16 @@ pub fn addGBAExecutable(b: *std.Build, rom_name: []const u8, source_file: []cons
             .format = .bin,
         });
 
-        const install_bin_step = b.addInstallBinFile(objcopy_step.getOutput(), b.fmt("{s}.gba", .{rom_name}));
+        const install_bin_step = b.addInstallBinFile(
+            objcopy_step.getOutput(),
+            b.fmt("{s}.gba", .{rom_name}),
+        );
         install_bin_step.step.dependOn(&objcopy_step.step);
 
         b.default_step.dependOn(&install_bin_step.step);
     }
 
-    const gba_lib = createGBALib(b, debug);
+    const gba_lib = addGBAStaticLibrary(b, "ZigGBA", gba_lib_file, debug);
     exe.root_module.addAnonymousImport("gba", .{
         .root_source_file = .{
             .src_path = .{
@@ -132,12 +143,6 @@ pub fn addGBAExecutable(b: *std.Build, rom_name: []const u8, source_file: []cons
     b.default_step.dependOn(&exe.step);
 
     return exe;
-}
-
-pub fn saveFile(file_path: []const u8, file_contents: []const u8) !void {
-    var file = try fs.cwd().createFile(file_path, .{});
-    defer file.close();
-    try file.writeAll(file_contents);
 }
 
 const Mode4ConvertStep = struct {
