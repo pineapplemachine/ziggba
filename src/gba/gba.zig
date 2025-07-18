@@ -1,3 +1,5 @@
+//! This module implements runtime APIs for code running on a GBA.
+
 const std = @import("std");
 const gba = @This();
 
@@ -16,12 +18,21 @@ pub const sound = @import("sound.zig");
 pub const timer = @import("timer.zig");
 pub const utils = @import("utils.zig");
 
+/// Pointer to EWRAM (external work RAM).
+/// More plentiful than IWRAM, but slower.
 pub const ewram: *volatile [0x20000]u16 = @ptrFromInt(gba.mem.ewram);
+
+/// Pointer to IWRAM (internal work RAM).
+/// Not as large as EWRAM, but faster.
 pub const iwram: *volatile [0x2000]u32 = @ptrFromInt(gba.mem.iwram);
 
+/// Width of the GBA video output in pixels.
 pub const screen_width = 240;
+
+/// Height of the GBA video output in pixels.
 pub const screen_height = 160;
 
+/// Represents the structure and contents of a standard GBA ROM header.
 const Header = extern struct {
     /// Encodes a relative jump past the end of the header in ARM.
     /// EA 00 is an unconditional jump without linking.

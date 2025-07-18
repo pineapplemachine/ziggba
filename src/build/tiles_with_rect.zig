@@ -11,6 +11,32 @@ pub const ColorRgba8888 = zigimg.color.Rgba32;
 /// Enumeration of possible bit depths for GBA tile data. (Bits per pixel.)
 pub const Bpp = @import("../color.zig").Color.Bpp;
 
+pub const ImageRect = struct {
+    x_min: u16 = 0,
+    x_max: u16 = 0,
+    y_min: u16 = 0,
+    y_max: u16 = 0,
+
+    pub fn width(self: ImageRect) u16 {
+        return self.x_max - self.x_min;
+    }
+
+    pub fn height(self: ImageRect) u16 {
+        return self.y_max - self.y_min;
+    }
+
+    pub fn is_valid(self: ImageRect) bool {
+        return self.x_max >= self.x_min and self.y_max >= self.y_min;
+    }
+
+    pub fn is_zero(self: ImageRect) bool {
+        return (self.x_min == 0 and
+            self.x_max == 0 and
+            self.y_min == 0 and
+            self.y_max == 0);
+    }
+};
+
 /// Enumeration of options for how many blocks converted tile image data
 /// is intended to fit within.
 pub const ConvertFit = enum(u3) {
@@ -61,6 +87,9 @@ pub fn ConvertOptions(comptime PaletteCtxT: type) type {
         pad_tiles: bool = false,
         /// If not set, then an empty input image will trigger an error.
         allow_empty: bool = false,
+        /// Specify a sub-rectangle of the image to use.
+        /// If all attributes are zero, then the image is used in its entirety.
+        rect: ImageRect = .{},
     };
 }
 
@@ -84,6 +113,8 @@ pub const ConvertError = error{
     /// The image was in an unsupported pixel format.
     /// Try converting it using image.convert before passing it.
     UnexpectedImagePixelFormat,
+    /// The subrect provided was invalid or exceed the bounds of the image.
+    InvalidRect,
     /// The image width and/or height was 0, and the "allow_empty"
     /// option was not used.
     EmptyImage,
@@ -136,11 +167,9 @@ pub fn getNearestPaletteColor(
         // Compute an approximation of perceptual color distance.
         // Human eyes are most sensitive to differences in green and
         // least sensitive to differences in blue.
-        const dist: i32 = (
-            ((dg * dg) << 2) +
+        const dist: i32 = (((dg * dg) << 2) +
             ((dr * dr) << 1) +
-            (db * db)
-        );
+            (db * db));
         if (pal_nearest_i <= 0 or dist < pal_nearest_dist) {
             pal_nearest_i = @truncate(pal_i);
             pal_nearest_dist = dist;
@@ -198,12 +227,10 @@ pub fn convertImagePath(
     comptime CtxT: type,
     image_path: []const u8,
     opt: ConvertOptions(CtxT),
-) (
-    ConvertError ||
+) (ConvertError ||
     std.mem.Allocator.Error ||
     zigimg.Image.ReadError ||
-    std.fs.File.OpenError
-)!ConvertOutput {
+    std.fs.File.OpenError)!ConvertOutput {
     var image = try zigimg.Image.fromFilePath(opt.allocator, image_path);
     defer image.deinit();
     return convertImage(CtxT, image, opt);
@@ -217,13 +244,11 @@ pub fn convertSaveImagePath(
     image_path: []const u8,
     output_path: []const u8,
     opt: ConvertOptions(CtxT),
-) (
-    ConvertError ||
+) (ConvertError ||
     std.mem.Allocator.Error ||
     zigimg.Image.ReadError ||
     std.fs.File.OpenError ||
-    std.posix.WriteError
-)!void {
+    std.posix.WriteError)!void {
     const tiles_data = try convertImagePath(CtxT, image_path, opt);
     defer opt.allocator.free(tiles_data.data);
     var file = try std.fs.cwd().createFile(output_path, .{});
@@ -247,39 +272,44 @@ pub fn convertImage(
     image: zigimg.Image,
     opt: ConvertOptions(CtxT),
 ) (ConvertError || std.mem.Allocator.Error)!ConvertOutput {
-    if (image.pixelFormat() == .invalid) {
+    if (!opt.rect.is_valid()) {
+        return ConvertError.InvalidRect;
+    } else if (image.pixelFormat() == .invalid) {
         return ConvertError.UnexpectedImagePixelFormat;
     }
     // Check image size
     if (image.width > 0xffff or image.height > 0xffff) {
         return ConvertError.ImageTooLarge;
     }
-    else if ((image.width <= 0 or image.height <= 0) and !opt.allow_empty) {
+    const rect = if (!opt.rect.is_zero()) opt.rect else ImageRect{
+        .x_max = @intCast(@max(0, image.width)),
+        .y_max = @intCast(@max(0, image.height)),
+    };
+    if ((rect.width() <= 0 or rect.height() <= 0) and !opt.allow_empty) {
         return ConvertError.EmptyImage;
     }
-    var image_tiles_x: u16 = @truncate(image.width >> 3);
-    var image_tiles_y: u16 = @truncate(image.height >> 3);
-    if (image.width & 0x7 != 0) {
+    var tile_count_x: u16 = @truncate(rect.width() >> 3);
+    var tile_count_y: u16 = @truncate(rect.height() >> 3);
+    if (rect.width() & 0x7 != 0) {
         if (!opt.pad_tiles) {
             return ConvertError.UnexpectedImageSize;
         }
-        image_tiles_x += 1;
+        tile_count_x += 1;
     }
-    if (image.height & 0x7 != 0) {
+    if (rect.height() & 0x7 != 0) {
         if (!opt.pad_tiles) {
             return ConvertError.UnexpectedImageSize;
         }
-        image_tiles_y += 1;
+        tile_count_y += 1;
     }
     const bpp_shift: u4 = if (opt.bpp == .bpp_4) 0 else 1;
-    const tile_count = image_tiles_x * image_tiles_y;
+    const tile_count = tile_count_x * tile_count_y;
     const tile_limit = (512 * @as(u16, @intFromEnum(opt.fit))) >> bpp_shift;
     if (opt.fit == .unlimited) {
         if (tile_count >= 0xffff) {
             return ConvertError.TooManyTiles;
         }
-    }
-    else {
+    } else {
         if (tile_count > tile_limit) {
             return ConvertError.TooManyTiles;
         }
@@ -287,8 +317,8 @@ pub fn convertImage(
     // Encode image data
     var data = std.ArrayList(u8).init(opt.allocator);
     defer data.deinit();
-    var tile_x: u16 = 0;
-    var tile_y: u16 = 0;
+    var tile_x: u16 = opt.rect.x_min;
+    var tile_y: u16 = opt.rect.y_min;
     var pal_index_prev: u8 = 0;
     for (0..tile_count) |_| {
         for (0..8) |pixel_y| {
@@ -299,8 +329,7 @@ pub fn convertImage(
                 var pal_index: u8 = 0;
                 if (image_i >= image.pixels.len()) {
                     pal_index = opt.pad;
-                }
-                else {
+                } else {
                     const px = getImagePixelRgba8888(image, image_i);
                     pal_index = opt.palette_fn(
                         @truncate(image_x),
@@ -316,19 +345,17 @@ pub fn convertImage(
                     }
                     if ((pixel_x & 1) != 0) {
                         try data.append(pal_index_prev | (pal_index << 4));
-                    }
-                    else {
+                    } else {
                         pal_index_prev = pal_index;
                     }
-                }
-                else {
+                } else {
                     try data.append(pal_index);
                 }
             }
         }
         tile_x += 8;
         if (tile_x >= image.width) {
-            tile_x = 0;
+            tile_x = opt.rect.x_min;
             tile_y += 8;
         }
     }
@@ -388,11 +415,12 @@ fn getImagePixelRgba8888(image: zigimg.Image, index: usize) ColorRgba8888 {
             .b = px[index].b,
         },
         .rgba32 => |px| px[index],
-        .rgb332 => |px| .{
-            .r = px[index].r,
-            .g = px[index].g,
-            .b = px[index].b,
-        },
+        // Present in the current version of zigimg
+        // .rgb332 => |px| .{
+        //     .r = px[index].r,
+        //     .g = px[index].g,
+        //     .b = px[index].b,
+        // },
         .rgb565 => |px| .{
             .r = px[index].r,
             .g = px[index].g,
