@@ -1,11 +1,12 @@
 const std = @import("std");
-const GBABuilder = @import("GBA/builder.zig");
+const GBABuilder = @import("GBA/build/builder.zig");
 
 pub fn build(b: *std.Build) void {
     _ = GBABuilder.addGBAExecutable(b, "first", "examples/first/first.zig");
     _ = GBABuilder.addGBAExecutable(b, "mode3draw", "examples/mode3draw/mode3draw.zig");
     _ = GBABuilder.addGBAExecutable(b, "mode4draw", "examples/mode4draw/mode4draw.zig");
     _ = GBABuilder.addGBAExecutable(b, "debugPrint", "examples/debugPrint/debugPrint.zig");
+    _ = GBABuilder.addGBAExecutable(b, "secondsTimer", "examples/secondsTimer/secondsTimer.zig");
 
     // Mode 4 Flip
     const mode4flip = GBABuilder.addGBAExecutable(b, "mode4flip", "examples/mode4flip/mode4flip.zig");
@@ -19,6 +20,25 @@ pub fn build(b: *std.Build) void {
             .target = "examples/mode4flip/back.agi",
         },
     }, "examples/mode4flip/mode4flip.agp");
+    
+    // Music example (Jesu, Joy of Man's Desiring)
+    var jesuMusic_palette = [_]GBABuilder.tiles.ColorRgb888 {
+        .{ .r = 0, .g = 0, .b = 0 }, // Transparency
+        .{ .r = 255, .g = 255, .b = 255 },
+        .{ .r = 0, .g = 0, .b = 0 },
+    };
+    _ = GBABuilder.addGBAExecutable(b, "jesuMusic", "examples/jesuMusic/jesuMusic.zig");
+    GBABuilder.tiles.convertSaveImagePath(
+        []GBABuilder.tiles.ColorRgb888,
+        "examples/jesuMusic/charset.png",
+        "examples/jesuMusic/charset.bin",
+        .{
+            .allocator = std.heap.page_allocator,
+            .bpp = .bpp_4,
+            .palette_fn = GBABuilder.tiles.getNearestPaletteColor,
+            .palette_ctx = jesuMusic_palette[0..],
+        },
+    ) catch {};
 
     // Key demo, TODO: Use image created by the build system once we support indexed image
     _ = GBABuilder.addGBAExecutable(b, "keydemo", "examples/keydemo/keydemo.zig");
