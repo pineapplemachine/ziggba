@@ -30,6 +30,7 @@ jobs:
 
       - name: Build API docs
         run: |
+          mkdir docs-out/
           ./zig build-lib -femit-docs=docs-out/gba src/gba/gba.zig
           ./zig build-lib -femit-docs=docs-out/build src/build/build.zig
           cp docs/api-index.html docs-out/index.html
