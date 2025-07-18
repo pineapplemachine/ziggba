@@ -1,0 +1,42 @@
+name: Build docs
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: "build-docs"
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0 # May be required for tag metadata?
+
+      - name: Install anyzig
+        run: |
+          wget -O - https://github.com/marler8997/anyzig/releases/latest/download/anyzig-x86_64-linux.tar.gz | tar xz
+          chmod 777 ./zig
+
+      - name: Build API docs
+        run: |
+          ./zig build-lib -femit-docs=docs-out/gba src/gba/gba.zig
+          ./zig build-lib -femit-docs=docs-out/build src/build/build.zig
+          cp docs/api-index.html docs-out/index.html
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs-out
+          destination_dir: "${{ (github.ref_type == 'tag' && github.ref_name) || 'master' }}"

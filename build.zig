@@ -1,5 +1,5 @@
 const std = @import("std");
-const gba = @import("src/build/gba.zig");
+const gba = @import("src/build/build.zig");
 
 pub fn build(b: *std.Build) void {
     _ = gba.addGBAExecutable(b, "first", "examples/first/first.zig");
