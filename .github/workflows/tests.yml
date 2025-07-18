@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install anyzig
+        run: |
+          wget -O - https://github.com/marler8997/anyzig/releases/latest/download/anyzig-x86_64-linux.tar.gz | tar xz
+          chmod 777 ./zig
+
+      - name: Build examples
+        run: |
+          ./zig build
