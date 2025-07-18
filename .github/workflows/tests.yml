@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - upcoming
   pull_request:
 
 jobs:
@@ -17,8 +16,8 @@ jobs:
       - name: Install anyzig
         run: |
           wget -O - https://github.com/marler8997/anyzig/releases/latest/download/anyzig-x86_64-linux.tar.gz | tar xz
-          chmod 777 zig
+          chmod 777 ./zig
 
       - name: Build examples
         run: |
-          zig build
+          ./zig build
