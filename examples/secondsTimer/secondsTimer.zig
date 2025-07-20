@@ -5,7 +5,7 @@ const Timer = gba.timer.Timer;
 const timers = gba.timer.timers;
 const bios = gba.bios;
 
-export const gameHeader linksection(".gbaheader") = gba.initHeader("SECSTIMER", "ASTE", "00", 0);
+export const gameHeader linksection(".gbaheader") = gba.Header.init("SECSTIMER", "ASTE", "00", 0);
 
 fn initMap() void {
     // Init background

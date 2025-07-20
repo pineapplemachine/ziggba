@@ -3,7 +3,7 @@ const Color = gba.Color;
 const Mode4 = gba.bitmap.Mode4;
 const display = gba.display;
 
-export var header linksection(".gbaheader") = gba.initHeader("MODE4DRAW", "AWJE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("MODE4DRAW", "AWJE", "00", 0);
 
 const palette: [26]Color = [_]Color{
     Color.black,

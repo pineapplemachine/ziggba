@@ -4,7 +4,7 @@ const display = gba.display;
 const bg = gba.bg;
 const brin = @import("brin.zig");
 
-export var header linksection(".gbaheader") = gba.initHeader("TILEDEMO", "ATDE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("TILEDEMO", "ATDE", "00", 0);
 
 fn loadData() void {
     const map_ram: [*]volatile u16 = @ptrFromInt(@intFromPtr(display.vram) + (30 * 2048));
