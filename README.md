@@ -7,7 +7,7 @@ Many thanks to [TONC](https://gbadev.net/tonc/) and [GBATEK](https://problemkapu
 Generated documentation for ZigGBA is available at
 [pineapplemachine.github.io/ziggba/master/](https://pineapplemachine.github.io/ziggba/master/). Documentation is split between the `build` library which contains tools for building code targeting the GBA, and the `gba` library which provides an API and other runtime utilities for code running on the GBA.
 
-For bug reports and feature requests, please submit a [GitHub issue](https://github.com/pineapplemachine/ziggba/issues). For general questions and support, you can submit an issue or you can visit the [gbadev Discord server](https://discord.gg/ctGSNxRkg2) which has a `#ziggba` channel for discussions specifically about this project, as well as other channels for more general discussions about GBA development.
+For bug reports and feature requests, please submit a [GitHub issue](https://github.com/pineapplemachine/ziggba/issues). For general questions and support, you can submit an issue or you can visit the [gbadev Discord server](https://discord.gg/7DBJvgW9bb) which has a `#ziggba` channel for discussions specifically about this project, as well as other channels for more general discussions about GBA development.
 
 ## Usage
 
