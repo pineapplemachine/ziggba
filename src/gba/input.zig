@@ -5,16 +5,16 @@ const gba = @import("gba.zig");
 
 /// Enumeration of physical buttons (or "keys") on the GBA console.
 pub const Key = enum {
-    A = 0,
-    B = 1,
-    select = 2,
-    start = 3,
-    right = 4,
-    left = 5,
-    up = 6,
-    down = 7,
-    R = 8,
-    L = 9,
+    A,
+    B,
+    select,
+    start,
+    right,
+    left,
+    up,
+    down,
+    R,
+    L,
 };
 
 /// Holds a bitfield representing the state of each of the console's buttons.
