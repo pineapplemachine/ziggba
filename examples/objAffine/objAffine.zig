@@ -19,28 +19,33 @@ pub export fn main() void {
     gba.mem.memcpy32(obj.tile_ram, &metr.box_tiles, metr.box_tiles.len * 4);
     gba.mem.memcpy32(obj.palette, &metr.pal, metr.pal.len * 4);
 
-    const metroid = obj.allocate();
-    metroid.* = .{
-        .affine_mode = .affine,
+    var metroid: gba.obj.Obj = .{
+        .mode = .affine,
         .transform = .{ .affine_index = 0 },
     };
     metroid.setSize(.@"64x64");
     metroid.setPosition(96, 32);
-    metroid.getAffine().setIdentity();
-
-    const shadow_metroid = obj.allocate();
-    shadow_metroid.* = .{
-        .affine_mode = .affine,
+    gba.obj.AffineTransform.Identity.set(metroid.transform.affine_index);
+    
+    var shadow_metroid: gba.obj.Obj = .{
+        .mode = .affine,
         .transform = .{ .affine_index = 31 },
         .palette = 1,
     };
     shadow_metroid.setSize(.@"64x64");
     shadow_metroid.setPosition(96, 32);
-    shadow_metroid.getAffine().setIdentity();
+    gba.obj.AffineTransform.Identity.set(shadow_metroid.transform.affine_index);
 
-    obj.update(2);
+    gba.obj.objects[0] = metroid;
+    gba.obj.objects[1] = shadow_metroid;
+    
+    var frame: u32 = 0;
 
-    while (true) {
+    while (true) : (frame +%= 1) {
         display.naiveVSync();
+        
+        // TODO: Doesn't work correctly
+        // const transform = gba.obj.AffineTransform.rotate(@intCast(frame));
+        // transform.set(metroid.transform.affine_index);
     }
 }

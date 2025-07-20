@@ -19,8 +19,7 @@ pub export fn main() void {
 
     loadSpriteData();
 
-    const metroid = obj.allocate();
-    metroid.* = .{
+    var metroid: gba.obj.Obj = .{
         .x_pos = 100,
         .y_pos = 150,
     };
@@ -43,10 +42,10 @@ pub export fn main() void {
         tile_index +%= input.getAxisShoulders();
 
         if (input.isJustPressed(.A)) {
-            metroid.flipH();
+            metroid.transform.flip.h = !metroid.transform.flip.h;
         }
         if (input.isJustPressed(.B)) {
-            metroid.flipV();
+            metroid.transform.flip.v = !metroid.transform.flip.v;
         }
 
         metroid.palette = if (input.isPressed(.select)) 1 else 0;
@@ -57,7 +56,7 @@ pub export fn main() void {
 
         metroid.setPosition(@bitCast(x), @bitCast(y));
         metroid.tile = @bitCast(tile_index);
-
-        obj.update(1);
+        
+        gba.obj.objects[0] = metroid;
     }
 }

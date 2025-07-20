@@ -4,7 +4,11 @@ const Int = std.meta.Int;
 
 // TODO: Add convenience functions for converting between fixed point types.
 /// Fixed point integer type
-pub fn FixedPoint(comptime signedness: Signedness, comptime integral_bits: comptime_int, comptime fractional_bits: comptime_int) type {
+pub fn FixedPoint(
+    comptime signedness: Signedness,
+    comptime integral_bits: comptime_int,
+    comptime fractional_bits: comptime_int,
+) type {
     if (integral_bits + fractional_bits > 32)
         @compileError("Only 32 bit and smaller fixed point numbers are supported");
     const RawType = Int(signedness, integral_bits + fractional_bits);
@@ -19,7 +23,7 @@ pub fn FixedPoint(comptime signedness: Signedness, comptime integral_bits: compt
 
         fractional: FractionalType = 0,
         integral: IntegralType = 0,
-
+        
         pub fn raw(self: Self) RawType {
             return @bitCast(self);
         }
@@ -48,6 +52,10 @@ pub fn FixedPoint(comptime signedness: Signedness, comptime integral_bits: compt
         pub fn toF32(self: Self) f32 {
             return @as(f32, @floatFromInt(self.raw())) / scale;
         }
+        
+        pub fn negate(self: Self) Self {
+            return @bitCast(0 - self.raw());
+        }
 
         pub fn add(left: Self, right: Self) Self {
             return @bitCast(left.raw() + right.raw());
@@ -67,6 +75,13 @@ pub fn FixedPoint(comptime signedness: Signedness, comptime integral_bits: compt
 
         pub fn toInt32(self: Self) MaxIntegerType {
             return @as(MaxIntegerType, @intCast(self.raw()));
+        }
+        
+        pub fn toI8_8(self: Self) I8_8 {
+            return I8_8{
+                .fractional = @intCast(self.fractional),
+                .integral = @intCast(self.integral),
+            };
         }
 
         pub fn mul(left: Self, right: Self) Self {
