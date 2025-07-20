@@ -17,7 +17,7 @@
 //!         input.poll();
 //! 
 //!         if(input.startIsJustPressed()) {
-//!             // Do something when the start button is pressed
+//!             // Do something when the start button was just pressed
 //!         }
 //!     }
 //! }
