@@ -45,7 +45,7 @@ pub export fn main() void {
         display.naiveVSync();
         
         // TODO: Doesn't work correctly
-        // const transform = gba.obj.AffineTransform.rotate(@intCast(frame));
-        // transform.set(metroid.transform.affine_index);
+        const transform = gba.obj.AffineTransform.rotate(.initRaw(@truncate(frame << 8)));
+        transform.set(metroid.transform.affine_index);
     }
 }

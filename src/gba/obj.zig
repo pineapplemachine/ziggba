@@ -1,6 +1,5 @@
 //! Module for operations related to Object/Sprite memory
 const gba = @import("gba.zig");
-const I8_8 = gba.math.I8_8;
 const display = gba.display;
 const Priority = display.Priority;
 const Tile = display.Tile;
@@ -20,18 +19,25 @@ pub const objects: *align(16) volatile [128]Obj = @ptrFromInt(gba.mem.oam);
 /// Refers to affine transformation matrix components in OAM.
 /// Affine transformation matrices are interleaved with object attributes.
 /// Should only be updated during VBlank, to avoid graphical glitches.
-const affine_values: [*]volatile I8_8 = @ptrFromInt(gba.mem.oam);
+const affine_values: [*]volatile gba.fixed.FixedI16R8 = @ptrFromInt(gba.mem.oam);
 
+/// Represents an affine transformation matrix.
 pub const AffineTransform = struct {
     /// Identity matrix. Applies no rotation, scaling, or shearing.
     pub const Identity: AffineTransform = (
-        .init(I8_8.fromInt(1), .{}, .{}, I8_8.fromInt(1))
+        .init(gba.fixed.FixedI16R8.initInt(1), .{}, .{}, gba.fixed.FixedI16R8.initInt(1))
     );
     
     /// Affine transformation matrix components, in row-major order.
-    values: [4]I8_8 = @splat(.{}),
+    values: [4]gba.fixed.FixedI16R8 = @splat(.{}),
     
-    pub fn init(a: I8_8, b: I8_8, c: I8_8, d: I8_8) AffineTransform {
+    /// Initialize an `AffineTransform` matrix with the given components.
+    pub fn init(
+        a: gba.fixed.FixedI16R8,
+        b: gba.fixed.FixedI16R8,
+        c: gba.fixed.FixedI16R8,
+        d: gba.fixed.FixedI16R8,
+    ) AffineTransform {
         return AffineTransform{ .values = .{ a, b, c, d } };
     }
     
@@ -62,18 +68,18 @@ pub const AffineTransform = struct {
     
     /// Return a transformation matrix that will scale an object by the
     /// given amount on each axis.
-    pub fn scale(x: I8_8, y: I8_8) AffineTransform {
+    pub fn scale(x: gba.fixed.FixedI16R8, y: gba.fixed.FixedI16R8) AffineTransform {
         return .init(x, .{}, .{}, y);
     }
     
     // TODO: Doesn't work correctly. Also affects scale.
     // I think the trig functions in gba.math are broken?
-    // Also possible that toI8_8 is broken?
-    // pub fn rotate(theta: i32) AffineTransform {
-    //     const sin_theta = gba.math.sin(theta).toI8_8();
-    //     const cos_theta = gba.math.cos(theta).toI8_8();
-    //     return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
-    // }
+    // Also possible that togba.fixed.FixedI16R8 is broken?
+    pub fn rotate(angle: gba.fixed.FixedU16R16) AffineTransform {
+        const sin_theta = angle.sin().toI16R8();
+        const cos_theta = angle.cos().toI16R8();
+        return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
+    }
 };
 
 pub const Obj = packed struct(u48) {
