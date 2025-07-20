@@ -1,5 +1,27 @@
 //! This module provides an API for reading the state of the GBA's
 //! buttons, which are also called "keys".
+//!
+//! Conventional usage of this library would be like so:
+//!
+//! ```zig
+//! const gba = @import("gba.zig");
+//! 
+//! pub export fn main() void {
+//!     // Initialize an object to contain input state.
+//!     var input: gba.input.BufferedKeysState = .{};
+//! 
+//!     while (true) {
+//!         // Wait for the next frame.
+//!         gba.display.naiveVSync();
+//!         // Update the input state object.
+//!         input.poll();
+//! 
+//!         if(input.startIsJustPressed()) {
+//!             // Do something when the start button was just pressed
+//!         }
+//!     }
+//! }
+//! ```
 
 const gba = @import("gba.zig");
 
