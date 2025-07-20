@@ -1,5 +1,4 @@
 const gba = @import("gba");
-const input = gba.input;
 const display = gba.display;
 const bg = gba.bg;
 
@@ -52,6 +51,7 @@ pub export fn main() void {
         .obj = true,
     };
 
+    var input: gba.input.KeysState = .{};
     var x: i10 = 0;
     var y: i10 = 0;
     var tx: u6 = 0;
@@ -65,10 +65,10 @@ pub export fn main() void {
     while (true) {
         display.naiveVSync();
 
-        _ = input.poll();
+        input.poll();
 
-        x +%= input.getAxis(.horizontal).toInt();
-        y +%= input.getAxis(.vertical).toInt();
+        x +%= input.getAxisHorizontal();
+        y +%= input.getAxisVertical();
 
         tx = @truncate((@as(u10, @bitCast(x)) >> 3) + cross_tx);
         ty = @truncate((@as(u10, @bitCast(y)) >> 3) + cross_ty);

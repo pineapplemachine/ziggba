@@ -1,5 +1,4 @@
 const gba = @import("gba");
-const input = gba.input;
 const display = gba.display;
 const obj = gba.obj;
 const debug = gba.debug;
@@ -43,7 +42,5 @@ pub export fn main() void {
 
     while (true) {
         display.naiveVSync();
-
-        _ = input.poll();
     }
 }

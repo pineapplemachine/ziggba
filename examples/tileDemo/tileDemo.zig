@@ -1,5 +1,4 @@
 const gba = @import("gba");
-const input = gba.input;
 const display = gba.display;
 const bg = gba.bg;
 const brin = @import("brin.zig");
@@ -25,16 +24,17 @@ pub export fn main() void {
         .bg0 = true,
     };
 
+    var input: gba.input.KeysState = .{};
     var x: i10 = 192;
     var y: i10 = 64;
 
     while (true) {
         display.naiveVSync();
 
-        _ = input.poll();
+        input.poll();
 
-        x +%= input.getAxis(.horizontal).toInt();
-        y +%= input.getAxis(.vertical).toInt();
+        x +%= input.getAxisHorizontal();
+        y +%= input.getAxisVertical();
 
         bg.scroll[0].set(x, y);
     }

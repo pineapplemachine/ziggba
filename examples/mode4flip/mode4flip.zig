@@ -1,5 +1,4 @@
 const gba = @import("gba");
-const input = gba.input;
 const display = gba.display;
 
 export var header linksection(".gbaheader") = gba.Header.init("MODE4FLIP", "AMFE", "00", 0);
@@ -24,10 +23,7 @@ pub export fn main() void {
 
     var i: u32 = 0;
     while (true) : (i += 1) {
-        _ = input.poll();
-        while (input.isKeyPressed(.start)) {
-            _ = input.poll();
-        }
+        while(gba.input.state.startIsPressed()) {}
 
         display.naiveVSync();
 

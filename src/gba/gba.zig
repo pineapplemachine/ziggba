@@ -16,7 +16,6 @@ pub const mem = @import("mem.zig");
 pub const obj = @import("obj.zig");
 pub const sound = @import("sound.zig");
 pub const timer = @import("timer.zig");
-pub const utils = @import("utils.zig");
 
 /// Pointer to EWRAM (external work RAM).
 /// More plentiful than IWRAM, but slower.
