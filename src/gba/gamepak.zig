@@ -1,6 +1,7 @@
 const gba = @import("gba.zig");
 
-/// Up to 32MB of addressable ROM
+/// Up to 32MB of addressable ROM.
+/// Some games use bank switching to achieve larger sizes.
 pub const Rom = [0x02000000]u8;
 
 /// Gamepak ROM is mirrored 3 times, using different access timings as controlled by `access_timings`:
@@ -50,7 +51,7 @@ const WaitStateControl = packed struct(u16) {
         @"16.78MHz" = 3,
     } = .disable,
     _: u1 = 0,
-    prefetch: gba.Enable = .disable,
+    prefetch: bool = false,
     /// Read-only
     cgb_mode: bool = false,
 };

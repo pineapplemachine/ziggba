@@ -11,8 +11,8 @@ export var header linksection(".gbaheader") = gba.Header.init("OBJAFFINE", "AODE
 pub export fn main() void {
     display.ctrl.* = .{
         .obj_mapping = .one_dimension,
-        .bg0 = .enable,
-        .obj = .enable,
+        .bg0 = true,
+        .obj = true,
     };
 
     debug.init();

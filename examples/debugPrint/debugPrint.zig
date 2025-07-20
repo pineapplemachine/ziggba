@@ -7,7 +7,7 @@ export var header linksection(".gbaheader") = gba.Header.init("DEBUGPRINT", "ADP
 pub export fn main() void {
     display.ctrl.* = .{
         .mode = .mode3,
-        .bg2 = .enable,
+        .bg2 = true,
     };
 
     debug.init();

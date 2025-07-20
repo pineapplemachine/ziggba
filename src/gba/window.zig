@@ -2,7 +2,6 @@
 
 const gba = @import("gba.zig");
 const window = @This();
-const Enable = gba.Enable;
 
 pub const Bounds = extern struct {
     pub const Horizontal = packed struct(u16) {
@@ -24,12 +23,12 @@ pub const Bounds = extern struct {
 pub const bounds: *volatile Bounds = @ptrFromInt(gba.mem.io + 0x40);
 
 pub const Layers = packed struct(u6) {
-    bg0: Enable = .disable,
-    bg1: Enable = .disable,
-    bg2: Enable = .disable,
-    bg3: Enable = .disable,
-    obj: Enable = .disable,
-    color_sfx: Enable = .disable,
+    bg0: bool = false,
+    bg1: bool = false,
+    bg2: bool = false,
+    bg3: bool = false,
+    obj: bool = false,
+    color_sfx: bool = false,
 };
 
 pub const Control = extern struct {

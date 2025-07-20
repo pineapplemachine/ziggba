@@ -77,9 +77,9 @@ pub export fn main() void {
     initMaps();
 
     display.ctrl.* = .{
-        .bg0 = .enable,
-        .bg1 = .enable,
-        .obj = .enable,
+        .bg0 = true,
+        .bg1 = true,
+        .obj = true,
     };
 
     bg.ctrl[0] = .{

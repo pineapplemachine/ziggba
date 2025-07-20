@@ -1,7 +1,6 @@
 const gba = @import("gba.zig");
 const Color = gba.Color;
 const display = gba.display;
-const Enable = gba.utils.Enable;
 const Priority = display.Priority;
 const math = gba.math;
 const I8_8 = math.I8_8;
@@ -52,7 +51,7 @@ pub const Control = packed struct(u16) {
     /// Unused bits.
     _: u2 = undefined,
     /// Enables mosaic effect. (Makes things appear blocky.)
-    mosaic: Enable = .disable,
+    mosaic: bool = false,
     /// Which format to expect charblock tile data to be in, whether
     /// 4bpp or 8bpp paletted.
     /// Affine backgrounds always use 8bpp.
@@ -68,7 +67,7 @@ pub const Control = packed struct(u16) {
     screen_base_block: u5 = 0,
     /// Whether affine backgrounds should wrap.
     /// Has no effect on normal backgrounds.
-    affine_wrap: Enable = .disable,
+    affine_wrap: bool = false,
     /// Sizes differ depending on whether the background is affine.
     /// Larger sizes use more screenblocks.
     tile_map_size: Size = .{ .normal = .@"32x32" },

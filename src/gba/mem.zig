@@ -2,7 +2,6 @@
 
 const isAligned = @import("std").mem.isAligned;
 const gba = @import("gba.zig");
-const Enable = gba.utils.Enable;
 
 // TODO: Maybe make these volatile pointers to u8?
 // Access to base addresses for memory regions. Intended mostly for internal use.
@@ -68,10 +67,10 @@ pub const Dma = packed struct {
         dma_repeat: bool = false,
         transfer_type: TransferType = .half_word,
         /// DMA3 only
-        gamepak_drq: Enable = .disable,
+        gamepak_drq: bool = false,
         start_timing: StartTiming = .immediate,
-        irq_at_end: Enable = .disable,
-        enabled: Enable = .disable,
+        irq_at_end: bool = false,
+        enabled: bool = false,
     };
 
     /// For DMA 0, can only be internal memory

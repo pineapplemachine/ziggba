@@ -3,7 +3,6 @@ const gba = @import("gba.zig");
 pub const window = @import("window.zig");
 const Color = gba.Color;
 const display = @This();
-const Enable = gba.utils.Enable;
 const U1_4 = gba.math.FixedPoint(.unsigned, 1, 4);
 
 var current_page_addr: u32 = gba.mem.vram;
@@ -90,17 +89,17 @@ pub const Control = packed struct(u16) {
     /// Read only, should stay false
     gbc_mode: bool = false,
     page_select: u1 = 0,
-    oam_access_in_hblank: Enable = .disable,
+    oam_access_in_hblank: bool = false,
     obj_mapping: ObjMapping = .two_dimensions,
     force_blank: bool = false,
-    bg0: Enable = .disable,
-    bg1: Enable = .disable,
-    bg2: Enable = .disable,
-    bg3: Enable = .disable,
-    obj: Enable = .disable,
-    window_0: Enable = .disable,
-    window_1: Enable = .disable,
-    window_obj: Enable = .disable,
+    bg0: bool = false,
+    bg1: bool = false,
+    bg2: bool = false,
+    bg3: bool = false,
+    obj: bool = false,
+    window_0: bool = false,
+    window_1: bool = false,
+    window_obj: bool = false,
 };
 
 /// Display Control Register
@@ -120,9 +119,9 @@ pub const Status = packed struct(u16) {
     h_refresh: RefreshState,
     /// Read only
     vcount_triggered: bool,
-    vblank_irq: Enable = .disable,
-    hblank_irq: Enable = .disable,
-    vcount_trigger: Enable = .disable,
+    vblank_irq: bool = false,
+    hblank_irq: bool = false,
+    vcount_trigger: bool = false,
     _: u2 = 0,
     vcount_trigger_at: u8 = 0,
 };
@@ -161,12 +160,12 @@ pub const mosaic: *volatile Mosaic = @ptrFromInt(gba.mem.io + 0x4C);
 
 pub const Blend = packed struct {
     pub const Layers = packed struct(u6) {
-        bg0: Enable = .disable,
-        bg1: Enable = .disable,
-        bg2: Enable = .disable,
-        bg3: Enable = .disable,
-        obj: Enable = .disable,
-        backdrop: Enable = .disable,
+        bg0: bool = false,
+        bg1: bool = false,
+        bg2: bool = false,
+        bg3: bool = false,
+        obj: bool = false,
+        backdrop: bool = false,
     };
 
     pub const Mode = enum(u2) {

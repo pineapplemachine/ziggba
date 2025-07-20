@@ -1,5 +1,4 @@
 const gba = @import("gba");
-const Enable = gba.utils.Enable;
 
 export const gameHeader linksection(".gbaheader") = gba.Header.init("JESUMUSIC", "AJME", "00", 0);
 
@@ -791,20 +790,20 @@ pub export fn main() void {
 
     // Initialize sound registers to allow playback.
     gba.sound.status.* = gba.sound.Status{
-        .pulse_1 = .enable,
-        .pulse_2 = .enable,
-        .noise = .enable,
-        .master = .enable,
+        .pulse_1 = true,
+        .pulse_2 = true,
+        .noise = true,
+        .master = true,
     };
     gba.sound.dmg.* = gba.sound.Dmg{
         .left_volume = 0x7,
         .right_volume = 0x7,
-        .left_pulse_1 = .enable,
-        .left_pulse_2 = .enable,
-        .left_noise = .enable,
-        .right_pulse_1 = .enable,
-        .right_pulse_2 = .enable,
-        .right_noise = .enable,
+        .left_pulse_1 = true,
+        .left_pulse_2 = true,
+        .left_noise = true,
+        .right_pulse_1 = true,
+        .right_pulse_2 = true,
+        .right_noise = true,
     };
     gba.sound.bias.* = gba.sound.Bias{
         .cycle = .bits_6,
@@ -824,7 +823,7 @@ pub export fn main() void {
     gba.bg.palette.banks[2][2] = .rgb(31, 31, 31);
     gba.display.memcpyCharBlock(0, 0, &charset_data);
     gba.display.ctrl.* = gba.display.Control{
-        .bg0 = .enable,
+        .bg0 = true,
     };
 
     var playing: bool = false;

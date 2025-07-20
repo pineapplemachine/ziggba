@@ -1,6 +1,5 @@
 const std = @import("std");
 const gba = @import("gba.zig");
-const Enable = gba.utils.Enable;
 
 // References:
 // https://problemkaputt.de/gbatek.htm#gbasoundcontroller
@@ -123,7 +122,7 @@ pub const WaveChannelSelect = packed struct(u16) {
     /// to via the REG_WAVE_RAMx registers.
     bank: u1 = 0,
     /// Whether the channel is stopped or playing.
-    playback: Enable = .disable,
+    playback: bool = false,
     /// Unused bits.
     _2: u8 = 0,
 };
@@ -150,9 +149,9 @@ pub const WaveChannelControl = packed struct(u16) {
     /// Playback volume.
     /// This is overridden when force_volume_75 is set.
     volume: Volume = .percent_0,
-    /// When enabled, overrides the previous volume setting and
+    /// When true, overrides the previous volume setting and
     /// sets volume to 75% instead.
-    force_volume_75: Enable = .disable,
+    force_volume_75: bool = false,
 };
 
 /// Represents the contents of the REG_SND3FREQ register.
@@ -239,21 +238,21 @@ pub const Dmg = packed struct(u16) {
     /// Unused bits.
     _2: u1 = 0,
     /// Enable pulse 1 channel for left speaker.
-    left_pulse_1: Enable = .disable,
+    left_pulse_1: bool = false,
     /// Enable pulse 2 channel for left speaker.
-    left_pulse_2: Enable = .disable,
+    left_pulse_2: bool = false,
     /// Enable wave channel for left speaker.
-    left_wave: Enable = .disable,
+    left_wave: bool = false,
     /// Enable noise channel for left speaker.
-    left_noise: Enable = .disable,
+    left_noise: bool = false,
     /// Enable pulse 1 channel for right speaker.
-    right_pulse_1: Enable = .disable,
+    right_pulse_1: bool = false,
     /// Enable pulse 2 channel for right speaker.
-    right_pulse_2: Enable = .disable,
+    right_pulse_2: bool = false,
     /// Enable wave channel for right speaker.
-    right_wave: Enable = .disable,
+    right_wave: bool = false,
     /// Enable noise channel for right speaker.
-    right_noise: Enable = .disable,
+    right_noise: bool = false,
 };
 
 /// Represents the contents of the DirectSound control register.
@@ -285,18 +284,18 @@ pub const DirectSound = packed struct(u16) {
     /// Unused bits.
     _: u4 = 0,
     /// Enable DirectSound A on left speaker.
-    left_a: Enable = .disable,
+    left_a: bool = false,
     /// Enable DirectSound A on right speaker.
-    right_a: Enable = .disable,
+    right_a: bool = false,
     /// Indicates which timer should be used for DirectSound A.
     timer_a: u1 = 0,
     /// FIFO reset for DirectSound A. When using DMA for DirectSound,
     /// this will cause DMA to reset the FIFO buffer after it's used.
     reset_a: bool = false,
     /// Enable DirectSound B on left speaker.
-    left_b: Enable = .disable,
+    left_b: bool = false,
     /// Enable DirectSound B on right speaker.
-    right_b: Enable = .disable,
+    right_b: bool = false,
     /// Indicates which timer should be used for DirectSound B.
     timer_b: u1 = 0,
     /// FIFO reset for DirectSound B. When using DMA for DirectSound,
@@ -306,18 +305,18 @@ pub const DirectSound = packed struct(u16) {
 
 pub const Status = packed struct(u16) {
     /// Whether the Pulse 1 channel should be currently playing.
-    pulse_1: Enable = .disable,
+    pulse_1: bool = false,
     /// Whether the Pulse 2 channel should be currently playing.
-    pulse_2: Enable = .disable,
+    pulse_2: bool = false,
     /// Whether the Wave channel should be currently playing.
-    wave: Enable = .disable,
+    wave: bool = false,
     /// Whether the Noise channel should be currently playing.
-    noise: Enable = .disable,
+    noise: bool = false,
     /// Unused bits.
     _1: u3 = 0,
     /// Master sound enable. Must be set if any sound is to be
     /// heard at all.
-    master: Enable,
+    master: bool,
     /// Unused bits.
     _2: u8 = 0,
 };
