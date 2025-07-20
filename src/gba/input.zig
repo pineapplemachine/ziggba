@@ -1,21 +1,20 @@
 //! This module provides an API for reading the state of the GBA's
 //! buttons, which are also called "keys".
 
-const std = @import("std");
 const gba = @import("gba.zig");
 
 /// Enumeration of physical buttons (or "keys") on the GBA console.
 pub const Key = enum {
-    A,
-    B,
-    select,
-    start,
-    right,
-    left,
-    up,
-    down,
-    R,
-    L,
+    A = 0,
+    B = 1,
+    select = 2,
+    start = 3,
+    right = 4,
+    left = 5,
+    up = 6,
+    down = 7,
+    R = 8,
+    L = 9,
 };
 
 /// Holds a bitfield representing the state of each of the console's buttons.
