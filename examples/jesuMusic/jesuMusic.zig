@@ -826,6 +826,7 @@ pub export fn main() void {
         .bg0 = true,
     };
 
+    var input: gba.input.BufferedKeysState = .{};
     var playing: bool = false;
     var frame: u8 = 0;
 
@@ -837,18 +838,18 @@ pub export fn main() void {
     // Main loop. Update the Tracker once per frame.
     while (true) : (frame +%= 1) {
         gba.display.naiveVSync();
-        _ = gba.input.poll();
+        input.poll();
         // Toggle paused/playing upon pressing A.
-        if (gba.input.isKeyJustPressed(.A)) {
+        if (input.isJustPressed(.A)) {
             playing = !playing;
         }
         // Stop playback upon pressing B.
-        if (gba.input.isKeyJustPressed(.B)) {
+        if (input.isJustPressed(.B)) {
             playing = false;
             tracker.reset();
         }
         // Fast-forward when holding R.
-        const fast_forward = gba.input.isKeyPressed(.R);
+        const fast_forward = input.isPressed(.R);
         // Play music, and flash the A button prompt if paused.
         if (playing) {
             tracker.update();
