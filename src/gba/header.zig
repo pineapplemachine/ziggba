@@ -114,7 +114,6 @@ pub const Header = extern struct {
     ) StringValidationError!void {
         if (game_name.len > 12) {
             return .InvalidLength;
-            
         }
         for (game_name) |char| {
             if (!(std.ascii.isUpper(char) or std.ascii.isDigit(char))) {
@@ -131,7 +130,6 @@ pub const Header = extern struct {
     ) StringValidationError!void {
         if (game_code.len != 4) {
             return .InvalidLength;
-            
         }
         for (game_code) |char| {
             if (!(std.ascii.isUpper(char) or std.ascii.isDigit(char))) {
@@ -148,7 +146,6 @@ pub const Header = extern struct {
     ) StringValidationError!void {
         if (maker_code.len != 2) {
             return .InvalidLength;
-            
         }
         for (maker_code) |char| {
             if (!(std.ascii.isUpper(char) or std.ascii.isDigit(char))) {
