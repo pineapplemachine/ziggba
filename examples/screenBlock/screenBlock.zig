@@ -48,8 +48,8 @@ fn initMap() void {
 pub export fn main() void {
     initMap();
     display.ctrl.* = .{
-        .bg0 = .enable,
-        .obj = .enable,
+        .bg0 = true,
+        .obj = true,
     };
 
     var x: i10 = 0;

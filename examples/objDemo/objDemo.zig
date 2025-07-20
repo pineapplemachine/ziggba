@@ -15,7 +15,7 @@ fn loadSpriteData() void {
 pub export fn main() void {
     display.ctrl.* = .{
         .obj_mapping = .one_dimension,
-        .obj = .enable,
+        .obj = true,
     };
 
     loadSpriteData();

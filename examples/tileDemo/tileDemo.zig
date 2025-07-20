@@ -22,7 +22,7 @@ pub export fn main() void {
     };
 
     display.ctrl.* = .{
-        .bg0 = .enable,
+        .bg0 = true,
     };
 
     var x: i10 = 192;
