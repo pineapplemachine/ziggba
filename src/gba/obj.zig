@@ -27,29 +27,6 @@ var buffer_inner: [128]Obj align(8) = @splat(.{});
 /// to OAM during VBlank
 pub var obj_affine_buffer: ObjAffineData = .{ .obj = &buffer_inner };
 
-var sort_keys: [128]u32 = @splat(0);
-
-// TODO: Could make this ?u7 I think.
-var sort_ids: [128]u8 = @splat(0);
-
-pub fn shellSort(count: u8) void {
-    var inc: u8 = 1;
-    while (inc <= count) : (inc += 1)
-        inc *= 3;
-    while (true) {
-        inc /= 3;
-        for (inc..count) |i| {
-            var j = i;
-            const key_0 = sort_keys[sort_ids[i]];
-            while (j >= inc and sort_keys[sort_ids[j - inc]] > key_0) : (j -= inc) {
-                sort_ids[j] = sort_ids[j - inc];
-            }
-            sort_ids[j] = sort_ids[i];
-        }
-        if (inc <= 1) break;
-    }
-}
-
 pub const palette: *Color.Palette = @ptrFromInt(gba.mem.palette + 0x200);
 
 var current_attr: usize = 0;
