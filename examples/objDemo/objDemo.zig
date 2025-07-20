@@ -3,7 +3,7 @@ const input = gba.input;
 const display = gba.display;
 const obj = gba.obj;
 
-export var header linksection(".gbaheader") = gba.initHeader("OBJDEMO", "AODE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("OBJDEMO", "AODE", "00", 0);
 
 const metr = @import("metroid_sprite_data.zig");
 

@@ -1,7 +1,7 @@
 const gba = @import("gba");
 const Enable = gba.utils.Enable;
 
-export const gameHeader linksection(".gbaheader") = gba.initHeader("JESUMUSIC", "AJME", "00", 0);
+export const gameHeader linksection(".gbaheader") = gba.Header.init("JESUMUSIC", "AJME", "00", 0);
 
 // Must be aligned or else memcpy will copy a byte at a time,
 // and VRAM doesn't like that.

@@ -6,7 +6,7 @@ const debug = gba.debug;
 const math = gba.math;
 const metr = @import("metr.zig");
 
-export var header linksection(".gbaheader") = gba.initHeader("OBJAFFINE", "AODE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("OBJAFFINE", "AODE", "00", 0);
 
 pub export fn main() void {
     display.ctrl.* = .{

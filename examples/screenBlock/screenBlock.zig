@@ -3,7 +3,7 @@ const input = gba.input;
 const display = gba.display;
 const bg = gba.bg;
 
-export var gameHeader linksection(".gbaheader") = gba.initHeader("SCREENBLOCK", "ASBE", "00", 0);
+export var gameHeader linksection(".gbaheader") = gba.Header.init("SCREENBLOCK", "ASBE", "00", 0);
 
 const cross_tx = 15;
 const cross_ty = 10;

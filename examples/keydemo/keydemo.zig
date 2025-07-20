@@ -4,7 +4,7 @@ const Color = gba.Color;
 const input = gba.input;
 const display = gba.display;
 
-export var header linksection(".gbaheader") = gba.initHeader("KEYDEMO", "AKDE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("KEYDEMO", "AKDE", "00", 0);
 
 fn loadImageData() void {
     gba.mem.memcpy32(gba.display.vram, &gba_pic.bitmap, gba_pic.bitmap.len * 4);
