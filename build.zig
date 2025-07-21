@@ -77,4 +77,12 @@ pub fn build(b: *std.Build) void {
     //     .file = .{ .src_path = .{ .owner = b, .sub_path = "examples/objAffine/metr.c" } },
     //     .flags = &[_][]const u8{"-std=c99"},
     // });
+    
+    const test_trig = b.addRunArtifact(b.addTest(.{
+        .root_source_file = b.path("src/gba/fixed.zig"),
+        .target = b.standardTargetOptions(.{}),
+    }));
+
+    const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&test_trig.step);
 }
