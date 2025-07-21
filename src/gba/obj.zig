@@ -2,10 +2,10 @@
 const gba = @import("gba.zig");
 const display = gba.display;
 const Priority = display.Priority;
-const Tile = display.Tile;
 
+// TODO: Fix this
 /// Tile data for objects.
-pub const tile_ram: *volatile [2][512]Tile(.bpp_4) = @ptrFromInt(gba.mem.vram + 0x10000);
+pub const tile_ram: *volatile [2][512]display.Tile(.bpp_4) = @ptrFromInt(gba.mem.vram + 0x10000);
 
 /// Pointer into color palette RAM, where color palettes for use with objects
 /// are stored.
@@ -16,27 +16,38 @@ pub const palette: *gba.Color.Palette = @ptrFromInt(gba.mem.palette + 0x200);
 /// Should only be updated during VBlank, to avoid graphical glitches.
 pub const objects: *align(16) volatile [128]Obj = @ptrFromInt(gba.mem.oam);
 
+/// Set all objects to hidden.
+///
+/// You likely want to do this upon initialization, if you're enabling objects.
+/// Otherwise, all 128 objects in OAM all initialized as visible 8x8 objects
+/// in the top-left corner using tile index 0.
+pub fn hideAllObjects() void {
+    for(objects) |*obj| {
+        obj.mode = .hidden;
+    }
+}
+
 /// Refers to affine transformation matrix components in OAM.
 /// Affine transformation matrices are interleaved with object attributes.
 /// Should only be updated during VBlank, to avoid graphical glitches.
-const affine_values: [*]volatile gba.fixed.FixedI16R8 = @ptrFromInt(gba.mem.oam);
+const affine_values: [*]volatile gba.FixedI16R8 = @ptrFromInt(gba.mem.oam);
 
 /// Represents an affine transformation matrix.
 pub const AffineTransform = struct {
     /// Identity matrix. Applies no rotation, scaling, or shearing.
     pub const Identity: AffineTransform = (
-        .init(gba.fixed.FixedI16R8.initInt(1), .{}, .{}, gba.fixed.FixedI16R8.initInt(1))
+        .init(gba.FixedI16R8.initInt(1), .{}, .{}, gba.FixedI16R8.initInt(1))
     );
     
     /// Affine transformation matrix components, in row-major order.
-    values: [4]gba.fixed.FixedI16R8 = @splat(.{}),
+    values: [4]gba.FixedI16R8 = @splat(.{}),
     
     /// Initialize an `AffineTransform` matrix with the given components.
     pub fn init(
-        a: gba.fixed.FixedI16R8,
-        b: gba.fixed.FixedI16R8,
-        c: gba.fixed.FixedI16R8,
-        d: gba.fixed.FixedI16R8,
+        a: gba.FixedI16R8,
+        b: gba.FixedI16R8,
+        c: gba.FixedI16R8,
+        d: gba.FixedI16R8,
     ) AffineTransform {
         return AffineTransform{ .values = .{ a, b, c, d } };
     }
@@ -44,7 +55,7 @@ pub const AffineTransform = struct {
     /// Write an affine transformation matrix to OAM.
     /// Should only be updated during VBlank, to avoid graphical glitches.
     pub fn set(self: AffineTransform, index: u5) void {
-        var value_index = 3 + (@as(u8, index) * 4);
+        var value_index = 3 + (@as(u8, index) << 4);
         affine_values[value_index] = self.values[0];
         value_index += 4;
         affine_values[value_index] = self.values[1];
@@ -68,16 +79,23 @@ pub const AffineTransform = struct {
     
     /// Return a transformation matrix that will scale an object by the
     /// given amount on each axis.
-    pub fn scale(x: gba.fixed.FixedI16R8, y: gba.fixed.FixedI16R8) AffineTransform {
+    pub fn scale(x: gba.FixedI16R8, y: gba.FixedI16R8) AffineTransform {
         return .init(x, .{}, .{}, y);
     }
     
-    // TODO: Doesn't work correctly. Also affects scale.
-    // I think the trig functions in gba.math are broken?
-    // Also possible that togba.fixed.FixedI16R8 is broken?
-    pub fn rotate(angle: gba.fixed.FixedU16R16) AffineTransform {
-        const sin_theta = angle.sin().toI16R8();
-        const cos_theta = angle.cos().toI16R8();
+    /// Return a rotation matrix that will scale an object by the
+    /// given amount on each axis. Uses `sin_fast` and `cos_fast`.
+    pub fn rotate_fast(angle: gba.FixedU16R16) AffineTransform {
+        const sin_theta = angle.sinFast().toI16R8();
+        const cos_theta = angle.cosFast().toI16R8();
+        return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
+    }
+    
+    /// Return a rotation matrix that will scale an object by the
+    /// given amount on each axis. Uses `sin_lerp` and `cos_lerp`.
+    pub fn rotate_lerp(angle: gba.FixedU16R16) AffineTransform {
+        const sin_theta = angle.sinLerp().toI16R8();
+        const cos_theta = angle.cosLerp().toI16R8();
         return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
     }
 };

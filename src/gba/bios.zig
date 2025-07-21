@@ -2,11 +2,6 @@ const std = @import("std");
 const bufPrint = std.fmt.bufPrint;
 const gba = @import("gba.zig");
 const interrupt = gba.interrupt;
-const math = gba.math;
-const I8_8 = math.I8_8;
-const U8_8 = math.U8_8;
-const I20_8 = math.I20_8;
-const I2_14 = math.FixedPoint(.signed, 2, 14);
 const Affine = gba.bg.Affine;
 
 pub const SWI = enum(u8) {
@@ -99,7 +94,7 @@ pub const SWI = enum(u8) {
             .div, .div_arm => DivResult,
             .bios_checksum, .sqrt => u16,
             .midi_key_2_freq => u32,
-            .arctan, .arctan2 => I2_14,
+            .arctan, .arctan2 => gba.FixedU16R16,
             .multi_boot => bool,
             else => void,
         };
@@ -195,21 +190,21 @@ pub const TransferMode = enum(u32) {
 };
 
 pub const BgAffineSource = extern struct {
-    original_x: I20_8 align(4),
-    original_y: I20_8 align(4),
+    original_x: gba.FixedI32R8 align(4),
+    original_y: gba.FixedI32R8 align(4),
     display_x: i16,
     display_y: i16,
-    scale_x: I8_8,
-    scale_y: I8_8,
-    /// BIOS ignores fractional part
-    angle: U8_8,
+    scale_x: gba.FixedI16R8,
+    scale_y: gba.FixedI16R8,
+    /// BIOS ignores the low 8 bits.
+    angle: gba.FixedU16R16,
 };
 
 pub const ObjAffineSource = packed struct {
-    scale_x: I8_8,
-    scale_y: I8_8,
-    /// BIOS ignores fractional part
-    angle: U8_8,
+    scale_x: gba.FixedI16R8,
+    scale_y: gba.FixedI16R8,
+    /// BIOS ignores the low 8 bits.
+    angle: gba.FixedU16R16,
 };
 
 pub const BitUnpackArgs = packed struct {
@@ -268,11 +263,11 @@ pub fn sqrt(x: u32) u16 {
     return call1Return1(.sqrt, x);
 }
 
-pub fn arctan(x: I2_14) I2_14 {
+pub fn arctan(x: gba.FixedU16R14) gba.FixedU16R16 {
     return call1Return1(.arctan, x);
 }
 
-pub fn arctan2(x: I2_14, y: I2_14) I2_14 {
+pub fn arctan2(x: i16, y: i16) gba.FixedU16R16 {
     return call2Return1(.arctan2, x, y);
 }
 
@@ -327,7 +322,7 @@ pub fn bgAffineSet(source: []align(4) const volatile BgAffineSource, dest: *vola
 
 /// Takes a slice of affine calculation parameters and a pointer to the `pa` field of
 /// the first `obj.Affine` to perform them on.
-pub fn objAffineSet(source: []align(4) const volatile ObjAffineSource, dest: *volatile I8_8) void {
+pub fn objAffineSet(source: []align(4) const volatile ObjAffineSource, dest: *volatile gba.obj.AffineTransform) void {
     call4Return0(.obj_affine_set, source, dest, source.len, 8);
 }
 

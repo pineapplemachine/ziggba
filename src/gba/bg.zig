@@ -2,9 +2,6 @@ const gba = @import("gba.zig");
 const Color = gba.Color;
 const display = gba.display;
 const Priority = display.Priority;
-const math = gba.math;
-const I8_8 = math.I8_8;
-const I20_8 = math.I20_8;
 const Tile = display.Tile;
 
 const bg = @This();
@@ -104,14 +101,14 @@ pub const TextScreenEntry = packed struct(u16) {
     palette_index: u4 = 0,
 };
 
-// TODO: consider a generic affine matrix type with functions for identity and other common transformations?
+// TODO: This is currently only used by the BIOS API
 pub const Affine = extern struct {
-    pa: I8_8 align(2) = I8_8.fromInt(1),
-    pb: I8_8 align(2) = .{},
-    pc: I8_8 align(2) = .{},
-    pd: I8_8 align(2) = I8_8.fromInt(1),
-    dx: I20_8 align(4) = .{},
-    dy: I20_8 align(4) = .{},
+    pa: gba.FixedI16R8 align(2) = gba.FixedI16R8.initInt(1),
+    pb: gba.FixedI16R8 align(2) = .{},
+    pc: gba.FixedI16R8 align(2) = .{},
+    pd: gba.FixedI16R8 align(2) = gba.FixedI16R8.initInt(1),
+    dx: gba.FixedI32R8 align(4) = .{},
+    dy: gba.FixedI32R8 align(4) = .{},
 };
 
 /// An index to a color tile
@@ -138,3 +135,6 @@ pub fn memcpyScreenBlock(block: u5, data: []const u8) void {
 
 pub const tile_ram = Tile(.bpp_4).ram();
 pub const tile_8_ram = Tile(.bpp_8).ram();
+
+// TODO
+// pub const ctrl: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x28);

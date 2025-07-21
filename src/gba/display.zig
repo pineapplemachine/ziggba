@@ -3,42 +3,11 @@ const gba = @import("gba.zig");
 pub const window = @import("window.zig");
 const Color = gba.Color;
 const display = @This();
-const U1_4 = gba.math.FixedPoint(.unsigned, 1, 4);
 
 var current_page_addr: u32 = gba.mem.vram;
 
 pub const vram: [*]volatile u16 = @ptrFromInt(gba.mem.vram);
 pub const back_page: [*]volatile u16 = @ptrFromInt(gba.mem.vram + 0xA000);
-
-/// Controls the capabilities of background layers
-///
-/// Modes 0-2 are tile modes, modes 3-5 are bitmap modes
-pub const Mode = enum(u3) {
-    /// Tiled mode
-    ///
-    /// Provides 4 normal background layers (0-3)
-    mode0,
-    /// Tiled mode
-    ///
-    /// Provides 2 normal (0, 1) and one affine (2) background layer
-    mode1,
-    /// Tiled mode
-    ///
-    /// Provides 2 affine (2, 3) background layers
-    mode2,
-    /// Bitmap mode
-    ///
-    /// Provides a 16bpp full screen bitmap frame
-    mode3,
-    /// Bitmap mode
-    ///
-    /// Provides two 8bpp (256 color palette) frames
-    mode4,
-    /// Bitmap mode
-    ///
-    /// Provides two 16bpp 160x128 pixel frames
-    mode5,
-};
 
 pub const Flip = packed struct(u2) {
     h: bool = false,
@@ -85,6 +54,36 @@ pub const Priority = enum(u2) {
 };
 
 pub const Control = packed struct(u16) {
+    /// Controls the capabilities of background layers
+    ///
+    /// Modes 0-2 are tile modes, modes 3-5 are bitmap modes
+    pub const Mode = enum(u3) {
+        /// Tiled mode
+        ///
+        /// Provides 4 normal background layers (0-3)
+        mode0,
+        /// Tiled mode
+        ///
+        /// Provides 2 normal (0, 1) and one affine (2) background layer
+        mode1,
+        /// Tiled mode
+        ///
+        /// Provides 2 affine (2, 3) background layers
+        mode2,
+        /// Bitmap mode
+        ///
+        /// Provides a 16bpp full screen bitmap frame
+        mode3,
+        /// Bitmap mode
+        ///
+        /// Provides two 8bpp (256 color palette) frames
+        mode4,
+        /// Bitmap mode
+        ///
+        /// Provides two 16bpp 160x128 pixel frames
+        mode5,
+    };
+    
     mode: Mode = .mode0,
     /// Read only, should stay false
     gbc_mode: bool = false,
@@ -158,7 +157,9 @@ pub const Mosaic = packed struct(u16) {
 /// (`REG_MOSAIC`)
 pub const mosaic: *volatile Mosaic = @ptrFromInt(gba.mem.io + 0x4C);
 
-pub const Blend = packed struct {
+// TODO: One struct per hardware register
+/// Represents the contents of REG_BLDCNT, REG_BLDALPHA, and REG_BLDY.
+pub const Blend = packed struct(u48) {
     pub const Layers = packed struct(u6) {
         bg0: bool = false,
         bg1: bool = false,
@@ -168,32 +169,45 @@ pub const Blend = packed struct {
         backdrop: bool = false,
     };
 
+    /// Enumeration of blending modes.
     pub const Mode = enum(u2) {
+        /// No blending. Blending effects are disabled.
         none,
+        /// Blend A and B layers.
         blend,
-        fade_white,
-        fade_black,
+        /// Blend A with white.
+        white,
+        /// Blend A with black.
+        black,
     };
 
+    /// Select target layers for blend A.
     a: Blend.Layers,
+    /// Determines blending behavior.
     mode: Blend.Mode,
+    /// Select target layers for blend B.
     b: Blend.Layers,
-    ev_a: U1_4,
+    /// Blend weight for blend A. Clamped to a maximum of 16.
+    ev_a: u5,
+    /// Unused bits.
     _0: u3,
-    ev_b: U1_4,
+    /// Blend weight for blend B. Clamped to a maximum of 16.
+    /// Used as a ratio with `ev_a` when `mode` is `Mode.blend`.
+    ev_b: u5,
+    /// Unused bits.
     _1: u3,
-    /// Write-only
-    ev_fade: U1_4,
+    /// Blend weight for white or black. Clamped to a maximum of 16.
+    /// Used as a ratio with `ev_a` when `mode` is `Mode.white` or
+    /// `Mode.black`.
+    ///
+    /// Write-only.
+    ev_y: u5,
+    /// Unused bits.
+    _2: u27,
 };
 
-/// Controls for alpha blending
-///
-/// `ev_a`, `ev_b`, and `ev_fade` are 1.4 fixed point numbers, bounded by hardware at 0 and 1,
-/// so any value with an integral bit of `1` is the same.
-///
-/// In other words, the fractional bits only matter if the integral bit is `0`.
-///
-/// (`REG_BLDMOD`, `BLD_EVA`, `BLD_EVB`, `BLD_EVY`)
+/// Controls for alpha blending.
+/// Corresponds to REG_BLDCNT, REG_BLDALPHA, and REG_BLDY.
 pub const blend: *volatile Blend = @ptrFromInt(gba.mem.io + 0x50);
 
 /// 4bpp/8bpp 8x8 tiles, "indexed" by letter coordinates (`tile.a.b`)
