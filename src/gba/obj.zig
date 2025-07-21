@@ -1,11 +1,6 @@
-//! Module for operations related to Object/Sprite memory
-const gba = @import("gba.zig");
-const display = gba.display;
-const Priority = display.Priority;
+//! Module for operations related to Object/Sprite memory.
 
-// TODO: Fix this
-/// Tile data for objects.
-pub const tile_ram: *volatile [2][512]display.Tile(.bpp_4) = @ptrFromInt(gba.mem.vram + 0x10000);
+const gba = @import("gba.zig");
 
 /// Pointer into color palette RAM, where color palettes for use with objects
 /// are stored.
@@ -19,7 +14,7 @@ pub const objects: *align(16) volatile [128]Obj = @ptrFromInt(gba.mem.oam);
 /// Set all objects to hidden.
 ///
 /// You likely want to do this upon initialization, if you're enabling objects.
-/// Otherwise, all 128 objects in OAM all initialized as visible 8x8 objects
+/// Otherwise, all 128 objects in OAM are initialized as visible 8x8 objects
 /// in the top-left corner using tile index 0.
 pub fn hideAllObjects() void {
     for(objects) |*obj| {
@@ -30,6 +25,9 @@ pub fn hideAllObjects() void {
 /// Refers to affine transformation matrix components in OAM.
 /// Affine transformation matrices are interleaved with object attributes.
 /// Should only be updated during VBlank, to avoid graphical glitches.
+///
+/// Values start at index 3, and only every 4th value after that is really
+/// an affine value. Other values belong to object attributes.
 const affine_values: [*]volatile gba.FixedI16R8 = @ptrFromInt(gba.mem.oam);
 
 /// Represents an affine transformation matrix.
@@ -85,7 +83,7 @@ pub const AffineTransform = struct {
     
     /// Return a rotation matrix that will scale an object by the
     /// given amount on each axis. Uses `sin_fast` and `cos_fast`.
-    pub fn rotate_fast(angle: gba.FixedU16R16) AffineTransform {
+    pub fn rotateFast(angle: gba.FixedU16R16) AffineTransform {
         const sin_theta = angle.sinFast().toI16R8();
         const cos_theta = angle.cosFast().toI16R8();
         return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
@@ -93,7 +91,7 @@ pub const AffineTransform = struct {
     
     /// Return a rotation matrix that will scale an object by the
     /// given amount on each axis. Uses `sin_lerp` and `cos_lerp`.
-    pub fn rotate_lerp(angle: gba.FixedU16R16) AffineTransform {
+    pub fn rotateLerp(angle: gba.FixedU16R16) AffineTransform {
         const sin_theta = angle.sinLerp().toI16R8();
         const cos_theta = angle.cosLerp().toI16R8();
         return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
@@ -220,7 +218,7 @@ pub const Obj = packed struct(u48) {
     /// Sprites cover backgrounds of the same priority.
     /// For sprites of the same priority, the higher-numbered objects are
     /// drawn first.
-    priority: Priority = .highest,
+    priority: gba.display.Priority = .highest,
     /// When the object is using 4-bit color, this value indicates which
     /// 16-color sprite palette bank should be used.
     /// Otherwise, for 8-bit color, this value is ignored.

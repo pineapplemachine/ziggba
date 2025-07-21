@@ -1,7 +1,6 @@
 const gba = @import("gba");
 const input = gba.input;
 const display = gba.display;
-const Tile = display.Tile;
 const bg = gba.bg;
 
 const cbb_ids = @import("cbb_ids.zig");
@@ -15,24 +14,24 @@ const screen_block_8 = 4;
 export var header linksection(".gbaheader") = gba.Header.init("CHARBLOCK", "ASBE", "00", 0);
 
 fn loadTiles() void {
-    const tl4: [*]align(4) const Tile(.bpp_4) = @ptrCast(&cbb_ids.ids_4_tiles);
-    const tl8: [*]align(4) const Tile(.bpp_8) = @ptrCast(&cbb_ids.ids_8_tiles);
+    const tl4: [*]align(4) const gba.display.Tile4Bpp = @ptrCast(&cbb_ids.ids_4_tiles);
+    const tl8: [*]align(4) const gba.display.Tile8Bpp = @ptrCast(&cbb_ids.ids_8_tiles);
 
     // Loading tiles. 4-bit tiles to blocks 0 and 1
-    bg.tile_ram[0][1] = tl4[1];
-    bg.tile_ram[0][2] = tl4[2];
-    bg.tile_ram[1][0] = tl4[3];
-    bg.tile_ram[1][1] = tl4[4];
+    gba.display.charblocks[0].bpp_4[1] = tl4[1];
+    gba.display.charblocks[0].bpp_4[2] = tl4[2];
+    gba.display.charblocks[1].bpp_4[0] = tl4[3];
+    gba.display.charblocks[1].bpp_4[1] = tl4[4];
 
     // and the 8-bit tiles to blocks 2 though 5
-    bg.tile_8_ram[2][1] = tl8[1];
-    bg.tile_8_ram[2][2] = tl8[2];
-    bg.tile_8_ram[3][0] = tl8[3];
-    bg.tile_8_ram[3][1] = tl8[4];
-    bg.tile_8_ram[4][0] = tl8[5];
-    bg.tile_8_ram[4][1] = tl8[6];
-    bg.tile_8_ram[5][0] = tl8[7];
-    bg.tile_8_ram[5][1] = tl8[8];
+    gba.display.charblocks[2].bpp_8[1] = tl8[1];
+    gba.display.charblocks[2].bpp_8[2] = tl8[2];
+    gba.display.charblocks[3].bpp_8[0] = tl8[3];
+    gba.display.charblocks[3].bpp_8[1] = tl8[4];
+    gba.display.charblocks[4].bpp_8[0] = tl8[5];
+    gba.display.charblocks[4].bpp_8[1] = tl8[6];
+    gba.display.charblocks[5].bpp_8[0] = tl8[7];
+    gba.display.charblocks[5].bpp_8[1] = tl8[8];
 
     // Load palette
     gba.mem.memcpy32(gba.bg.palette, &cbb_ids.ids_4_pal, cbb_ids.ids_4_pal.len * 4);

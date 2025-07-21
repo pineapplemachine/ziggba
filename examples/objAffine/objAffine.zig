@@ -4,7 +4,7 @@ const metr = @import("metr.zig");
 export var header linksection(".gbaheader") = gba.Header.init("OBJAFFINE", "AOAE", "00", 0);
 
 pub export fn main() void {
-    gba.mem.memcpy32(gba.obj.tile_ram, &metr.box_tiles, metr.box_tiles.len * 4);
+    gba.display.memcpyObjectTiles4Bpp(0, @ptrCast(&metr.box_tiles));
     gba.mem.memcpy32(gba.obj.palette, &metr.pal, metr.pal.len * 4);
 
     var metroid: gba.obj.Obj = .{
@@ -39,7 +39,7 @@ pub export fn main() void {
     while (true) : (frame +%= 1) {
         gba.display.naiveVSync();
 
-        const transform = gba.obj.AffineTransform.rotate_fast(
+        const transform = gba.obj.AffineTransform.rotateFast(
             .initRaw(@truncate(frame << 8)),
         );
         transform.set(metroid.transform.affine_index);

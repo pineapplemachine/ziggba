@@ -106,7 +106,12 @@ pub fn memcpy16(noalias dest: anytype, noalias source: anytype, count: usize) vo
     }
 }
 
-pub fn alignedMemcpy(comptime T: type, noalias dest: [*]align(@alignOf(T)) volatile u8, noalias source: [*]align(@alignOf(T)) const u8, bytes: usize) void {
+pub fn alignedMemcpy(
+    comptime T: type,
+    noalias dest: [*]align(@alignOf(T)) volatile u8,
+    noalias source: [*]align(@alignOf(T)) const u8,
+    bytes: usize,
+) void {
     @setRuntimeSafety(false);
     const aligned_count = bytes / @sizeOf(T);
     const rem_bytes = bytes % @sizeOf(T);

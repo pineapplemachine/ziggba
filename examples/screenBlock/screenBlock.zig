@@ -21,8 +21,14 @@ fn initMap() void {
     bg.scroll[0].set(0, 0);
 
     // create the tiles: basic tile and a cross
-    bg.tile_ram[0][0] = @bitCast([_]u32{ 0x11111111, 0x01111111, 0x01111111, 0x01111111, 0x01111111, 0x01111111, 0x01111111, 0x00000001 });
-    bg.tile_ram[0][1] = @bitCast([_]u32{ 0x00000000, 0x00100100, 0x01100110, 0x00011000, 0x00011000, 0x01100110, 0x00100100, 0x00000000 });
+    gba.display.bg_charblocks[0].bpp_4[0] = @bitCast([_]u32{
+        0x11111111, 0x01111111, 0x01111111, 0x01111111,
+        0x01111111, 0x01111111, 0x01111111, 0x00000001,
+    });
+    gba.display.bg_charblocks[0].bpp_4[1] = @bitCast([_]u32{
+        0x00000000, 0x00100100, 0x01100110, 0x00011000,
+        0x00011000, 0x01100110, 0x00100100, 0x00000000,
+    });
 
     const bg_palette = &bg.palette.banks;
 

@@ -16,47 +16,47 @@ fn initMap() void {
     bg.scroll[0].set(0, 0);
 
     // Create tiles for numeric digits
-    bg.tile_ram[0][0] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[0] = @bitCast([_]u32{
         0x11111110, 0x11000110, 0x11000110, 0x11000110,
         0x11000110, 0x11000110, 0x11111110, 0x00000000,
     });
-    bg.tile_ram[0][1] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[1] = @bitCast([_]u32{
         0x11000000, 0x11000000, 0x11000000, 0x11000000,
         0x11000000, 0x11000000, 0x11000000, 0x00000000,
     });
-    bg.tile_ram[0][2] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[2] = @bitCast([_]u32{
         0x11111110, 0x11000000, 0x11000000, 0x11111110,
         0x00000110, 0x00000110, 0x11111110, 0x00000000,
     });
-    bg.tile_ram[0][3] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[3] = @bitCast([_]u32{
         0x11111110, 0x11000000, 0x11000000, 0x11111110,
         0x11000000, 0x11000000, 0x11111110, 0x00000000,
     });
-    bg.tile_ram[0][4] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[4] = @bitCast([_]u32{
         0x11000110, 0x11000110, 0x11000110, 0x11111110,
         0x11000000, 0x11000000, 0x11000000, 0x00000000,
     });
-    bg.tile_ram[0][5] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[5] = @bitCast([_]u32{
         0x11111110, 0x00000110, 0x00000110, 0x11111110,
         0x11000000, 0x11000000, 0x11111110, 0x00000000,
     });
-    bg.tile_ram[0][6] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[6] = @bitCast([_]u32{
         0x11111110, 0x00000110, 0x00000110, 0x11111110,
         0x11000110, 0x11000110, 0x11111110, 0x00000000,
     });
-    bg.tile_ram[0][7] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[7] = @bitCast([_]u32{
         0x11111110, 0x11000000, 0x11000000, 0x11000000,
         0x11000000, 0x11000000, 0x11000000, 0x00000000,
     });
-    bg.tile_ram[0][8] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[8] = @bitCast([_]u32{
         0x11111110, 0x11000110, 0x11000110, 0x11111110,
         0x11000110, 0x11000110, 0x11111110, 0x00000000,
     });
-    bg.tile_ram[0][9] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[9] = @bitCast([_]u32{
         0x11111110, 0x11000110, 0x11000110, 0x11111110,
         0x11000000, 0x11000000, 0x11111110, 0x00000000,
     });
-    bg.tile_ram[0][10] = @bitCast([_]u32{
+    gba.display.bg_charblocks[0].bpp_4[10] = @bitCast([_]u32{
         0x00000000, 0x00000000, 0x00000000, 0x00000000,
         0x00000000, 0x00000000, 0x00000000, 0x00000000,
     });

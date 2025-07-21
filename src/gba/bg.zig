@@ -2,13 +2,12 @@ const gba = @import("gba.zig");
 const Color = gba.Color;
 const display = gba.display;
 const Priority = display.Priority;
-const Tile = display.Tile;
 
 const bg = @This();
 
 pub const palette: *Color.Palette = @ptrFromInt(gba.mem.palette);
 
-/// Background size in 8x8 tiles
+/// Background size, in 8x8 tiles.
 pub const Size = packed union {
     pub const Normal = enum(u2) {
         /// Uses one screenblock.
@@ -133,8 +132,8 @@ pub fn memcpyScreenBlock(block: u5, data: []const u8) void {
     );
 }
 
-pub const tile_ram = Tile(.bpp_4).ram();
-pub const tile_8_ram = Tile(.bpp_8).ram();
-
-// TODO
-// pub const ctrl: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x28);
+// TODO: REG_BGxX, REG_BGxY, and other background affine registers
+// pub const bg_2_affine_dx: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x28);
+// pub const bg_2_affine_dy: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x2c);
+// pub const bg_3_affine_dx: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x38);
+// pub const bg_3_affine_dy: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x3c);

@@ -9,7 +9,7 @@ fn loadData() void {
     const map_ram: [*]volatile u16 = @ptrFromInt(@intFromPtr(display.vram) + (30 * 2048));
 
     gba.mem.memcpy32(bg.palette, &brin.pal, brin.pal.len * 2);
-    gba.mem.memcpy32(bg.tile_ram, &brin.tiles, brin.tiles.len * 2);
+    gba.display.memcpyBackgroundTiles4Bpp(0, @ptrCast(&brin.tiles));
     gba.mem.memcpy32(map_ram, &brin.map, brin.map.len * 2);
 }
 

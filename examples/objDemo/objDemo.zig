@@ -7,7 +7,7 @@ export var header linksection(".gbaheader") = gba.Header.init("OBJDEMO", "AODE",
 const metr = @import("metroid_sprite_data.zig");
 
 fn loadSpriteData() void {
-    gba.mem.memcpy32(obj.tile_ram, &metr.tiles, metr.tiles.len * 4);
+    gba.display.memcpyObjectTiles4Bpp(0, @ptrCast(&metr.tiles));
     gba.mem.memcpy32(obj.palette, &metr.pal, metr.pal.len * 4);
 }
 
