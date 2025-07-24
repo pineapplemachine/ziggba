@@ -5,8 +5,6 @@ const Priority = display.Priority;
 
 const bg = @This();
 
-pub const palette: *Color.Palette = @ptrFromInt(gba.mem.palette);
-
 /// Background size, in 8x8 tiles.
 pub const Size = packed union {
     pub const Normal = enum(u2) {
@@ -21,9 +19,9 @@ pub const Size = packed union {
     };
 
     pub const Affine = enum(u2) {
-        /// Uses 256 bytes of one screenblock.
+        /// Uses 256 entries in one screenblock.
         @"16x16",
-        /// Uses 1024 bytes of one screenblock.
+        /// Uses one screenblock.
         @"32x32",
         /// Uses two screenblocks.
         @"64x64",
@@ -31,7 +29,10 @@ pub const Size = packed union {
         @"128x128",
     };
 
+    /// Determines size for non-affine backgrounds.
     normal: Size.Normal,
+    /// Determines size for affine backgrounds.
+    /// Affine backgrounds are always square.
     affine: Size.Affine,
 };
 
@@ -118,18 +119,6 @@ pub const screen_block_ram: [*]volatile TextScreenBlock = @ptrCast(display.vram)
 
 pub inline fn screenBlockMap(block: u5) [*]volatile bg.TextScreenEntry {
     return @ptrCast(&screen_block_ram[block]);
-}
-
-/// Copy memory into a screenblock, containing background layer data.
-/// Note that screenblocks and charblocks share the same VRAM.
-/// WARNING: This will not copy memory correctly if the input
-/// data is not aligned on a 16-bit word boundary.
-pub fn memcpyScreenBlock(block: u5, data: []const u8) void {
-    gba.mem.memcpy32(
-        display.vram + (@as(u32, block) * 0x800),
-        @as([*]align(2) const u8, @ptrCast(@alignCast(data))),
-        data.len,
-    );
 }
 
 // TODO: REG_BGxX, REG_BGxY, and other background affine registers

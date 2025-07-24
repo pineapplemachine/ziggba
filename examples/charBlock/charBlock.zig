@@ -1,7 +1,4 @@
 const gba = @import("gba");
-const input = gba.input;
-const display = gba.display;
-const bg = gba.bg;
 
 const cbb_ids = @import("cbb_ids.zig");
 
@@ -34,15 +31,15 @@ fn loadTiles() void {
     gba.display.charblocks[5].bpp_8[1] = tl8[8];
 
     // Load palette
-    gba.mem.memcpy32(gba.bg.palette, &cbb_ids.ids_4_pal, cbb_ids.ids_4_pal.len * 4);
-    gba.mem.memcpy32(gba.obj.palette, &cbb_ids.ids_4_pal, cbb_ids.ids_4_pal.len * 4);
+    gba.display.memcpyBackgroundPalette(0, @ptrCast(&cbb_ids.ids_4_pal));
+    gba.display.memcpyObjectPalette(0, @ptrCast(&cbb_ids.ids_4_pal));
 }
 
 fn initMaps() void {
     // map coords (0, 2)
-    const screen_entry_4: []volatile bg.TextScreenEntry = bg.screen_block_ram[screen_block_4][2 * 32 ..];
+    const screen_entry_4: []volatile gba.bg.TextScreenEntry = gba.bg.screen_block_ram[screen_block_4][2 * 32 ..];
     // map coords (0, 8)
-    const screen_entry_8: []volatile bg.TextScreenEntry = bg.screen_block_ram[screen_block_8][8 * 32 ..];
+    const screen_entry_8: []volatile gba.bg.TextScreenEntry = gba.bg.screen_block_ram[screen_block_8][8 * 32 ..];
 
     // Show first tiles of char-blocks available to background 0
     // tiles 1, 2 of CharacterBlock4
@@ -75,18 +72,18 @@ pub export fn main() void {
 
     initMaps();
 
-    display.ctrl.* = .{
+    gba.display.ctrl.* = .{
         .bg0 = true,
         .bg1 = true,
         .obj = true,
     };
 
-    bg.ctrl[0] = .{
+    gba.bg.ctrl[0] = .{
         .tile_base_block = character_block_4,
         .screen_base_block = screen_block_4,
     };
 
-    bg.ctrl[1] = .{
+    gba.bg.ctrl[1] = .{
         .tile_base_block = character_block_8,
         .screen_base_block = screen_block_8,
         .palette_mode = .bpp_8,

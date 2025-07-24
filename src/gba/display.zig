@@ -5,14 +5,14 @@ const display = @This();
 
 pub const window = @import("display_window.zig");
 
-pub const memcpyTiles4Bpp = @import("display_vram.zig").memcpyTiles4Bpp;
-pub const memcpyTiles8Bpp = @import("display_vram.zig").memcpyTiles8Bpp;
-pub const memcpyBackgroundTiles4Bpp = @import("display_vram.zig").memcpyBackgroundTiles4Bpp;
-pub const memcpyBackgroundTiles8Bpp = @import("display_vram.zig").memcpyBackgroundTiles8Bpp;
-pub const memcpyObjectTiles4Bpp = @import("display_vram.zig").memcpyObjectTiles4Bpp;
-pub const memcpyObjectTiles8Bpp = @import("display_vram.zig").memcpyObjectTiles8Bpp;
+pub const vram = @import("display_vram.zig").vram;
+pub const ScreenblockEntry = @import("display_vram.zig").ScreenblockEntry;
+pub const Screenblock = @import("display_vram.zig").Screenblock;
 pub const Charblock = @import("display_vram.zig").Charblock;
 pub const CharblockTiles = @import("display_vram.zig").CharblockTiles;
+pub const BackgroundCharblockTiles = @import("display_vram.zig").BackgroundCharblockTiles;
+pub const ObjectCharblockTiles = @import("display_vram.zig").ObjectCharblockTiles;
+pub const screenblocks = @import("display_vram.zig").screenblocks;
 pub const charblocks = @import("display_vram.zig").charblocks;
 pub const charblock_tiles = @import("display_vram.zig").charblock_tiles;
 pub const bg_charblocks = @import("display_vram.zig").bg_charblocks;
@@ -21,11 +21,23 @@ pub const obj_charblocks = @import("display_vram.zig").obj_charblocks;
 pub const obj_charblock_tiles = @import("display_vram.zig").obj_charblock_tiles;
 pub const Tile4Bpp = @import("display_vram.zig").Tile4Bpp;
 pub const Tile8Bpp = @import("display_vram.zig").Tile8Bpp;
+pub const memcpyTiles4Bpp = @import("display_vram.zig").memcpyTiles4Bpp;
+pub const memcpyTiles8Bpp = @import("display_vram.zig").memcpyTiles8Bpp;
+pub const memcpyBackgroundTiles4Bpp = @import("display_vram.zig").memcpyBackgroundTiles4Bpp;
+pub const memcpyBackgroundTiles8Bpp = @import("display_vram.zig").memcpyBackgroundTiles8Bpp;
+pub const memcpyObjectTiles4Bpp = @import("display_vram.zig").memcpyObjectTiles4Bpp;
+pub const memcpyObjectTiles8Bpp = @import("display_vram.zig").memcpyObjectTiles8Bpp;
+
+pub const Palette = @import("display_palette.zig").Palette;
+pub const bg_palette = @import("display_palette.zig").bg_palette;
+pub const obj_palette = @import("display_palette.zig").obj_palette;
+pub const memcpyBackgroundPalette = @import("display_palette.zig").memcpyBackgroundPalette;
+pub const memcpyBackgroundPaletteBank = @import("display_palette.zig").memcpyBackgroundPaletteBank;
+pub const memcpyObjectPalette = @import("display_palette.zig").memcpyObjectPalette;
+pub const memcpyObjectPaletteBank = @import("display_palette.zig").memcpyObjectPaletteBank;
 
 var current_page_addr: u32 = gba.mem.vram;
 
-// TODO: Remove
-pub const vram: [*]volatile u16 = @ptrFromInt(gba.mem.vram);
 pub const back_page: [*]volatile u16 = @ptrFromInt(gba.mem.vram + 0xA000);
 
 pub const Flip = packed struct(u2) {

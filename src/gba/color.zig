@@ -8,9 +8,13 @@ pub const Color = packed struct(u16) {
     pub const cyan = Color.rgb(0, 31, 31);
     pub const white = Color.rgb(31, 31, 31);
 
+    /// Intensity in red color channel.
     r: u5 = 0,
+    /// Intensity in green color channel.
     g: u5 = 0,
+    /// Intensity in blue color channel.
     b: u5 = 0,
+    /// Unused padding bit.
     _: u1 = 0,
 
     /// Initialize a color with red, green, and blue values.
@@ -23,15 +27,6 @@ pub const Color = packed struct(u16) {
             .b = b,
         };
     }
-
-    pub const Palette = union {
-        /// A palette of 16 colors.
-        /// The color at `bank[0]` is always transparent.
-        pub const Bank = [16]Color;
-
-        banks: [16]Bank,
-        full: [256]Color,
-    };
 
     /// Enumeration of tile bits per pixel values.
     /// Determines whether palettes are accessed via banks of 16 colors (4bpp)

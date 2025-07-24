@@ -8,7 +8,7 @@ const metr = @import("metroid_sprite_data.zig");
 
 fn loadSpriteData() void {
     gba.display.memcpyObjectTiles4Bpp(0, @ptrCast(&metr.tiles));
-    gba.mem.memcpy32(obj.palette, &metr.pal, metr.pal.len * 4);
+    gba.display.memcpyObjectPalette(0, @ptrCast(&metr.pal));
 }
 
 pub export fn main() void {

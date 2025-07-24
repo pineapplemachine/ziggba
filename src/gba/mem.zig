@@ -128,7 +128,11 @@ pub fn alignedMemcpy(
     }
 }
 
-pub fn genericMemcpy(noalias dest: [*]volatile u8, noalias source: [*]const u8, bytes: usize) void {
+pub fn genericMemcpy(
+    noalias dest: [*]volatile u8,
+    noalias source: [*]const u8,
+    bytes: usize,
+) void {
     @setRuntimeSafety(false);
     for (0..bytes) |index| {
         dest[index] = source[index];

@@ -5,7 +5,7 @@ export var header linksection(".gbaheader") = gba.Header.init("OBJAFFINE", "AOAE
 
 pub export fn main() void {
     gba.display.memcpyObjectTiles4Bpp(0, @ptrCast(&metr.box_tiles));
-    gba.mem.memcpy32(gba.obj.palette, &metr.pal, metr.pal.len * 4);
+    gba.display.memcpyObjectPalette(0, @ptrCast(&metr.pal));
 
     var metroid: gba.obj.Obj = .{
         .mode = .affine,

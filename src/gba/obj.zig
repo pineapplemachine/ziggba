@@ -2,10 +2,6 @@
 
 const gba = @import("gba.zig");
 
-/// Pointer into color palette RAM, where color palettes for use with objects
-/// are stored.
-pub const palette: *gba.Color.Palette = @ptrFromInt(gba.mem.palette + 0x200);
-
 /// Refers to object attributes data in OAM.
 /// Affine transformation matrices are interleaved with object attributes.
 /// Should only be updated during VBlank, to avoid graphical glitches.

@@ -1,20 +1,19 @@
 const gba = @import("gba");
-const display = gba.display;
 
 export var header linksection(".gbaheader") = gba.Header.init("MODE4FLIP", "AMFE", "00", 0);
 
-const front_image_data = @embedFile("front.agi");
-const back_image_data = @embedFile("back.agi");
-const palette_data = @embedFile("mode4flip.agp");
+const front_image_data align(4) = @embedFile("front.agi");
+const back_image_data align(4) = @embedFile("back.agi");
+const palette_data align(4) = @embedFile("mode4flip.agp");
 
 fn loadImageData() void {
-    gba.mem.memcpy32(display.vram, @as([*]align(2) const u8, @ptrCast(@alignCast(front_image_data))), front_image_data.len);
-    gba.mem.memcpy32(display.back_page, @as([*]align(2) const u8, @ptrCast(@alignCast(back_image_data))), back_image_data.len);
-    gba.mem.memcpy32(gba.bg.palette, @as([*]align(2) const u8, @ptrCast(@alignCast(palette_data))), palette_data.len);
+    gba.mem.memcpy32(gba.display.vram, @as([*]align(2) const u8, @ptrCast(@alignCast(front_image_data))), front_image_data.len);
+    gba.mem.memcpy32(gba.display.back_page, @as([*]align(2) const u8, @ptrCast(@alignCast(back_image_data))), back_image_data.len);
+    gba.display.memcpyBackgroundPalette(0, @ptrCast(@alignCast(palette_data)));
 }
 
 pub export fn main() void {
-    display.ctrl.* = .{
+    gba.display.ctrl.* = .{
         .mode = .mode4,
         .bg2 = true,
     };
@@ -23,13 +22,15 @@ pub export fn main() void {
 
     var i: u32 = 0;
     while (true) : (i += 1) {
+        // Pause while the start button is held down.
         while(gba.input.state.startIsPressed()) {}
 
-        display.naiveVSync();
+        gba.display.naiveVSync();
 
-        if (i == 60 * 2) {
+        // Flip every 120 frames, i.e. about every two seconds.
+        if (i == 120) {
             i = 0;
-            display.pageFlip();
+            gba.display.pageFlip();
         }
     }
 }

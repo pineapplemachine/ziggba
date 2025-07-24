@@ -815,12 +815,12 @@ pub export fn main() void {
         .tile_map_size = .{ .normal = .@"32x32" },
     };
     gba.bg.scroll[0].set(0, 0);
-    gba.bg.palette.banks[0][1] = .rgb(31, 31, 31);
-    gba.bg.palette.banks[0][2] = .rgb(0, 0, 0);
-    gba.bg.palette.banks[1][1] = .rgb(31, 31, 31);
-    gba.bg.palette.banks[1][2] = .rgb(19, 19, 19);
-    gba.bg.palette.banks[2][1] = .rgb(1, 0, 25);
-    gba.bg.palette.banks[2][2] = .rgb(31, 31, 31);
+    gba.display.bg_palette.banks[0][1] = .rgb(31, 31, 31);
+    gba.display.bg_palette.banks[0][2] = .rgb(0, 0, 0);
+    gba.display.bg_palette.banks[1][1] = .rgb(31, 31, 31);
+    gba.display.bg_palette.banks[1][2] = .rgb(19, 19, 19);
+    gba.display.bg_palette.banks[2][1] = .rgb(1, 0, 25);
+    gba.display.bg_palette.banks[2][2] = .rgb(31, 31, 31);
     gba.display.memcpyBackgroundTiles4Bpp(0, @ptrCast(&charset_data));
     gba.display.ctrl.* = gba.display.Control{
         .bg0 = true,

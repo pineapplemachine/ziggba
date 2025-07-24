@@ -30,13 +30,11 @@ fn initMap() void {
         0x00011000, 0x01100110, 0x00100100, 0x00000000,
     });
 
-    const bg_palette = &bg.palette.banks;
-
     // Create the background palette
-    bg_palette[0][1] = gba.Color.rgb(31, 0, 0);
-    bg_palette[1][1] = gba.Color.rgb(0, 31, 0);
-    bg_palette[2][1] = gba.Color.rgb(0, 0, 31);
-    bg_palette[3][1] = gba.Color.rgb(16, 16, 16);
+    gba.display.bg_palette.banks[0][1] = gba.Color.rgb(31, 0, 0);
+    gba.display.bg_palette.banks[1][1] = gba.Color.rgb(0, 31, 0);
+    gba.display.bg_palette.banks[2][1] = gba.Color.rgb(0, 0, 31);
+    gba.display.bg_palette.banks[3][1] = gba.Color.rgb(16, 16, 16);
 
     const bg0_map: [*]volatile bg.TextScreenEntry = @ptrCast(&bg.screen_block_ram[28]);
 
