@@ -1,36 +1,34 @@
 const gba = @import("gba");
-const Color = gba.Color;
 const Mode4 = gba.bitmap.Mode4;
-const display = gba.display;
 
 export var header linksection(".gbaheader") = gba.Header.init("MODE4DRAW", "AWJE", "00", 0);
 
-const palette: [26]Color = [_]Color{
-    Color.black,
-    Color.rgb(12, 12, 12),
-    Color.red,
-    Color.lime,
-    Color.blue,
-    Color.cyan,
-    Color.black,
-    Color.yellow,
+const palette: [26]gba.Color = [_]gba.Color{
+    gba.Color.black,
+    gba.Color.rgb(12, 12, 12),
+    gba.Color.red,
+    gba.Color.lime,
+    gba.Color.blue,
+    gba.Color.cyan,
+    gba.Color.black,
+    gba.Color.yellow,
 } ++ blk: {
-    var pink: [9]Color = undefined;
-    var teal: [9]Color = undefined;
+    var pink: [9]gba.Color = undefined;
+    var teal: [9]gba.Color = undefined;
 
     for (0..9) |i| {
         const j = @as(u5, @intCast(i)) * 3 + 7;
-        pink[i] = Color.rgb(j, 0, j);
-        teal[i] = Color.rgb(0, j, j);
+        pink[i] = gba.Color.rgb(j, 0, j);
+        teal[i] = gba.Color.rgb(0, j, j);
     }
 
     break :blk pink ++ teal;
 };
 
 pub export fn main() void {
-    gba.mem.memcpy32(gba.bg.palette, &palette, 256);
+    gba.display.memcpyBackgroundPalette(0, &palette);
 
-    display.ctrl.* = .{
+    gba.display.ctrl.* = .{
         .mode = .mode4,
         .bg2 = true,
     };
