@@ -2,32 +2,56 @@ const std = @import("std");
 const gba = @import("src/build/build.zig");
 
 pub fn build(b: *std.Build) void {
-    _ = gba.addGBAExecutable(b, "first", "examples/first/first.zig");
-    _ = gba.addGBAExecutable(b, "mode3draw", "examples/mode3draw/mode3draw.zig");
-    _ = gba.addGBAExecutable(b, "mode4draw", "examples/mode4draw/mode4draw.zig");
-    _ = gba.addGBAExecutable(b, "debugPrint", "examples/debugPrint/debugPrint.zig");
-    _ = gba.addGBAExecutable(b, "secondsTimer", "examples/secondsTimer/secondsTimer.zig");
-
-    // Mode 4 Flip
-    const mode4flip = gba.addGBAExecutable(b, "mode4flip", "examples/mode4flip/mode4flip.zig");
-    gba.convertMode4Images(mode4flip, &[_]gba.ImageSourceTarget{
-        .{
-            .source = "examples/mode4flip/front.bmp",
-            .target = "examples/mode4flip/front.agi",
-        },
-        .{
-            .source = "examples/mode4flip/back.bmp",
-            .target = "examples/mode4flip/back.agi",
-        },
-    }, "examples/mode4flip/mode4flip.agp");
+    // TODO: Use tile and palette data created by the build system for demos
     
-    // Music example (Jesu, Joy of Man's Desiring)
+    // Options
+    
+    // const text_options: gba.Options = .{
+    //     .text_charset_latin = true,
+    //     .text_charset_latin_supplement = true,
+    //     .text_charset_kana = true,
+    // };
+    
+    // Examples
+    
+    _ = gba.addGBAExecutable(b, "charBlock", "examples/charBlock/charBlock.zig", .{});
+    _ = gba.addGBAExecutable(b, "debugPrint", "examples/debugPrint/debugPrint.zig", .{});
+    _ = gba.addGBAExecutable(b, "first", "examples/first/first.zig", .{});
+    _ = gba.addGBAExecutable(b, "keydemo", "examples/keydemo/keydemo.zig", .{});
+    _ = gba.addGBAExecutable(b, "mode3draw", "examples/mode3draw/mode3draw.zig", .{});
+    _ = gba.addGBAExecutable(b, "mode4draw", "examples/mode4draw/mode4draw.zig", .{});
+    _ = gba.addGBAExecutable(b, "objAffine", "examples/objAffine/objAffine.zig", .{});
+    _ = gba.addGBAExecutable(b, "objDemo", "examples/objDemo/objDemo.zig", .{});
+    _ = gba.addGBAExecutable(b, "secondsTimer", "examples/secondsTimer/secondsTimer.zig", .{});
+    _ = gba.addGBAExecutable(b, "screenBlock", "examples/screenBlock/screenBlock.zig", .{});
+    _ = gba.addGBAExecutable(b, "tileDemo", "examples/tileDemo/tileDemo.zig", .{});
+    
+    var bgAffine_palette = [_]gba.tiles.ColorRgb888 {
+        .{ .r = 0, .g = 0, .b = 0 }, // Transparency
+        .{ .r = 255, .g = 255, .b = 255 },
+        .{ .r = 255, .g = 0, .b = 0 },
+        .{ .r = 0, .g = 255, .b = 0 },
+        .{ .r = 0, .g = 128, .b = 255 },
+    };
+    _ = gba.addGBAExecutable(b, "bgAffine", "examples/bgAffine/bgAffine.zig", .{});
+    gba.tiles.convertSaveImagePath(
+        []gba.tiles.ColorRgb888,
+        "examples/bgAffine/tiles.png",
+        "examples/bgAffine/tiles.bin",
+        .{
+            .allocator = std.heap.page_allocator,
+            .bpp = .bpp_8, // Affine backgrounds require 8bpp tile data
+            .palette_fn = gba.tiles.getNearestPaletteColor,
+            .palette_ctx = bgAffine_palette[0..],
+        },
+    ) catch {};
+    
     var jesuMusic_palette = [_]gba.tiles.ColorRgb888 {
         .{ .r = 0, .g = 0, .b = 0 }, // Transparency
         .{ .r = 255, .g = 255, .b = 255 },
         .{ .r = 0, .g = 0, .b = 0 },
     };
-    _ = gba.addGBAExecutable(b, "jesuMusic", "examples/jesuMusic/jesuMusic.zig");
+    _ = gba.addGBAExecutable(b, "jesuMusic", "examples/jesuMusic/jesuMusic.zig", .{});
     gba.tiles.convertSaveImagePath(
         []gba.tiles.ColorRgb888,
         "examples/jesuMusic/charset.png",
@@ -40,43 +64,19 @@ pub fn build(b: *std.Build) void {
         },
     ) catch {};
 
-    // Key demo, TODO: Use image created by the build system once we support indexed image
-    _ = gba.addGBAExecutable(b, "keydemo", "examples/keydemo/keydemo.zig");
-    // keydemo.addCSourceFile(.{
-    //     .file = .{ .src_path = .{ .owner = b, .sub_path = "examples/keydemo/gba_pic.c" } },
-    //     .flags = &[_][]const u8{"-std=c99"},
-    // });
-
-    // Simple OBJ demo, TODO: Use tile and palette data created by the build system
-    _ = gba.addGBAExecutable(b, "objDemo", "examples/objDemo/objDemo.zig");
-    // objDemo.addCSourceFile(.{
-    //     .file = .{ .src_path = .{ .owner = b, .sub_path = "examples/objDemo/metroid_sprite_data.c" } },
-    //     .flags = &[_][]const u8{"-std=c99"},
-    // });
-
-    // tileDemo, TODO: Use tileset, tile and palette created by the build system
-    _ = gba.addGBAExecutable(b, "tileDemo", "examples/tileDemo/tileDemo.zig");
-    // tileDemo.addCSourceFile(.{
-    //     .file = .{ .src_path = .{ .owner = b, .sub_path = "examples/tileDemo/brin.c" } },
-    //     .flags = &[_][]const u8{"-std=c99"},
-    // });
-
-    // screenBlock
-    _ = gba.addGBAExecutable(b, "screenBlock", "examples/screenBlock/screenBlock.zig");
-
-    // charBlock
-    _ = gba.addGBAExecutable(b, "charBlock", "examples/charBlock/charBlock.zig");
-    // charBlock.addCSourceFile(.{
-    //     .file = .{ .src_path = .{.owner = b, .sub_path = "examples/charBlock/cbb_ids.c" } },
-    //     .flags = &[_][]const u8{"-std=c99"},
-    // });
-
-    // objAffine
-    _ = gba.addGBAExecutable(b, "objAffine", "examples/objAffine/objAffine.zig");
-    // objAffine.addCSourceFile(.{
-    //     .file = .{ .src_path = .{ .owner = b, .sub_path = "examples/objAffine/metr.c" } },
-    //     .flags = &[_][]const u8{"-std=c99"},
-    // });
+    const mode4flip = gba.addGBAExecutable(b, "mode4flip", "examples/mode4flip/mode4flip.zig", .{});
+    gba.convertMode4Images(mode4flip, &[_]gba.ImageSourceTarget{
+        .{
+            .source = "examples/mode4flip/front.bmp",
+            .target = "examples/mode4flip/front.agi",
+        },
+        .{
+            .source = "examples/mode4flip/back.bmp",
+            .target = "examples/mode4flip/back.agi",
+        },
+    }, "examples/mode4flip/mode4flip.agp");
+    
+    // Tests
     
     const test_trig = b.addRunArtifact(b.addTest(.{
         .root_source_file = b.path("src/gba/fixed.zig"),

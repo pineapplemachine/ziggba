@@ -25,6 +25,12 @@ const gba_lib_file = libRoot() ++ "/../gba/gba.zig";
 var is_debug: ?bool = null;
 var use_gdb_option: ?bool = null;
 
+pub const Options = struct {
+    text_charset_latin: bool = false,
+    text_charset_latin_supplement: bool = false,
+    text_charset_kana: bool = false,
+};
+
 const gba_thumb_target_query = blk: {
     var target = std.Target.Query{
         .cpu_arch = std.Target.Cpu.Arch.thumb,
@@ -39,15 +45,24 @@ const gba_thumb_target_query = blk: {
 /// The library will be compiled to run on the GBA.
 pub fn addGBAStaticLibrary(
     b: *std.Build,
-    lib_name: []const u8,
-    source_file: []const u8,
-    debug: bool,
+    name: []const u8,
+    options: *std.Build.Step.Options,
+    module: *std.Build.Module,
 ) *std.Build.Step.Compile {
-    const lib = b.addStaticLibrary(.{
-        .name = lib_name,
-        .root_source_file = .{ .src_path = .{ .owner = b, .sub_path = source_file } },
-        .target = b.resolveTargetQuery(gba_thumb_target_query),
-        .optimize = if (debug) .Debug else .ReleaseFast,
+    const lib = b.addLibrary(.{
+        .linkage = .static,
+        .name = name,
+        .root_module = module,
+    });
+    lib.root_module.addOptions("gba_build_options", options);
+    lib.root_module.addAnonymousImport("ziggba_font_latin.bin", .{
+        .root_source_file = b.path("assets/font_latin.bin"),
+    });
+    lib.root_module.addAnonymousImport("ziggba_font_latin_supplement.bin", .{
+        .root_source_file = b.path("assets/font_latin_supplement.bin"),
+    });
+    lib.root_module.addAnonymousImport("ziggba_font_kana.bin", .{
+        .root_source_file = b.path("assets/font_kana.bin"),
     });
     lib.setLinkerScript(.{
         .src_path = .{
@@ -58,12 +73,48 @@ pub fn addGBAStaticLibrary(
     return lib;
 }
 
+pub fn addGBAModule(
+    b: *std.Build,
+    name: []const u8,
+    source_file: []const u8,
+    debug: bool,
+    options: *std.Build.Step.Options,
+) *std.Build.Module {
+    const module = b.addModule(name, .{
+        .root_source_file = .{ .src_path = .{ .owner = b, .sub_path = source_file } },
+        .target = b.resolveTargetQuery(gba_thumb_target_query),
+        .optimize = if (debug) .Debug else .ReleaseFast,
+    });
+    module.addOptions("ziggba_build_options", options);
+    module.addAnonymousImport("ziggba_font_latin.bin", .{
+        .root_source_file = b.path("assets/font_latin.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_latin_supplement.bin", .{
+        .root_source_file = b.path("assets/font_latin_supplement.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_kana.bin", .{
+        .root_source_file = b.path("assets/font_kana.bin"),
+    });
+    return module;
+}
+
+pub fn addGBAOptions(b: *std.Build, options: Options) *std.Build.Step.Options {
+    const build_options = b.addOptions();
+    build_options.addOption(bool, "text_charset_latin", options.text_charset_latin);
+    build_options.addOption(bool, "text_charset_latin_supplement", options.text_charset_latin_supplement);
+    build_options.addOption(bool, "text_charset_kana", options.text_charset_kana);
+    return build_options;
+}
+
 /// Add a build step to compile an executable, i.e. a GBA ROM.
 pub fn addGBAExecutable(
     b: *std.Build,
     rom_name: []const u8,
     source_file: []const u8,
+    options: ?Options,
 ) *std.Build.Step.Compile {
+    const build_options = addGBAOptions(b, options orelse .{});
+    
     const debug = is_debug orelse blk: {
         const dbg = b.option(bool, "debug", "Generate a debug build") orelse false;
         is_debug = dbg;
@@ -87,6 +138,7 @@ pub fn addGBAExecutable(
         .target = b.resolveTargetQuery(gba_thumb_target_query),
         .optimize = if (debug) .Debug else .ReleaseFast,
     });
+    start_zig_obj.root_module.addOptions("gba_build_options", build_options);
 
     const exe = b.addExecutable(.{
         .name = rom_name,
@@ -129,16 +181,22 @@ pub fn addGBAExecutable(
         b.default_step.dependOn(&install_bin_step.step);
     }
 
-    const gba_lib = addGBAStaticLibrary(b, "ZigGBA", gba_lib_file, debug);
-    exe.root_module.addAnonymousImport("gba", .{
-        .root_source_file = .{
-            .src_path = .{
-                .owner = b,
-                .sub_path = gba_lib_file,
-            },
-        },
-    });
+    const gba_module = addGBAModule(
+        b,
+        "gba",
+        gba_lib_file,
+        debug,
+        build_options,
+    );
+    const gba_lib = addGBAStaticLibrary(
+        b,
+        "ziggba",
+        build_options,
+        gba_module,
+    );
     exe.linkLibrary(gba_lib);
+    exe.root_module.addImport("gba", gba_module);
+    exe.root_module.addOptions("ziggba_build_options", build_options);
 
     b.default_step.dependOn(&exe.step);
 
