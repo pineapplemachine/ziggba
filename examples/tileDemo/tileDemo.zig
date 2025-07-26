@@ -17,7 +17,7 @@ pub export fn main() void {
     loadData();
     gba.bg.ctrl[0] = .{
         .screen_base_block = screenblock_index,
-        .tile_map_size = .{ .normal = .@"64x32" },
+        .tile_map_size = .{ .normal = .size_64x32 },
     };
 
     gba.display.ctrl.* = .{

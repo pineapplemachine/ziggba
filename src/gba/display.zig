@@ -6,8 +6,9 @@ const display = @This();
 pub const window = @import("display_window.zig");
 
 pub const vram = @import("display_vram.zig").vram;
-pub const ScreenblockEntry = @import("display_vram.zig").ScreenblockEntry;
 pub const Screenblock = @import("display_vram.zig").Screenblock;
+pub const BackgroundMap = @import("display_vram.zig").BackgroundMap;
+pub const AffineBackgroundMap = @import("display_vram.zig").AffineBackgroundMap;
 pub const Charblock = @import("display_vram.zig").Charblock;
 pub const CharblockTiles = @import("display_vram.zig").CharblockTiles;
 pub const BackgroundCharblockTiles = @import("display_vram.zig").BackgroundCharblockTiles;

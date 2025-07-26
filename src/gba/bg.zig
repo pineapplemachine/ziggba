@@ -7,26 +7,39 @@ const bg = @This();
 
 /// Background size, in 8x8 tiles.
 pub const Size = packed union {
-    pub const Normal = enum(u2) {
-        /// Uses one screenblock.
-        @"32x32",
-        /// Uses two screenblocks.
-        @"64x32",
-        /// Uses two screenblocks.
-        @"32x64",
-        /// Uses four screenblocks.
-        @"64x64",
+    /// Represents possible sizes for normal (non-affine) backgrounds.
+    pub const Normal = packed struct(u2) {
+        /// 32 tiles wide and 32 tiles tall. Uses one screenblock.
+        pub const size_32x32 = Size.Normal{ .x = .size_32, .y = .size_32 };
+        /// 64 tiles wide and 32 tiles tall. Uses two screenblocks.
+        pub const size_64x32 = Size.Normal{ .x = .size_64, .y = .size_32 };
+        /// 32 tiles wide and 64 tiles tall. Uses two screenblocks.
+        pub const size_32x64 = Size.Normal{ .x = .size_32, .y = .size_64 };
+        /// 64 tiles wide and 64 tiles tall. Uses four screenblocks.
+        pub const size_64x64 = Size.Normal{ .x = .size_64, .y = .size_64 };
+        
+        pub const Value = enum(u1) {
+            size_32 = 0,
+            size_64 = 1,
+        };
+        
+        /// When 0, the background is 32 tiles wide. When 1, 64 tiles wide.
+        x: Value,
+        /// When 0, the background is 32 tiles tall. When 1, 64 tiles tall.
+        y: Value,
     };
 
+    /// Enumeration of possible sizes for affine backgrounds.
+    /// Affine backgrounds are always square.
     pub const Affine = enum(u2) {
-        /// Uses 256 entries in one screenblock.
-        @"16x16",
-        /// Uses one screenblock.
-        @"32x32",
-        /// Uses two screenblocks.
-        @"64x64",
-        /// Uses eight screenblocks.
-        @"128x128",
+        /// 16 tiles wide and tall. Uses 256 bytes of one screenblock.
+        size_16,
+        /// 32 tiles wide and tall. Uses 1024 bytes (i.e. half) of one screenblock.
+        size_32,
+        /// 64 tiles wide and tall. Uses two screenblocks.
+        size_64,
+        /// 128 tiles wide and tall. Uses eight screenblocks.
+        size_128,
     };
 
     /// Determines size for non-affine backgrounds.
@@ -67,7 +80,7 @@ pub const Control = packed struct(u16) {
     affine_wrap: bool = false,
     /// Sizes differ depending on whether the background is affine.
     /// Larger sizes use more screenblocks.
-    tile_map_size: Size = .{ .normal = .@"32x32" },
+    tile_map_size: Size = .{ .normal = .size_32x32 },
 };
 
 /// Background control registers for tile modes.
@@ -121,8 +134,37 @@ pub inline fn screenBlockMap(block: u5) [*]volatile bg.TextScreenEntry {
     return @ptrCast(&screen_block_ram[block]);
 }
 
-// TODO: REG_BGxX, REG_BGxY, and other background affine registers
-// pub const bg_2_affine_dx: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x28);
-// pub const bg_2_affine_dy: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x2c);
-// pub const bg_3_affine_dx: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x38);
-// pub const bg_3_affine_dy: *volatile gba.fixed.FixedI32R8 = @ptrFromInt(gba.mem.io + 0x3c);
+/// Represents a displacement vector (also called a translation vector)
+/// for use with affine backgrounds.
+///
+/// Note that the highest 4 bits of each component are not used.
+pub const AffineDisplacement = extern struct {
+    /// X displacement of an affine background.
+    /// The highest 4 bits are ignored, meaning this behaves like a
+    /// `FixedI28R8` in practice.
+    x: gba.FixedI32R8 align(4) = .{},
+    /// Y displacement of an affine background.
+    /// The highest 4 bits are ignored, meaning this behaves like a
+    /// `FixedI28R8` in practice.
+    y: gba.FixedI32R8 align(4) = .{},
+};
+
+/// Holds an affine transformation matrix for background 2,
+/// when in affine mode. (Mode 1 or Mode 2.)
+/// Corresponds to REG_BG2PA, REG_BG2PB, REG_BG2PC, and REG_BG2PD.
+pub const bg_2_affine: *volatile gba.obj.AffineTransform = @ptrFromInt(gba.mem.io + 0x20);
+
+/// Holds a displacement/translation vector for background 2,
+/// when in affine mode. (Mode 1 or Mode 2.)
+/// Corresponds to REG_BG2X and REG_BG2Y.
+pub const bg_2_affine_xy: *volatile AffineDisplacement = @ptrFromInt(gba.mem.io + 0x28);
+
+/// Holds an affine transformation matrix for background 3,
+/// when in affine mode. (Mode 2.)
+/// Corresponds to REG_BG3PA, REG_BG3PB, REG_BG3PC, and REG_BG3PD.
+pub const bg_3_affine: *volatile gba.obj.AffineTransform = @ptrFromInt(gba.mem.io + 0x20);
+
+/// Holds a displacement/translation vector for background 3,
+/// when in affine mode. (Mode 2.)
+/// Corresponds to REG_BG3X and REG_BG3Y.
+pub const bg_3_affine_xy: *volatile AffineDisplacement = @ptrFromInt(gba.mem.io + 0x38);

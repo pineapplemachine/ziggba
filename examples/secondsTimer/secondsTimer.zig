@@ -11,7 +11,7 @@ fn initMap() void {
     // Init background
     bg.ctrl[0] = bg.Control{
         .screen_base_block = 28,
-        .tile_map_size = .{ .normal = .@"32x32" },
+        .tile_map_size = .{ .normal = .size_32x32 },
     };
     bg.scroll[0].set(0, 0);
 

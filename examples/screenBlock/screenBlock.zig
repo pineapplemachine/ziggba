@@ -16,7 +16,7 @@ fn initMap() void {
     // Init background
     bg.ctrl[0] = .{
         .screen_base_block = 28,
-        .tile_map_size = .{ .normal = .@"64x64" },
+        .tile_map_size = .{ .normal = .size_64x64 },
     };
     bg.scroll[0].set(0, 0);
 
