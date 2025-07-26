@@ -9,6 +9,11 @@ const assert = @import("std").debug.assert;
 
 const build_options = @import("ziggba_build_options");
 
+// The seemingly obvious solution of using an optional pointer for a
+// `Charset` without data causes the compiler to crash in 0.14.1.
+// https://github.com/ziglang/zig/issues/24593
+const charset_data_empty: [0]u8 = .{};
+
 /// Contains data regarding supported character sets for text rendering.
 pub const Charset = struct {
     pub const CharHeader = packed struct(u32) {
@@ -25,9 +30,9 @@ pub const Charset = struct {
     /// Records whether support for this charset has been enabled in
     /// build options.
     enabled: bool,
-    /// Spacing and image data for this charset, if enabled, or `null`
-    /// if not enabled.
-    data: ?[]align(4) const u8,
+    /// Spacing and image data for this charset, if enabled,
+    /// or an empty array if not enabled.
+    data: []align(2) const u8,
     /// Inclusive low bound of Unicode code point range represented by
     /// this charset.
     code_point_min: u16,
@@ -35,13 +40,17 @@ pub const Charset = struct {
     /// this charset.
     code_point_max: u16,
     
-    pub inline fn getHeader(self: Charset, index: u16) *const CharHeader {
-        const header_data: [*]const CharHeader = @ptrCast(self.data);
+    pub inline fn getHeader(self: Charset, index: u16) *align(2) const CharHeader {
+        const header_data: [*]align(2) const CharHeader = @ptrCast(self.data);
         return &header_data[index];
     }
     
     pub fn containsCodePoint(self: Charset, point: i32) bool {
         return point >= self.code_point_min and point <= self.code_point_max;
+    }
+    
+    pub fn hasData(self: Charset) bool {
+        return self.data.len > 0;
     }
 };
 
@@ -49,31 +58,52 @@ pub const charset_latin = Charset{
     .enabled = build_options.text_charset_latin,
     .code_point_min = 0x20,
     .code_point_max = 0x7f,
-    .data = (
-        if (!build_options.text_charset_latin) null
-        else @ptrCast(@alignCast(@embedFile("ziggba_font_latin.bin")))
-    ),
+    .data = @ptrCast(@alignCast(
+        if (!build_options.text_charset_latin) &charset_data_empty
+        else @embedFile("ziggba_font_latin.bin")
+    )),
 };
 
 pub const charset_latin_supplement = Charset{
     .enabled = build_options.text_charset_latin_supplement,
     .code_point_min = 0xa0,
     .code_point_max = 0xff,
-    .data = (
-        if (!build_options.text_charset_latin_supplement) null
-        else @ptrCast(@alignCast(@embedFile("ziggba_font_latin_supplement.bin")))
-    ),
+    .data = @ptrCast(@alignCast(
+        if (!build_options.text_charset_latin_supplement) &charset_data_empty
+        else @embedFile("ziggba_font_latin_supplement.bin")
+    )),
 };
 
 pub const charset_kana = Charset{
     .enabled = build_options.text_charset_kana,
     .code_point_min = 0x3040,
     .code_point_max = 0x30ff,
-    .data = (
-        if (!build_options.text_charset_kana) null
-        else @ptrCast(@alignCast(@embedFile("ziggba_font_kana.bin")))
-    ),
+    .data = @ptrCast(@alignCast(
+        if (!build_options.text_charset_kana) &charset_data_empty
+        else @embedFile("ziggba_font_kana.bin")
+    )),
 };
+
+// pub const charset_latin = Charset{
+//     .enabled = build_options.text_charset_latin,
+//     .code_point_min = 0x20,
+//     .code_point_max = 0x7f,
+//     .data = @ptrCast(@alignCast(@embedFile("ziggba_font_latin.bin"))),
+// };
+
+// pub const charset_latin_supplement = Charset{
+//     .enabled = build_options.text_charset_latin_supplement,
+//     .code_point_min = 0xa0,
+//     .code_point_max = 0xff,
+//     .data = @ptrCast(@alignCast(@embedFile("ziggba_font_latin_supplement.bin"))),
+// };
+
+// pub const charset_kana = Charset{
+//     .enabled = build_options.text_charset_kana,
+//     .code_point_min = 0x3040,
+//     .code_point_max = 0x30ff,
+//     .data = @ptrCast(@alignCast(@embedFile("ziggba_font_kana.bin"))),
+// };
 
 pub const charsets = [_]Charset{
     charset_latin,
@@ -222,7 +252,7 @@ const GlyphLayoutIterator = struct {
             return .eof;
         }
         for(charsets) |charset| {
-            if(charset.data != null and charset.containsCodePoint(point)) {
+            if(charset.hasData() and charset.containsCodePoint(point)) {
                 return self.layoutGlyph(charset, point);
             }
         }
@@ -236,8 +266,7 @@ const GlyphLayoutIterator = struct {
         point: i32,
     ) Glyph {
         assert(point >= 0);
-        assert(charset.data != null);
-        const charset_data = charset.data orelse unreachable;
+        assert(charset.hasData());
         const header = charset.getHeader(
             @as(u16, @intCast(point)) - charset.code_point_min
         );
@@ -272,7 +301,7 @@ const GlyphLayoutIterator = struct {
         }
         return .{
             .point = point,
-            .data = @ptrCast(&charset_data[header.data_offset]),
+            .data = @ptrCast(&charset.data[header.data_offset]),
             .data_is_wide = header.size_x > 8,
             .x = x,
             .y = y,

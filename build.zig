@@ -6,11 +6,11 @@ pub fn build(b: *std.Build) void {
     
     // Options
     
-    // const text_options: gba.Options = .{
-    //     .text_charset_latin = true,
-    //     .text_charset_latin_supplement = true,
-    //     .text_charset_kana = true,
-    // };
+    const text_options: gba.Options = .{
+        .text_charset_latin = true,
+        .text_charset_latin_supplement = true,
+        .text_charset_kana = true,
+    };
     
     // Examples
     
@@ -33,7 +33,7 @@ pub fn build(b: *std.Build) void {
         .{ .r = 0, .g = 255, .b = 0 },
         .{ .r = 0, .g = 128, .b = 255 },
     };
-    _ = gba.addGBAExecutable(b, "bgAffine", "examples/bgAffine/bgAffine.zig", .{});
+    _ = gba.addGBAExecutable(b, "bgAffine", "examples/bgAffine/bgAffine.zig", text_options);
     gba.tiles.convertSaveImagePath(
         []gba.tiles.ColorRgb888,
         "examples/bgAffine/tiles.png",
