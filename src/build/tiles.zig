@@ -108,11 +108,16 @@ pub fn gbaColorToRgb888(color: GBAColor) ColorRgb888 {
 
 /// Convenience function for finding a best fit color within a truecolor
 /// palette to match a color found in an image.
+///
 /// When using this function, []ColorRgb888 should be provided as the CtxT
 /// comptime argument to a convertTiles call. Only the first 16 items are
 /// considered for 4bpp tiles, and only the first 256 items for 8bpp tiles.
 /// The first palette color is treated as full transparency, to reflect
 /// GBA rendering behavior.
+///
+/// Pixels with less than full 100% opacity are always matched with palette
+/// index 0. Otherwise, a perceptual color distance algorithm is used to
+/// match the nearest color that isn't at index 0.
 pub fn getNearestPaletteColor(
     _: u16, // x
     _: u16, // y

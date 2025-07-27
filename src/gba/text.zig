@@ -27,6 +27,13 @@ pub const Charset = struct {
         data_offset: u16 = 0,
     };
     
+    pub const none: Charset = .{
+        .enabled = false,
+        .data = &charset_data_empty,
+        .code_point_min = 0,
+        .code_point_max = 0,
+    };
+    
     /// Records whether support for this charset has been enabled in
     /// build options.
     enabled: bool,
@@ -84,31 +91,31 @@ pub const charset_kana = Charset{
     )),
 };
 
-// pub const charset_latin = Charset{
-//     .enabled = build_options.text_charset_latin,
-//     .code_point_min = 0x20,
-//     .code_point_max = 0x7f,
-//     .data = @ptrCast(@alignCast(@embedFile("ziggba_font_latin.bin"))),
-// };
-
-// pub const charset_latin_supplement = Charset{
-//     .enabled = build_options.text_charset_latin_supplement,
-//     .code_point_min = 0xa0,
-//     .code_point_max = 0xff,
-//     .data = @ptrCast(@alignCast(@embedFile("ziggba_font_latin_supplement.bin"))),
-// };
-
-// pub const charset_kana = Charset{
-//     .enabled = build_options.text_charset_kana,
-//     .code_point_min = 0x3040,
-//     .code_point_max = 0x30ff,
-//     .data = @ptrCast(@alignCast(@embedFile("ziggba_font_kana.bin"))),
-// };
-
-pub const charsets = [_]Charset{
+pub const all_charsets = [_]Charset{
     charset_latin,
     charset_latin_supplement,
     charset_kana,
+};
+
+const num_enabled_charsets: u8 = blk: {
+    var count: u8 = 0;
+    for(all_charsets) |charset| {
+        count += @intFromBool(charset.hasData());
+    }
+    break :blk count;
+};
+
+pub const enabled_charsets = blk: {
+    var array: [num_enabled_charsets]Charset = @splat(.none);
+    var array_index: u8 = 0;
+    for(all_charsets) |charset| {
+        if(charset.hasData()) {
+            array[array_index] = charset;
+            array_index += 1;
+        }
+    }
+    assert(array_index == array.len);
+    break :blk array;
 };
 
 /// This type can be used to decode and iterator Unicode code points in
@@ -251,8 +258,8 @@ const GlyphLayoutIterator = struct {
         if(point < 0) {
             return .eof;
         }
-        for(charsets) |charset| {
-            if(charset.hasData() and charset.containsCodePoint(point)) {
+        for(enabled_charsets) |charset| {
+            if(charset.containsCodePoint(point)) {
                 return self.layoutGlyph(charset, point);
             }
         }
