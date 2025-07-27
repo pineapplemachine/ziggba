@@ -473,12 +473,6 @@ const GlyphLayoutIterator = struct {
             }
         }
         const data = &charset.data[header.data_offset];
-        gba.debug.print("Glyph {x} '{u}'", .{ point, @as(u21, @intCast(point)) }) catch {};
-        gba.debug.print("  size_x {d}", .{ header.size_x }) catch {};
-        gba.debug.print("  size_y {d}", .{ header.size_y }) catch {};
-        gba.debug.print("  offset_y {d}", .{ header.offset_y }) catch {};
-        gba.debug.print("  data_offset {d}", .{ header.data_offset }) catch {};
-        gba.debug.print("  ptr {d} {x:0<8}", .{ data, data }) catch {};
         return .{
             .point = point,
             .data = @ptrCast(data),
@@ -557,12 +551,10 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
         }
         for(0..glyph.size_y) |row_i| {
             var row = glyph.getDataRow(@truncate(row_i));
-            gba.debug.print("Glyph row {d}: {x:0>4} {b:0>12}", .{ row_i, row, row }) catch {};
             for(0..glyph.size_x) |col_i| {
                 const pixel = row & 1;
                 row >>= 1;
                 if(pixel != 0) {
-                    // gba.debug.print("Drawing pixel @ {d}, {d}", .{ col_i, row_i }) catch {};
                     const px_x = glyph.x + col_i;
                     const px_y = glyph.y + row_i;
                     var tile = &options.target[
