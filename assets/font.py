@@ -105,7 +105,7 @@ class Char:
             for px_x in range(self.x_min, self.x_max):
                 if im_pixels[px_x, px_y]:
                     row |= (1 << i)
-                i + 1
+                i += 1
             self.rows.append(row)
     
     def is_blank(self):
