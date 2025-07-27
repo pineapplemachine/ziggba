@@ -2,12 +2,12 @@ const gba = @import("gba");
 const debug = gba.debug;
 const display = gba.display;
 
-export var header linksection(".gbaheader") = gba.initHeader("DEBUGPRINT", "ADPE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("DEBUGPRINT", "ADPE", "00", 0);
 
 pub export fn main() void {
     display.ctrl.* = .{
         .mode = .mode3,
-        .bg2 = .enable,
+        .bg2 = true,
     };
 
     debug.init();

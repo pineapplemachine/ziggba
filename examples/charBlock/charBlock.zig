@@ -12,7 +12,7 @@ const screen_block_4 = 2;
 const character_block_8 = 2;
 const screen_block_8 = 4;
 
-export var header linksection(".gbaheader") = gba.initHeader("CHARBLOCK", "ASBE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("CHARBLOCK", "ASBE", "00", 0);
 
 fn loadTiles() void {
     const tl4: [*]align(4) const Tile(.bpp_4) = @ptrCast(&cbb_ids.ids_4_tiles);
@@ -77,9 +77,9 @@ pub export fn main() void {
     initMaps();
 
     display.ctrl.* = .{
-        .bg0 = .enable,
-        .bg1 = .enable,
-        .obj = .enable,
+        .bg0 = true,
+        .bg1 = true,
+        .obj = true,
     };
 
     bg.ctrl[0] = .{

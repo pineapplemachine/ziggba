@@ -1,9 +1,8 @@
 const gba = @import("gba");
-const input = gba.input;
 const display = gba.display;
 const bg = gba.bg;
 
-export var gameHeader linksection(".gbaheader") = gba.initHeader("SCREENBLOCK", "ASBE", "00", 0);
+export var gameHeader linksection(".gbaheader") = gba.Header.init("SCREENBLOCK", "ASBE", "00", 0);
 
 const cross_tx = 15;
 const cross_ty = 10;
@@ -48,10 +47,11 @@ fn initMap() void {
 pub export fn main() void {
     initMap();
     display.ctrl.* = .{
-        .bg0 = .enable,
-        .obj = .enable,
+        .bg0 = true,
+        .obj = true,
     };
 
+    var input: gba.input.KeysState = .{};
     var x: i10 = 0;
     var y: i10 = 0;
     var tx: u6 = 0;
@@ -65,10 +65,10 @@ pub export fn main() void {
     while (true) {
         display.naiveVSync();
 
-        _ = input.poll();
+        input.poll();
 
-        x +%= input.getAxis(.horizontal).toInt();
-        y +%= input.getAxis(.vertical).toInt();
+        x +%= input.getAxisHorizontal();
+        y +%= input.getAxisVertical();
 
         tx = @truncate((@as(u10, @bitCast(x)) >> 3) + cross_tx);
         ty = @truncate((@as(u10, @bitCast(y)) >> 3) + cross_ty);

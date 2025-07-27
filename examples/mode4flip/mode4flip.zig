@@ -1,8 +1,7 @@
 const gba = @import("gba");
-const input = gba.input;
 const display = gba.display;
 
-export var header linksection(".gbaheader") = gba.initHeader("MODE4FLIP", "AMFE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("MODE4FLIP", "AMFE", "00", 0);
 
 const front_image_data = @embedFile("front.agi");
 const back_image_data = @embedFile("back.agi");
@@ -17,17 +16,14 @@ fn loadImageData() void {
 pub export fn main() void {
     display.ctrl.* = .{
         .mode = .mode4,
-        .bg2 = .enable,
+        .bg2 = true,
     };
 
     loadImageData();
 
     var i: u32 = 0;
     while (true) : (i += 1) {
-        _ = input.poll();
-        while (input.isKeyPressed(.start)) {
-            _ = input.poll();
-        }
+        while(gba.input.state.startIsPressed()) {}
 
         display.naiveVSync();
 

@@ -2,7 +2,6 @@
 const std = @import("std");
 const gba = @import("gba.zig");
 const Color = gba.Color;
-const Enable = gba.utils.Enable;
 const I8_8 = gba.math.I8_8;
 const display = gba.display;
 const Priority = display.Priority;
@@ -138,7 +137,7 @@ pub const Obj = packed struct {
     affine_mode: AffineMode = .normal,
     mode: GfxMode = .normal,
     /// Enables mosaic effects on this object
-    mosaic: Enable = .disable,
+    mosaic: bool = false,
     palette_mode: Color.Bpp = .bpp_4,
     /// Used in combination with size, see `setSize`
     shape: Shape = .square,

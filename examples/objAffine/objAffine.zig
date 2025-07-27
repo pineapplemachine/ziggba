@@ -1,18 +1,17 @@
 const gba = @import("gba");
-const input = gba.input;
 const display = gba.display;
 const obj = gba.obj;
 const debug = gba.debug;
 const math = gba.math;
 const metr = @import("metr.zig");
 
-export var header linksection(".gbaheader") = gba.initHeader("OBJAFFINE", "AODE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("OBJAFFINE", "AODE", "00", 0);
 
 pub export fn main() void {
     display.ctrl.* = .{
         .obj_mapping = .one_dimension,
-        .bg0 = .enable,
-        .obj = .enable,
+        .bg0 = true,
+        .obj = true,
     };
 
     debug.init();
@@ -43,7 +42,5 @@ pub export fn main() void {
 
     while (true) {
         display.naiveVSync();
-
-        _ = input.poll();
     }
 }

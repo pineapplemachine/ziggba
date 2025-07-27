@@ -1,9 +1,8 @@
 const gba = @import("gba");
-const input = gba.input;
 const display = gba.display;
 const obj = gba.obj;
 
-export var header linksection(".gbaheader") = gba.initHeader("OBJDEMO", "AODE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("OBJDEMO", "AODE", "00", 0);
 
 const metr = @import("metroid_sprite_data.zig");
 
@@ -15,7 +14,7 @@ fn loadSpriteData() void {
 pub export fn main() void {
     display.ctrl.* = .{
         .obj_mapping = .one_dimension,
-        .obj = .enable,
+        .obj = true,
     };
 
     loadSpriteData();
@@ -27,6 +26,7 @@ pub export fn main() void {
     };
     metroid.setSize(.@"64x64");
 
+    var input: gba.input.BufferedKeysState = .{};
     var x: i9 = 96;
     var y: i8 = 32;
     const scale_factor: i4 = 2;
@@ -35,23 +35,25 @@ pub export fn main() void {
     while (true) {
         display.naiveVSync();
 
-        _ = input.poll();
+        input.poll();
 
-        x +%= input.getAxis(.horizontal).scale(scale_factor);
-        y +%= input.getAxis(.vertical).scale(scale_factor);
+        x +%= scale_factor * input.getAxisHorizontal();
+        y +%= scale_factor * input.getAxisVertical();
 
-        tile_index +%= input.getAxis(.shoulders).toInt();
+        tile_index +%= input.getAxisShoulders();
 
-        if (input.isKeyJustPressed(.A)) {
+        if (input.isJustPressed(.A)) {
             metroid.flipH();
         }
-        if (input.isKeyJustPressed(.B)) {
+        if (input.isJustPressed(.B)) {
             metroid.flipV();
         }
 
-        metroid.palette = if (input.isKeyPressed(.select)) 1 else 0;
+        metroid.palette = if (input.isPressed(.select)) 1 else 0;
 
-        display.ctrl.obj_mapping = if (input.isKeyPressed(.start)) .two_dimensions else .one_dimension;
+        display.ctrl.obj_mapping = (
+            if (input.isPressed(.start)) .two_dimensions else .one_dimension
+        );
 
         metroid.setPosition(@bitCast(x), @bitCast(y));
         metroid.tile = @bitCast(tile_index);

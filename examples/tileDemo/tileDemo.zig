@@ -1,10 +1,9 @@
 const gba = @import("gba");
-const input = gba.input;
 const display = gba.display;
 const bg = gba.bg;
 const brin = @import("brin.zig");
 
-export var header linksection(".gbaheader") = gba.initHeader("TILEDEMO", "ATDE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("TILEDEMO", "ATDE", "00", 0);
 
 fn loadData() void {
     const map_ram: [*]volatile u16 = @ptrFromInt(@intFromPtr(display.vram) + (30 * 2048));
@@ -22,19 +21,20 @@ pub export fn main() void {
     };
 
     display.ctrl.* = .{
-        .bg0 = .enable,
+        .bg0 = true,
     };
 
+    var input: gba.input.KeysState = .{};
     var x: i10 = 192;
     var y: i10 = 64;
 
     while (true) {
         display.naiveVSync();
 
-        _ = input.poll();
+        input.poll();
 
-        x +%= input.getAxis(.horizontal).toInt();
-        y +%= input.getAxis(.vertical).toInt();
+        x +%= input.getAxisHorizontal();
+        y +%= input.getAxisVertical();
 
         bg.scroll[0].set(x, y);
     }

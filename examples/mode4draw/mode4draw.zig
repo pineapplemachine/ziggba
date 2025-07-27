@@ -3,7 +3,7 @@ const Color = gba.Color;
 const Mode4 = gba.bitmap.Mode4;
 const display = gba.display;
 
-export var header linksection(".gbaheader") = gba.initHeader("MODE4DRAW", "AWJE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("MODE4DRAW", "AWJE", "00", 0);
 
 const palette: [26]Color = [_]Color{
     Color.black,
@@ -32,7 +32,7 @@ pub export fn main() void {
 
     display.ctrl.* = .{
         .mode = .mode4,
-        .bg2 = .enable,
+        .bg2 = true,
     };
 
     // Fill screen with grey color

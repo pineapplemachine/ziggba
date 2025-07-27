@@ -1,6 +1,5 @@
 const std = @import("std");
 const gba = @import("gba.zig");
-const Enable = gba.utils.Enable;
 
 /// Encapsulates access to REG_TMxD and REG_TMxCNT registers
 /// for controlling and reading one of the GBA's four timers.
@@ -47,9 +46,9 @@ pub const Timer = packed struct(u32) {
         /// Unused bits.
         _: u3 = 0,
         /// Raise an interrupt upon overflow.
-        interrupt: Enable = .disable,
+        interrupt: bool = false,
         /// Enable the timer.
-        enable: Enable = .disable,
+        enable: bool = false,
     };
 
     /// Corresponds to tonc REG_TMxD.
