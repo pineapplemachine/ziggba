@@ -29,6 +29,9 @@ pub const Options = struct {
     text_charset_latin: bool = false,
     text_charset_latin_supplement: bool = false,
     text_charset_kana: bool = false,
+    text_charset_fullwidth_punctuation: bool = false,
+    text_charset_fullwidth_latin: bool = false,
+    text_charset_cjk_symbols: bool = false,
 };
 
 const gba_thumb_target_query = blk: {
@@ -95,6 +98,15 @@ pub fn addGBAModule(
     module.addAnonymousImport("ziggba_font_kana.bin", .{
         .root_source_file = b.path("assets/font_kana.bin"),
     });
+    module.addAnonymousImport("ziggba_font_fullwidth_punctuation.bin", .{
+        .root_source_file = b.path("assets/font_fullwidth_punctuation.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_fullwidth_latin.bin", .{
+        .root_source_file = b.path("assets/font_fullwidth_latin.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_cjk_symbols.bin", .{
+        .root_source_file = b.path("assets/font_cjk_symbols.bin"),
+    });
     return module;
 }
 
@@ -103,6 +115,9 @@ pub fn addGBAOptions(b: *std.Build, options: Options) *std.Build.Step.Options {
     build_options.addOption(bool, "text_charset_latin", options.text_charset_latin);
     build_options.addOption(bool, "text_charset_latin_supplement", options.text_charset_latin_supplement);
     build_options.addOption(bool, "text_charset_kana", options.text_charset_kana);
+    build_options.addOption(bool, "text_charset_fullwidth_punctuation", options.text_charset_fullwidth_punctuation);
+    build_options.addOption(bool, "text_charset_fullwidth_latin", options.text_charset_fullwidth_latin);
+    build_options.addOption(bool, "text_charset_cjk_symbols", options.text_charset_cjk_symbols);
     return build_options;
 }
 

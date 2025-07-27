@@ -61,40 +61,103 @@ pub const Charset = struct {
     }
 };
 
+const charset_latin_data align(2) = blk: {
+    if (build_options.text_charset_latin) {
+        break :blk @embedFile("ziggba_font_latin.bin").*;
+    }
+    else {
+        break :blk &charset_data_empty;
+    }
+};
 pub const charset_latin = Charset{
     .enabled = build_options.text_charset_latin,
     .code_point_min = 0x20,
     .code_point_max = 0x7f,
-    .data = @ptrCast(@alignCast(
-        if (!build_options.text_charset_latin) &charset_data_empty
-        else @embedFile("ziggba_font_latin.bin")
-    )),
+    .data = &charset_latin_data,
 };
 
+const charset_latin_supplement_data align(2) = blk: {
+    if (build_options.text_charset_latin_supplement) {
+        break :blk @embedFile("ziggba_font_latin_supplement.bin").*;
+    }
+    else {
+        break :blk &charset_data_empty;
+    }
+};
 pub const charset_latin_supplement = Charset{
     .enabled = build_options.text_charset_latin_supplement,
     .code_point_min = 0xa0,
     .code_point_max = 0xff,
-    .data = @ptrCast(@alignCast(
-        if (!build_options.text_charset_latin_supplement) &charset_data_empty
-        else @embedFile("ziggba_font_latin_supplement.bin")
-    )),
+    .data = &charset_latin_supplement_data,
 };
 
+const charset_cjk_symbols_data align(2) = blk: {
+    if (build_options.text_charset_cjk_symbols) {
+        break :blk @embedFile("ziggba_font_cjk_symbols.bin").*;
+    }
+    else {
+        break :blk &charset_data_empty;
+    }
+};
+pub const charset_cjk_symbols = Charset{
+    .enabled = build_options.text_charset_cjk_symbols,
+    .code_point_min = 0x3000,
+    .code_point_max = 0x303f,
+    .data = &charset_cjk_symbols_data,
+};
+
+const charset_kana_data align(2) = blk: {
+    if (build_options.text_charset_kana) {
+        break :blk @embedFile("ziggba_font_kana.bin").*;
+    }
+    else {
+        break :blk &charset_data_empty;
+    }
+};
 pub const charset_kana = Charset{
     .enabled = build_options.text_charset_kana,
     .code_point_min = 0x3040,
     .code_point_max = 0x30ff,
-    .data = @ptrCast(@alignCast(
-        if (!build_options.text_charset_kana) &charset_data_empty
-        else @embedFile("ziggba_font_kana.bin")
-    )),
+    .data = &charset_kana_data,
+};
+
+const charset_fullwidth_punctuation_data align(2) = blk: {
+    if (build_options.text_charset_fullwidth_punctuation) {
+        break :blk @embedFile("ziggba_font_fullwidth_punctuation.bin").*;
+    }
+    else {
+        break :blk &charset_data_empty;
+    }
+};
+pub const charset_fullwidth_punctuation = Charset{
+    .enabled = build_options.text_charset_fullwidth_punctuation,
+    .code_point_min = 0xff00,
+    .code_point_max = 0xff1f,
+    .data = &charset_fullwidth_punctuation_data,
+};
+
+const charset_fullwidth_latin_data align(2) = blk: {
+    if (build_options.text_charset_fullwidth_latin) {
+        break :blk @embedFile("ziggba_font_fullwidth_latin.bin").*;
+    }
+    else {
+        break :blk &charset_data_empty;
+    }
+};
+pub const charset_fullwidth_latin = Charset{
+    .enabled = build_options.text_charset_fullwidth_latin,
+    .code_point_min = 0xff20,
+    .code_point_max = 0xff60,
+    .data = &charset_fullwidth_latin_data,
 };
 
 pub const all_charsets = [_]Charset{
     charset_latin,
     charset_latin_supplement,
+    charset_cjk_symbols,
     charset_kana,
+    charset_fullwidth_punctuation,
+    charset_fullwidth_latin,
 };
 
 const num_enabled_charsets: u8 = blk: {
@@ -186,6 +249,9 @@ pub const CodePointIterator = struct {
 const GlyphLayoutIterator = struct {
     // TODO: Might be helpful to support line wrapping
     
+    pub const full_height = 12;
+    pub const full_width = 10;
+    
     pub const Glyph = struct {
         pub const eof: Glyph = .{ .point = -1 };
         pub const unknown: Glyph = .{ .point = 0 };
@@ -205,7 +271,7 @@ const GlyphLayoutIterator = struct {
                 return data[row_i];
             }
             else {
-                const row_i_2 = row_i << 1;
+                const row_i_2 = @as(u16, row_i) << 1;
                 return data[row_i_2] | (@as(u16, data[row_i_2 + 1]) << 8);
             }
         }
@@ -219,21 +285,63 @@ const GlyphLayoutIterator = struct {
         }
     };
     
+    pub const GlyphAlignment = enum {
+        /// Normal character alignment.
+        /// Reserves as much horizontal space as it needs and no more.
+        normal,
+        /// Fullwidth character, aligned to the left side of its reserved space.
+        fullwidth_left,
+        /// Fullwidth character, aligned to the right side of its reserved space.
+        fullwidth_right,
+        /// Fullwidth character, horizontally centered within its reserved space.
+        fullwidth_center,
+    };
+    
+    /// Get alignment for the glyph corresponding to a given code point.
+    pub inline fn getGlyphAlignment(point: i32) GlyphAlignment {
+        return switch(point) {
+            // CJK Symbols and Punctuation
+            0x3000 => .fullwidth_center,
+            0x3001, 0x3002 => .fullwidth_left, // '、' '。'
+            0x3003...0x3007 => .fullwidth_center,
+            0x3008, 0x300a, 0x300c, 0x300e, 0x3010 => .fullwidth_right, // brackets
+            0x3009, 0x300b, 0x300d, 0x300f, 0x3011 => .fullwidth_left, // brackets
+            0x3012, 0x3013 => .fullwidth_center,
+            0x3014, 0x3016, 0x3018, 0x301a => .fullwidth_right, // more brackets
+            0x3015, 0x3017, 0x3019, 0x301b => .fullwidth_left, // more brackets
+            0x301c => .fullwidth_center,
+            0x301d => .fullwidth_right, // quotation mark
+            0x301e, 0x301f => .fullwidth_left, // quotation marks
+            0x3020...0x3029 => .fullwidth_center,
+            0x302a, 0x302b => .fullwidth_left, // tone marks
+            0x302c, 0x302d => .fullwidth_right, // tone marks
+            0x302e, 0x302f => .fullwidth_left, // more tone marks
+            0x3030...0x303f => .fullwidth_center,
+            // Hiragana, Katakana
+            0x3040...0x30ff => .fullwidth_center,
+            // Fullwidth Forms
+            0xff00...0xff60 => .fullwidth_center,
+            // Everything else...
+            else => .normal,
+        };
+    }
+    
     pub const InitOptions = struct {
         text: []const u8,
         x: u16,
         y: u16,
         max_width: u16 = 0xffff,
         max_height: u16 = 0xffff,
-        line_height: u8 = 12,
+        line_height: u8 = full_height,
     };
     
     points: CodePointIterator,
+    prev_point: i32 = -1,
     prev_kerning_dangle_top_right: bool = false,
     prev_kerning_gap_bottom_right: bool = false,
     max_width: u16 = 0xffff,
     max_height: u16 = 0xffff,
-    line_height: u8 = 12,
+    line_height: u8 = full_height,
     x_initial: u16,
     x: u16,
     y: u16,
@@ -245,7 +353,7 @@ const GlyphLayoutIterator = struct {
             .max_height = options.max_height,
             .x_initial = options.x,
             .x = options.x,
-            .y = options.y + options.line_height - 12,
+            .y = options.y + options.line_height - full_height,
             .line_height = options.line_height,
         };
     }
@@ -255,18 +363,67 @@ const GlyphLayoutIterator = struct {
             return .eof;
         }
         const point = self.points.next();
+        defer self.prev_point = point;
         if(point < 0) {
             return .eof;
         }
-        for(enabled_charsets) |charset| {
-            if(charset.containsCodePoint(point)) {
-                return self.layoutGlyph(charset, point);
+        switch(point) {
+            ' ', 0xa0 => { // space and non-breaking space (nbsp)
+                self.x += 4;
+            },
+            '\t' => { // horizontal tab/line tabulation
+                self.x = (self.x & 0xfff0) + 0x10;
+            },
+            '\n' => { // line feed
+                self.x = self.x_initial;
+                self.prev_kerning_gap_bottom_right = false;
+                self.prev_kerning_dangle_top_right = false;
+                self.y += self.line_height;
+            },
+            0x2002 => { // en space
+                self.x += full_height >> 1;
+            },
+            0x2003 => { // em space
+                self.x += full_height;
+            },
+            0x2004 => { // three-per-em space
+                const full_height_div3 = comptime(full_height / 3);
+                self.x += full_height_div3;
+            },
+            0x2005 => { // four-per-em space
+                self.x += full_height >> 2;
+            },
+            0x2006 => { // six-per-em space
+                const full_height_div6 = comptime(full_height / 6);
+                self.x += full_height_div6;
+            },
+            0x2007 => { // figure space
+                self.x += full_width;
+            },
+            0x2008 => { // punctuation space
+                self.x += 3; // width of '.' and ','
+            },
+            0x2009 => { // thin space
+                self.x += 2;
+            },
+            0x200a => { // hair space
+                self.x += 1;
+            },
+            0x3000 => { // ideographic space
+                self.x += full_width;
+            },
+            else => {
+                for(enabled_charsets) |charset| {
+                    if(charset.containsCodePoint(point)) {
+                        return self.layoutGlyph(charset, point);
+                    }
+                }
             }
         }
         return .unknown;
     }
     
-    /// Helper called by `GlyphLayoutIterator.next` for a matching charset.
+    /// Helper called by `GlyphLayoutIterator.next` for a matching charset.bdg
     fn layoutGlyph(
         self: *GlyphLayoutIterator,
         charset: Charset,
@@ -274,10 +431,13 @@ const GlyphLayoutIterator = struct {
     ) Glyph {
         assert(point >= 0);
         assert(charset.hasData());
+        const glyph_align = getGlyphAlignment(point);
         const header = charset.getHeader(
             @as(u16, @intCast(point)) - charset.code_point_min
         );
-        if(
+        defer self.prev_kerning_gap_bottom_right = header.kerning_gap_bottom_right;
+        defer self.prev_kerning_dangle_top_right = header.kerning_dangle_top_right;
+        if(glyph_align == .normal and (
             (
                 header.kerning_dangle_bottom_left and
                 self.prev_kerning_gap_bottom_right
@@ -286,32 +446,45 @@ const GlyphLayoutIterator = struct {
                 header.kerning_gap_top_left and
                 self.prev_kerning_dangle_top_right
             )
-        ) {
+        )) {
             self.x -= 1;
         }
-        const x = self.x;
+        var x = self.x;
         const y = self.y;
-        if(point == ' ') {
-            self.x += 5;
-        }
-        else if(point == '\t') {
-            self.x = (self.x & 0xfff0) + 0x10;
-        }
-        else if(point == '\n') {
-            self.x = self.x_initial;
-            self.prev_kerning_gap_bottom_right = false;
-            self.prev_kerning_dangle_top_right = false;
-            self.y += self.line_height;
-        }
-        else {
+        if(header.size_x >= full_width) {
             self.x += header.size_x + 1;
         }
+        else {
+            switch(glyph_align) {
+                .normal => {
+                    self.x += header.size_x + 1;
+                },
+                .fullwidth_left => {
+                    self.x += full_width;
+                },
+                .fullwidth_right => {
+                    x += full_width - header.size_x - 1;
+                    self.x += full_width;
+                },
+                .fullwidth_center => {
+                    x += (full_width - header.size_x) >> 1;
+                    self.x += full_width;
+                },
+            }
+        }
+        const data = &charset.data[header.data_offset];
+        gba.debug.print("Glyph {x} '{u}'", .{ point, @as(u21, @intCast(point)) }) catch {};
+        gba.debug.print("  size_x {d}", .{ header.size_x }) catch {};
+        gba.debug.print("  size_y {d}", .{ header.size_y }) catch {};
+        gba.debug.print("  offset_y {d}", .{ header.offset_y }) catch {};
+        gba.debug.print("  data_offset {d}", .{ header.data_offset }) catch {};
+        gba.debug.print("  ptr {d} {x:0<8}", .{ data, data }) catch {};
         return .{
             .point = point,
-            .data = @ptrCast(&charset.data[header.data_offset]),
+            .data = @ptrCast(data),
             .data_is_wide = header.size_x > 8,
             .x = x,
-            .y = y,
+            .y = y + header.offset_y,
             .size_x = @min(
                 header.size_x,
                 self.max_width - @min(self.max_width, x),
@@ -366,7 +539,7 @@ pub const DrawToCharblock4BppOptions = struct {
 
 /// Draw text to memory structured as 16-color background or object tile data.
 pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
-    var glyphs = GlyphLayoutIterator.init(.{
+    var layoutGlyphs = GlyphLayoutIterator.init(.{
         .text = options.text,
         .x = options.x,
         .y = options.y,
@@ -375,7 +548,7 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
         .line_height = options.line_height,
     });
     while(true) {
-        const glyph = glyphs.next();
+        const glyph = layoutGlyphs.next();
         if(glyph.isEof()) {
             return;
         }
@@ -384,13 +557,15 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
         }
         for(0..glyph.size_y) |row_i| {
             var row = glyph.getDataRow(@truncate(row_i));
+            gba.debug.print("Glyph row {d}: {x:0>4} {b:0>12}", .{ row_i, row, row }) catch {};
             for(0..glyph.size_x) |col_i| {
                 const pixel = row & 1;
-                row <<= 1;
+                row >>= 1;
                 if(pixel != 0) {
+                    // gba.debug.print("Drawing pixel @ {d}, {d}", .{ col_i, row_i }) catch {};
                     const px_x = glyph.x + col_i;
                     const px_y = glyph.y + row_i;
-                    var tile = options.target[
+                    var tile = &options.target[
                         (px_x >> 3) +
                         ((px_y >> 3) << options.pitch_shift)
                     ];

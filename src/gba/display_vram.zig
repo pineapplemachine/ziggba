@@ -201,7 +201,7 @@ pub const AffineBackgroundMap = struct {
     /// Get tile data at a given coordinate.
     pub fn get(self: AffineBackgroundMap, x: u7, y: u7) Screenblock.AffineEntry {
         const tile_index = self.getTileIndex(x, y);
-        const screenblock_index = tile_index >> 11;
+        const screenblock_index = self.screenblock_index + (tile_index >> 11);
         const screenblock = &screenblocks[screenblock_index];
         return screenblock.getAffine(@truncate(tile_index));
     }
@@ -217,7 +217,7 @@ pub const AffineBackgroundMap = struct {
         entry: Screenblock.AffineEntry,
     ) void {
         const tile_index = self.getTileIndex(x, y);
-        const screenblock_index = tile_index >> 11;
+        const screenblock_index = self.screenblock_index + (tile_index >> 11);
         const screenblock = &screenblocks[screenblock_index];
         screenblock.setAffine(@truncate(tile_index), entry);
     }
@@ -335,9 +335,9 @@ pub const Tile4Bpp = extern union {
     /// Set the color of a pixel at a given coordinate.
     /// Colors are indices into a palette bank.
     ///
-    /// This function can be used if the tile is in VRAM, but it comes
-    /// with a performance cost.
-    pub fn setPixel16(self: *Tile4Bpp, x: u3, y: u3, value: u4) void {
+    /// This function can be safely used if the tile is in VRAM,
+    /// but it comes with a performance cost.
+    pub fn setPixel16(self: *volatile Tile4Bpp, x: u3, y: u3, value: u4) void {
         const i: u8 = x + (@as(u8, y) << 3);
         const i_quarter = i >> 2;
         self.data[i_quarter] = switch(x & 3) {
@@ -353,7 +353,7 @@ pub const Tile4Bpp = extern union {
     /// Colors are indices into a palette bank.
     ///
     /// This function is not safe to use if the tile is located in VRAM.
-    pub fn setPixel8(self: *Tile4Bpp, x: u3, y: u3, value: u4) void {
+    pub fn setPixel8(self: *volatile Tile4Bpp, x: u3, y: u3, value: u4) void {
         const i: u8 = x + (@as(u8, y) << 3);
         const i_half = i >> 1;
         self.pixels[i_half] = switch(x & 1) {
@@ -391,9 +391,9 @@ pub const Tile8Bpp = extern union {
     /// Set the color of a pixel at a given coordinate.
     /// Colors are indices into a palette.
     ///
-    /// This function can be used if the tile is in VRAM, but it comes
-    /// with a performance cost.
-    pub fn setPixel16(self: *Tile4Bpp, x: u3, y: u3, value: u8) void {
+    /// This function can be safely used if the tile is in VRAM,
+    /// but it comes with a performance cost.
+    pub fn setPixel16(self: *volatile Tile4Bpp, x: u3, y: u3, value: u8) void {
         const i: u8 = x + (@as(u8, y) << 3);
         const i_half = i >> 1;
         self.data[i_half] = switch(x & 1) {
@@ -407,7 +407,7 @@ pub const Tile8Bpp = extern union {
     /// Colors are indices into a palette.
     ///
     /// This function is not safe to use if the tile is located in VRAM.
-    pub fn setPixel8(self: *Tile4Bpp, x: u3, y: u3, value: u8) void {
+    pub fn setPixel8(self: *volatile Tile4Bpp, x: u3, y: u3, value: u8) void {
         const i: u8 = x + (@as(u8, y) << 3);
         self.pixels[i] = value;
     }

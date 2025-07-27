@@ -10,6 +10,9 @@ pub fn build(b: *std.Build) void {
         .text_charset_latin = true,
         .text_charset_latin_supplement = true,
         .text_charset_kana = true,
+        .text_charset_fullwidth_punctuation = true,
+        .text_charset_fullwidth_latin = true,
+        .text_charset_cjk_symbols = true,
     };
     
     // Examples

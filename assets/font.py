@@ -10,7 +10,10 @@ for embedding with ziggba.
 def __main__():
     pack_font("font_latin.png", "font_latin.bin", (8, 12), (0, 24, 128, 72))
     pack_font("font_latin.png", "font_latin_supplement.bin", (8, 12), (0, 120, 128, 72))
-    pack_font("font_kana.png", "font_kana.bin", (12, 12), (0, 0, 160, 176))
+    pack_font("font_cjk_symbols.png", "font_cjk_symbols.bin", (10, 12), (0, 0, 160, 48))
+    pack_font("font_kana.png", "font_kana.bin", (10, 12), (0, 0, 160, 144))
+    pack_font("font_fullwidth.png", "font_fullwidth_punctuation.bin", (10, 12), (0, 0, 160, 24))
+    pack_font("font_fullwidth.png", "font_fullwidth_latin.bin", (10, 12), (0, 24, 160, 48))
 
 def pack_font(path_in, path_out, ch_size, im_rect):
     print("Reading image:", repr(path_in))
@@ -23,6 +26,7 @@ def pack_font(path_in, path_out, ch_size, im_rect):
     ch_list = []
     for ch_y in range(ch_count_y):
         for ch_x in range(ch_count_x):
+            # print(repr(chr(0x3040 + len(ch_list)))) # Helpful for debugging
             ch_list.append(Char(im_pixels, (
                 im_rect_x + (ch_x * ch_size_x),
                 im_rect_y + (ch_y * ch_size_y),
@@ -107,6 +111,8 @@ class Char:
                     row |= (1 << i)
                 i += 1
             self.rows.append(row)
+            # Helpful for debugging
+            # print("  " + format(row, '#010b')[2:].replace("0", ".").replace("1", "X")[::-1])
     
     def is_blank(self):
         return self.x_max <= self.x_min or self.y_max <= self.y_min
