@@ -10,6 +10,8 @@ for embedding with ziggba.
 def __main__():
     pack_font("font_latin.png", "font_latin.bin", (8, 12), (0, 24, 128, 72))
     pack_font("font_latin.png", "font_latin_supplement.bin", (8, 12), (0, 120, 128, 72))
+    pack_font("font_greek.png", "font_greek.bin", (8, 12), (0, 0, 128, 108))
+    pack_font("font_arrows.png", "font_arrows.bin", (10, 12), (0, 0, 160, 72))
     pack_font("font_cjk_symbols.png", "font_cjk_symbols.bin", (10, 12), (0, 0, 160, 48))
     pack_font("font_kana.png", "font_kana.bin", (10, 12), (0, 0, 160, 144))
     pack_font("font_fullwidth.png", "font_fullwidth_punctuation.bin", (10, 12), (0, 0, 160, 24))

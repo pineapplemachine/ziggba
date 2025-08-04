@@ -9,6 +9,8 @@ pub fn build(b: *std.Build) void {
     const text_options: gba.Options = .{
         .text_charset_latin = true,
         .text_charset_latin_supplement = true,
+        .text_charset_greek = true,
+        .text_charset_arrows = true,
         .text_charset_kana = true,
         .text_charset_fullwidth_punctuation = true,
         .text_charset_fullwidth_latin = true,

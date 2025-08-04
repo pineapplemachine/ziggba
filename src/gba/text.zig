@@ -91,6 +91,36 @@ pub const charset_latin_supplement = Charset{
     .data = &charset_latin_supplement_data,
 };
 
+const charset_greek_data align(2) = blk: {
+    if (build_options.text_charset_greek) {
+        break :blk @embedFile("ziggba_font_greek.bin").*;
+    }
+    else {
+        break :blk &charset_data_empty;
+    }
+};
+pub const charset_greek = Charset{
+    .enabled = build_options.text_charset_greek,
+    .code_point_min = 0x0370,
+    .code_point_max = 0x03ff,
+    .data = &charset_greek_data,
+};
+
+const charset_arrows_data align(2) = blk: {
+    if (build_options.text_charset_arrows) {
+        break :blk @embedFile("ziggba_font_arrows.bin").*;
+    }
+    else {
+        break :blk &charset_data_empty;
+    }
+};
+pub const charset_arrows = Charset{
+    .enabled = build_options.text_charset_arrows,
+    .code_point_min = 0x2190,
+    .code_point_max = 0x21ff,
+    .data = &charset_arrows_data,
+};
+
 const charset_cjk_symbols_data align(2) = blk: {
     if (build_options.text_charset_cjk_symbols) {
         break :blk @embedFile("ziggba_font_cjk_symbols.bin").*;
@@ -187,7 +217,7 @@ pub const enabled_charsets = blk: {
 /// This implementation does not validate that the input is well-formed
 /// UTF-8 text. The output may be unpredictable when the iterator attempts
 /// to decode invalid UTF-8.
-pub const CodePointIterator = struct {
+const CodePointIterator = struct {
     /// UTF-8 encoded text.
     text: []const u8,
     /// Current byte index within the encoded text.
