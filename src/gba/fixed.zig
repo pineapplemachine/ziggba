@@ -140,6 +140,9 @@ fn sinRevolutionsLerp(value: u16) i32 {
 /// The GBA hardware uses values of this type to represent the components
 /// of affine transformation matrices.
 pub const FixedI16R8 = packed struct(i16) {
+    pub const zero: FixedI16R8 = .initRaw(0);
+    pub const one: FixedI16R8 = .initInt(1);
+    
     value: i16 = 0,
     
     pub inline fn initRaw(raw_value: i16) FixedI16R8 {
@@ -240,6 +243,9 @@ pub const FixedI16R8 = packed struct(i16) {
 /// Fixed point number type. Signed, width 16 bits, radix 14 bits.
 /// The GBA BIOS uses this type in arctangent calculations.
 pub const FixedI16R14 = packed struct(i16) {
+    pub const zero: FixedI16R14 = .initRaw(0);
+    pub const one: FixedI16R14 = .initInt(1);
+    
     value: i16 = 0,
     
     pub inline fn initRaw(raw_value: i16) FixedI16R14 {
@@ -324,6 +330,8 @@ pub const FixedI16R14 = packed struct(i16) {
 /// the `BgAffineSet` and `ObjAffineSet` functions, as well as angle outputs
 /// from the `ArcTan` and `ArcTan2` functions.
 pub const FixedU16R16 = packed struct(u16) {
+    pub const zero: FixedU16R16 = .initRaw(0);
+    
     value: u16 = 0,
     
     pub inline fn initRaw(raw_value: u16) FixedU16R16 {
@@ -354,11 +362,11 @@ pub const FixedU16R16 = packed struct(u16) {
         return FixedI16R8.initRaw(self.value >> 8);
     }
     
-    pub inline fn toI32R8(self: FixedI32R8) FixedI32R8 {
+    pub inline fn toI32R8(self: FixedU16R16) FixedI32R8 {
         return FixedI32R8.initRaw(self.value >> 8);
     }
     
-    pub inline fn toI32R16(self: FixedI32R8) FixedI32R16 {
+    pub inline fn toI32R16(self: FixedU16R16) FixedI32R16 {
         return FixedI32R16.initRaw(self.value);
     }
     
@@ -441,6 +449,9 @@ pub const FixedU16R16 = packed struct(u16) {
 /// The GBA hardware uses values of this type to represent the
 /// displacement vector components of a background's affine transformation.
 pub const FixedI32R8 = packed struct(i32) {
+    pub const zero: FixedI32R8 = .initRaw(0);
+    pub const one: FixedI32R8 = .initInt(1);
+    
     value: i32 = 0,
     
     pub inline fn initRaw(raw_value: i32) FixedI32R8 {
@@ -610,6 +621,9 @@ pub const FixedI32R8 = packed struct(i32) {
 
 /// Fixed point number type. Signed, width 32 bits, radix 16 bits.
 pub const FixedI32R16 = packed struct(i32) {
+    pub const zero: FixedI32R16 = .initRaw(0);
+    pub const one: FixedI32R16 = .initInt(1);
+    
     value: i32 = 0,
     
     pub inline fn initRaw(raw_value: i32) FixedI32R16 {
@@ -703,5 +717,108 @@ pub const FixedI32R16 = packed struct(i32) {
     
     pub inline fn greaterOrEqual(a: FixedI32R16, b: FixedI32R16) bool {
         return a.value <= b.value;
+    }
+};
+
+/// Represents a 2-vector whose X and Y components are `FixedI32R8` values.
+pub const FixedVec2I32R8 = extern struct {
+    pub const zero: FixedVec2I32R8 = .{ .x = .initRaw(0), .y = .initRaw(0) };
+    pub const one: FixedVec2I32R8 = .{ .x = .initInt(1), .y = .initInt(1) };
+    
+    x: FixedI32R8 = .{},
+    y: FixedI32R8 = .{},
+    
+    pub inline fn toVec2I32R16(self: FixedVec2I32R8) FixedVec2I32R16 {
+        return .{
+            .x = self.x.toI32R16(),
+            .y = self.y.toI32R16(),
+        };
+    }
+    
+    pub fn negate(self: FixedVec2I32R8) FixedVec2I32R8 {
+        return .{
+            .x = self.x.negate(),
+            .y = self.y.negate(),
+        };
+    }
+    
+    pub fn add(a: FixedVec2I32R8, b: FixedVec2I32R8) FixedVec2I32R8 {
+        return .{
+            .x = a.x.add(b.x),
+            .y = a.y.add(b.y),
+        };
+    }
+    
+    pub fn sub(a: FixedVec2I32R8, b: FixedVec2I32R8) FixedVec2I32R8 {
+        return .{
+            .x = a.x.sub(b.x),
+            .y = a.y.sub(b.y),
+        };
+    }
+    
+    pub fn mul(a: FixedVec2I32R8, b: FixedVec2I32R8) FixedVec2I32R8 {
+        return .{
+            .x = a.x.mul(b.x),
+            .y = a.y.mul(b.y),
+        };
+    }
+    
+    pub fn scale(self: FixedVec2I32R8, scalar: FixedI32R8) FixedVec2I32R8 {
+        return .{
+            .x = self.x.mul(scalar),
+            .y = self.y.mul(scalar),
+        };
+    }
+};
+
+
+/// Represents a 2-vector whose X and Y components are `FixedI32R16` values.
+pub const FixedVec2I32R16 = extern struct {
+    pub const zero: FixedVec2I32R16 = .{ .x = .initRaw(0), .y = .initRaw(0) };
+    pub const one: FixedVec2I32R16 = .{ .x = .initInt(1), .y = .initInt(1) };
+    
+    x: FixedI32R16 = .{},
+    y: FixedI32R16 = .{},
+    
+    pub inline fn toVec2I32R8(self: FixedVec2I32R16) FixedVec2I32R8 {
+        return .{
+            .x = self.x.toI32R8(),
+            .y = self.y.toI32R8(),
+        };
+    }
+    
+    pub fn negate(self: FixedVec2I32R16) FixedVec2I32R16 {
+        return .{
+            .x = self.x.negate(),
+            .y = self.y.negate(),
+        };
+    }
+    
+    pub fn add(a: FixedVec2I32R16, b: FixedVec2I32R16) FixedVec2I32R16 {
+        return .{
+            .x = a.x.add(b.x),
+            .y = a.y.add(b.y),
+        };
+    }
+    
+    pub fn sub(a: FixedVec2I32R16, b: FixedVec2I32R16) FixedVec2I32R16 {
+        return .{
+            .x = a.x.sub(b.x),
+            .y = a.y.sub(b.y),
+        };
+    }
+    
+    pub fn mul(a: FixedVec2I32R16, b: FixedVec2I32R16) FixedVec2I32R16 {
+        return .{
+            .x = a.x.mul(b.x),
+            .y = a.y.mul(b.y),
+        };
+    }
+    
+    pub fn scale(self: FixedVec2I32R16, scalar: FixedI32R16) FixedVec2I32R16 {
+        return .{
+            .x = self.x.mul(scalar),
+            .y = self.y.mul(scalar),
+        };
     }
 };

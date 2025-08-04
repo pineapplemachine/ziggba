@@ -27,7 +27,7 @@ pub fn hideAllObjects() void {
 const affine_values: [*]volatile gba.FixedI16R8 = @ptrFromInt(gba.mem.oam);
 
 /// Represents an affine transformation matrix.
-pub const AffineTransform = struct {
+pub const AffineTransform = extern struct {
     /// Identity matrix. Applies no rotation, scaling, or shearing.
     pub const Identity: AffineTransform = (
         .init(gba.FixedI16R8.initInt(1), .{}, .{}, gba.FixedI16R8.initInt(1))
@@ -46,23 +46,10 @@ pub const AffineTransform = struct {
         return AffineTransform{ .values = .{ a, b, c, d } };
     }
     
-    /// Write an affine transformation matrix to OAM.
-    /// Should only be updated during VBlank, to avoid graphical glitches.
-    pub fn set(self: AffineTransform, index: u5) void {
-        var value_index = 3 + (@as(u8, index) << 4);
-        affine_values[value_index] = self.values[0];
-        value_index += 4;
-        affine_values[value_index] = self.values[1];
-        value_index += 4;
-        affine_values[value_index] = self.values[2];
-        value_index += 4;
-        affine_values[value_index] = self.values[3];
-    }
-    
     /// Multiply one transformation matrix by another, and return the product.
     /// The new matrix produces the same transform as applying one transform
     /// and then the other.
-    pub fn multiply(a: AffineTransform, b: AffineTransform) AffineTransform {
+    pub fn mul(a: AffineTransform, b: AffineTransform) AffineTransform {
         return .init(
             a.values[0].mul(b.values[0]).add(a.values[1].mul(b.values[2])),
             a.values[0].mul(b.values[1]).add(a.values[1].mul(b.values[3])),
@@ -234,3 +221,15 @@ pub const Obj = packed struct(u48) {
     }
 };
 
+/// Write an affine transformation matrix to OAM, for use with objects.
+/// Should only be updated during VBlank, to avoid graphical glitches.
+pub fn setObjectTransform(index: u5, transform: AffineTransform) void {
+    var value_index = 3 + (@as(u8, index) << 4);
+    affine_values[value_index] = transform.values[0];
+    value_index += 4;
+    affine_values[value_index] = transform.values[1];
+    value_index += 4;
+    affine_values[value_index] = transform.values[2];
+    value_index += 4;
+    affine_values[value_index] = transform.values[3];
+}

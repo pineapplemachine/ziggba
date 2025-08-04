@@ -13,7 +13,10 @@ pub export fn main() void {
     };
     metroid.setSize(.@"64x64");
     metroid.setPosition(96, 32);
-    gba.obj.AffineTransform.Identity.set(metroid.transform.affine_index);
+    gba.obj.setObjectTransform(
+        metroid.transform.affine_index,
+        gba.obj.AffineTransform.Identity,
+    );
     
     var shadow_metroid: gba.obj.Obj = .{
         .mode = .affine,
@@ -22,7 +25,10 @@ pub export fn main() void {
     };
     shadow_metroid.setSize(.@"64x64");
     shadow_metroid.setPosition(96, 32);
-    gba.obj.AffineTransform.Identity.set(shadow_metroid.transform.affine_index);
+    gba.obj.setObjectTransform(
+        shadow_metroid.transform.affine_index,
+        gba.obj.AffineTransform.Identity,
+    );
 
     gba.obj.hideAllObjects();
     gba.obj.objects[0] = metroid;
@@ -42,6 +48,6 @@ pub export fn main() void {
         const transform = gba.obj.AffineTransform.rotateFast(
             .initRaw(@truncate(frame << 8)),
         );
-        transform.set(metroid.transform.affine_index);
+        gba.obj.setObjectTransform(metroid.transform.affine_index, transform);
     }
 }

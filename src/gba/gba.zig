@@ -23,6 +23,8 @@ pub const FixedI16R8 = fixed.FixedI16R8;
 pub const FixedU16R16 = fixed.FixedU16R16;
 pub const FixedI32R8 = fixed.FixedI32R8;
 pub const FixedI32R16 = fixed.FixedI32R16;
+pub const FixedVec2I32R8 = fixed.FixedVec2I32R8;
+pub const FixedVec2I32R16 = fixed.FixedVec2I32R16;
 
 /// Pointer to EWRAM (external work RAM).
 /// More plentiful than IWRAM, but slower.
