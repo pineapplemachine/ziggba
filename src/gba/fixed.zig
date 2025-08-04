@@ -29,6 +29,7 @@ const assert = @import("std").debug.assert;
 
 test {
     _ = @import("test/fixed_format.zig");
+    _ = @import("test/fixed_math.zig");
     _ = @import("test/fixed_trig.zig");
 }
 
@@ -639,7 +640,7 @@ pub const FixedI32R16 = packed struct(i32) {
         return FixedU16R16.initRaw(@intCast(self.value & 0xffff));
     }
     
-    pub inline fn toI32R8(self: FixedI32R8) FixedI32R8 {
+    pub inline fn toI32R8(self: FixedI32R16) FixedI32R8 {
         return FixedI32R8.initRaw(@intCast(self.value >> 8));
     }
     
@@ -666,8 +667,9 @@ pub const FixedI32R16 = packed struct(i32) {
         const s1 = x & 0xffff;
         const s2 = x >> 16;
         x = s1 + (a.value & 0xffff) * (b.value >> 16);
+        const s3 = x & 0xffff;
         x = s2 + (a.value >> 16) * (b.value >> 16) + (x >> 16);
-        return FixedI32R16.initRaw(x);
+        return FixedI32R16.initRaw((x << 16) | s3);
         // TODO: Sometime figure out how to make this work using the
         // very likely more performant `smull` ARM instruction.
         // var product_lo: i32 = undefined;

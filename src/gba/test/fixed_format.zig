@@ -8,13 +8,11 @@ fn formatTest(
     value: gba.FixedI32R8,
     options: gba.fixed.FormatDecimalOptions,
 ) !void {
-    std.debug.print("Test: {d}f -> \"{s}\"\n", .{ value.value, expected });
     var buffer: [256]u8 = @splat(0);
     const actual_len = value.formatDecimal(
         @ptrCast(&buffer),
         options,
     );
-    std.debug.print("  result: {s}\n", .{ buffer[0..actual_len] });
     try std.testing.expectEqual(expected.len, actual_len);
     try std.testing.expectEqualSlices(u8, expected, buffer[0..actual_len]);
 }
