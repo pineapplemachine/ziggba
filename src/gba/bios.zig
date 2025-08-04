@@ -1,8 +1,6 @@
+const builtin = @import("builtin");
 const std = @import("std");
-const bufPrint = std.fmt.bufPrint;
 const gba = @import("gba.zig");
-const interrupt = gba.interrupt;
-const Affine = gba.bg.Affine;
 
 pub const SWI = enum(u8) {
     soft_reset = 0x00,
@@ -86,7 +84,11 @@ pub const SWI = enum(u8) {
     // TODO: add a way to use ARM versions rather than just thumb
     fn getAsm(comptime code: SWI) []const u8 {
         var buffer: [16]u8 = undefined;
-        return bufPrint(&buffer, "swi 0x{X}", .{@intFromEnum(code)}) catch unreachable;
+        return std.fmt.bufPrint(
+            &buffer,
+            "swi 0x{X}",
+            .{@intFromEnum(code)},
+        ) catch unreachable;
     }
 
     fn ReturnType(comptime self: SWI) type {
@@ -239,7 +241,10 @@ pub fn resetRamRegisters(flags: RamResetFlags) void {
     call1Return0(.register_ram_reset, flags);
 }
 
-pub fn waitInterrupt(return_type: interrupt.WaitReturn, flags: interrupt.Flags) void {
+pub fn waitInterrupt(
+    return_type: gba.interrupt.WaitReturn,
+    flags: gba.interrupt.Flags,
+) void {
     call2Return0(.intr_wait, return_type, flags);
 }
 
@@ -250,13 +255,46 @@ pub fn waitVBlank() void {
     call0Return0(.vblank_intr_wait);
 }
 
+/// Divide the numerator by the denominator.
+///
+/// Beware calling this function with a denominator of zero.
+/// Doing so may result in an endless loop.
+///
+/// Normally uses a GBA BIOS function, but also implements a fallback to run
+/// as you would expect in tests and at comptime where the GBA BIOS is not
+/// available.
 pub fn div(numerator: i32, denominator: i32) DivResult {
-    return call2Return3(.div, numerator, denominator);
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        return .{
+            .quotient = @divTrunc(numerator, denominator),
+            .remainder = @rem(numerator, denominator),
+            .absolute_quotient = @abs(numerator) / @abs(denominator),
+        };
+    }
+    else {
+        return call2Return3(.div, numerator, denominator);
+    }
 }
 
-/// 3 cycles slower than div
+/// Divide the numerator by the denominator.
+///
+/// This call is 3 cycles slower than `div`.
+/// It exists for compatibility with ARM's library.
+///
+/// Normally uses a GBA BIOS function, but also implements a fallback to run
+/// as you would expect in tests and at comptime where the GBA BIOS is not
+/// available
 pub fn divArm(numerator: i32, denominator: i32) DivResult {
-    return call2Return3(.div_arm, denominator, numerator);
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        return .{
+            .quotient = @divTrunc(numerator, denominator),
+            .remainder = @rem(numerator, denominator),
+            .absolute_quotient = @abs(numerator) / @abs(denominator),
+        };
+    }
+    else {
+        return call2Return3(.div_arm, denominator, numerator);
+    }
 }
 
 pub fn sqrt(x: u32) u16 {
