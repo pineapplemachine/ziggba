@@ -83,11 +83,14 @@ pub fn build(b: *std.Build) void {
     
     // Tests
     
-    const test_trig = b.addRunArtifact(b.addTest(.{
+    const test_fixed = b.addRunArtifact(b.addTest(.{
         .root_source_file = b.path("src/gba/fixed.zig"),
-        .target = b.standardTargetOptions(.{}),
+    }));
+    const test_format = b.addRunArtifact(b.addTest(.{
+        .root_source_file = b.path("src/gba/format.zig"),
     }));
 
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&test_trig.step);
+    test_step.dependOn(&test_fixed.step);
+    test_step.dependOn(&test_format.step);
 }

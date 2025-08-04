@@ -9,6 +9,7 @@ pub const Color = @import("color.zig").Color;
 pub const debug = @import("debug.zig");
 pub const display = @import("display.zig");
 pub const fixed = @import("fixed.zig");
+pub const format = @import("format.zig");
 pub const Header = @import("header.zig").Header;
 pub const input = @import("input.zig");
 pub const interrupt = @import("interrupt.zig");

@@ -25,10 +25,42 @@
 //! affine transformation matrices.
 
 const gba = @import("gba.zig");
+const assert = @import("std").debug.assert;
 
 test {
+    _ = @import("test/fixed_format.zig");
     _ = @import("test/fixed_trig.zig");
 }
+
+pub const FormatDecimalOptions = struct {
+    /// Array of decimal digits, e.g. `'0'...'9'`.
+    decimal_digits: [10]u8 = gba.format.decimal_digits_ascii,
+    /// This character is prepended to negative numbers.
+    sign_negative_char: u8 = '-',
+    /// This character may be prepended to positive numbers, if `always_sign`
+    /// is true.
+    sign_positive_char: u8 = '+',
+    /// Always prepend a `sign_positive_char` for non-negative numbers,
+    /// not only `sign_negative_char` for negative ones.
+    always_sign: bool = false,
+    /// If the output string would be shorter than this many bytes,
+    /// prepend enough `pad_left_char` to match this padded length.
+    pad_left_len: u8 = 0,
+    /// Padding byte, for use with `pad_left_len`.
+    pad_left_char: u8 = ' ',
+    /// If true, then padding is applied only to the integer part
+    /// of the number string, instead of to the entire thing.
+    /// This can be used, for example, to align decimals.
+    pad_left_int: bool = false,
+    /// Pad the fractional part with zeros to have at least this many
+    /// digits.
+    min_fraction_digits: u8 = 0,
+    /// Truncate the fractional part to not have more than this many
+    /// digits.
+    max_fraction_digits: u8 = 8,
+    /// This character is used for the decimal point.
+    decimal_char: u8 = '.',
+};
 
 /// Stores `sine(x) * 0x10000` in 256 steps over the range `[0, pi/2)` radians.
 /// This can be used to trivially compute sine and cosine for arbitary inputs.
@@ -183,6 +215,24 @@ pub const FixedI16R8 = packed struct(i16) {
     
     pub inline fn greaterOrEqual(a: FixedI16R8, b: FixedI16R8) bool {
         return a.value <= b.value;
+    }
+    
+    /// Write the fixed point value with ASCII characters in decimal
+    /// format to an output buffer. The longest possible output string
+    /// under normal circumstances is 13 characters: 1 for sign, 3 for
+    /// integer portion, 1 for decimal point, and 8 after the decimal.
+    ///
+    /// May write junk in the output buffer past the end of the returned
+    /// length, using it as a scratch area. Always provide a buffer with
+    /// at least 13 free bytes.
+    /// More is required when using a `options.pad_left_len` longer
+    /// than 13 or `options.max_fraction_digits` longer than 8.
+    pub fn formatDecimal(
+        self: FixedI16R8,
+        buffer: [*]volatile u8,
+        options: FormatDecimalOptions,
+    ) u8 {
+        return self.toI32R8().formatDecimal(buffer, options);
     }
 };
 
@@ -396,7 +446,7 @@ pub const FixedI32R8 = packed struct(i32) {
         return FixedI32R8{ .value = raw_value };
     }
     
-    pub inline fn initInt(int_value: i16) FixedI32R8 {
+    pub inline fn initInt(int_value: i24) FixedI32R8 {
         return FixedI32R8.initRaw(@as(i32, int_value) << 8);
     }
     
@@ -472,6 +522,88 @@ pub const FixedI32R8 = packed struct(i32) {
     
     pub inline fn greaterOrEqual(a: FixedI32R8, b: FixedI32R8) bool {
         return a.value <= b.value;
+    }
+    
+    /// Write the fixed point value with ASCII characters in decimal
+    /// format to an output buffer. The longest possible output string
+    /// under normal circumstances is 17 characters: 1 for sign, 7 for
+    /// integer portion, 1 for decimal point, and 8 after the decimal.
+    ///
+    /// May write junk in the output buffer past the end of the returned
+    /// length, using it as a scratch area. Always provide a buffer with
+    /// at least 17 free bytes.
+    /// More is required when using a `options.pad_left_len` longer
+    /// than 17 or `options.max_fraction_digits` longer than 8.
+    pub fn formatDecimal(
+        self: FixedI32R8,
+        buffer: [*]volatile u8,
+        options: FormatDecimalOptions,
+    ) u8 {
+        const int_value: i32 = (self.value >> 8) + @as(i32, (
+            if(self.value < 0 and (self.value & 0xff) != 0) 1 else 0
+        ));
+        const int_len = gba.format.formatDecimalI32(buffer, int_value, .{
+            .decimal_digits = options.decimal_digits,
+            .sign_negative_char = options.sign_negative_char,
+            .sign_positive_char = options.sign_positive_char,
+            .always_sign = options.always_sign,
+            .pad_left_len = if(options.pad_left_int) options.pad_left_len else 0,
+            .pad_left_char = options.pad_left_char,
+        });
+        // 1/256 == 0.00390625
+        const frac_value: i32 = 390625 * @as(i32, (
+            if(self.value >= 0) self.value & 0xff
+            else (0x100 -% self.value) & 0xff
+        ));
+        var total_len: u8 = int_len;
+        if(frac_value > 0 or options.min_fraction_digits > 0) {
+            buffer[int_len] = options.decimal_char;
+            const frac_buffer = buffer + int_len + 1;
+            var frac_len = gba.format.formatDecimalI32(frac_buffer, frac_value, .{
+                .decimal_digits = options.decimal_digits,
+                .pad_left_len = 8,
+                .pad_left_char = options.decimal_digits[0],
+            });
+            assert(frac_len == 8);
+            total_len += 9; // decimal point plus 8 digits == 9 bytes
+            // Truncate to max_fraction_digits
+            if(frac_len > options.max_fraction_digits) {
+                total_len -= frac_len - options.max_fraction_digits;
+                frac_len = options.max_fraction_digits;
+            }
+            // Trim trailing zeros
+            while(buffer[total_len - 1] == options.decimal_digits[0] and (
+                frac_len > options.min_fraction_digits
+            )) {
+                frac_len -= 1;
+                total_len -= 1;
+            }
+            // Pad to min_fraction_digits
+            while(frac_len < options.min_fraction_digits) {
+                buffer[total_len] = options.decimal_digits[0];
+                frac_len += 1;
+                total_len += 1;
+            }
+            // No fraction digits, after all that? Remove the decimal point.
+            if(frac_len == 0) {
+                total_len -= 1;
+            }
+        }
+        if(total_len < options.pad_left_len and !options.pad_left_int) {
+            const pad_len = options.pad_left_len - total_len;
+            for(0..total_len) |pad_i| {
+                const j = options.pad_left_len - pad_i - 1;
+                assert(j >= pad_len);
+                buffer[j] = buffer[j - pad_len];
+            }
+            for(0..pad_len) |pad_i| {
+                buffer[pad_i] = options.pad_left_char;
+            }
+            return options.pad_left_len;
+        }
+        else {
+            return total_len;
+        }
     }
 };
 
