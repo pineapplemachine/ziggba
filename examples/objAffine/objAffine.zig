@@ -1,46 +1,53 @@
 const gba = @import("gba");
-const display = gba.display;
-const obj = gba.obj;
-const debug = gba.debug;
-const math = gba.math;
 const metr = @import("metr.zig");
 
-export var header linksection(".gbaheader") = gba.Header.init("OBJAFFINE", "AODE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("OBJAFFINE", "AOAE", "00", 0);
 
 pub export fn main() void {
-    display.ctrl.* = .{
-        .obj_mapping = .one_dimension,
-        .bg0 = true,
-        .obj = true,
-    };
+    gba.display.memcpyObjectTiles4Bpp(0, @ptrCast(&metr.box_tiles));
+    gba.display.memcpyObjectPalette(0, @ptrCast(&metr.pal));
 
-    debug.init();
-
-    gba.mem.memcpy32(obj.tile_ram, &metr.box_tiles, metr.box_tiles.len * 4);
-    gba.mem.memcpy32(obj.palette, &metr.pal, metr.pal.len * 4);
-
-    const metroid = obj.allocate();
-    metroid.* = .{
-        .affine_mode = .affine,
+    var metroid: gba.obj.Obj = .{
+        .mode = .affine,
         .transform = .{ .affine_index = 0 },
     };
     metroid.setSize(.@"64x64");
     metroid.setPosition(96, 32);
-    metroid.getAffine().setIdentity();
-
-    const shadow_metroid = obj.allocate();
-    shadow_metroid.* = .{
-        .affine_mode = .affine,
-        .transform = .{ .affine_index = 31 },
+    gba.obj.setObjectTransform(
+        metroid.transform.affine_index,
+        gba.obj.AffineTransform.Identity,
+    );
+    
+    var shadow_metroid: gba.obj.Obj = .{
+        .mode = .affine,
+        .transform = .{ .affine_index = 1 },
         .palette = 1,
     };
     shadow_metroid.setSize(.@"64x64");
     shadow_metroid.setPosition(96, 32);
-    shadow_metroid.getAffine().setIdentity();
+    gba.obj.setObjectTransform(
+        shadow_metroid.transform.affine_index,
+        gba.obj.AffineTransform.Identity,
+    );
 
-    obj.update(2);
+    gba.obj.hideAllObjects();
+    gba.obj.objects[0] = metroid;
+    gba.obj.objects[1] = shadow_metroid;
+    
+    gba.display.ctrl.* = gba.display.Control{
+        .obj_mapping = .one_dimension,
+        .bg0 = true,
+        .obj = true,
+    };
+    
+    var frame: u32 = 0;
 
-    while (true) {
-        display.naiveVSync();
+    while (true) : (frame +%= 1) {
+        gba.display.naiveVSync();
+
+        const transform = gba.obj.AffineTransform.rotateFast(
+            .initRaw(@truncate(frame << 8)),
+        );
+        gba.obj.setObjectTransform(metroid.transform.affine_index, transform);
     }
 }

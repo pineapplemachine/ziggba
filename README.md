@@ -22,6 +22,8 @@ git clone https://github.com/pineapplemachine/ziggba.git
 cd ziggba
 # Download submodule dependencies
 git submodule update --init
+# Build `gba.text` font data used by examples
+zig build font
 # Compile example ROMs, outputted to `zig-out/bin/`
 zig build
 ```

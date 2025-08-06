@@ -20,6 +20,8 @@ jobs:
           wget -O - https://github.com/marler8997/anyzig/releases/latest/download/anyzig-x86_64-linux.tar.gz | tar xz
           chmod 777 ./zig
 
-      - name: Build examples
+      - name: Build examples and run tests
         run: |
+          ./zig build font
           ./zig build
+          ./zig build test

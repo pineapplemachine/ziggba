@@ -1,61 +1,88 @@
-//! Module for operations related to Object/Sprite memory
-const std = @import("std");
+//! Module for operations related to Object/Sprite memory.
+
 const gba = @import("gba.zig");
-const Color = gba.Color;
-const I8_8 = gba.math.I8_8;
-const display = gba.display;
-const Priority = display.Priority;
-const Tile = display.Tile;
 
-/// Tile data for objects
-pub const tile_ram: *volatile [2][512]Tile(.bpp_4) = @ptrFromInt(gba.mem.vram + 0x10000);
-
-/// Obj and `Affine` data is interleaved but starts at the same place in memory.
-const ObjAffineData = packed union {
-    obj: *[128]Obj align(4),
-    affine: *[32]Affine align(4),
-};
-
-/// The actual location of objects in VRAM
-///
+/// Refers to object attributes data in OAM.
+/// Affine transformation matrices are interleaved with object attributes.
 /// Should only be updated during VBlank, to avoid graphical glitches.
-pub const oam: ObjAffineData = .{ .obj = @ptrFromInt(gba.mem.oam) };
+pub const objects: *align(16) volatile [128]Obj = @ptrFromInt(gba.mem.oam);
 
-var buffer_inner: [128]Obj align(8) = @splat(.{});
-
-/// A buffer that can be updated at any time, then copied
-/// to OAM during VBlank
-pub var obj_affine_buffer: ObjAffineData = .{ .obj = &buffer_inner };
-
-var sort_keys: [128]u32 = @splat(0);
-
-// TODO: Could make this ?u7 I think.
-var sort_ids: [128]u8 = @splat(0);
-
-pub fn shellSort(count: u8) void {
-    var inc: u8 = 1;
-    while (inc <= count) : (inc += 1)
-        inc *= 3;
-    while (true) {
-        inc /= 3;
-        for (inc..count) |i| {
-            var j = i;
-            const key_0 = sort_keys[sort_ids[i]];
-            while (j >= inc and sort_keys[sort_ids[j - inc]] > key_0) : (j -= inc) {
-                sort_ids[j] = sort_ids[j - inc];
-            }
-            sort_ids[j] = sort_ids[i];
-        }
-        if (inc <= 1) break;
+/// Set all objects to hidden.
+///
+/// You likely want to do this upon initialization, if you're enabling objects.
+/// Otherwise, all 128 objects in OAM are initialized as visible 8x8 objects
+/// in the top-left corner using tile index 0.
+pub fn hideAllObjects() void {
+    for(objects) |*obj| {
+        obj.mode = .hidden;
     }
 }
 
-pub const palette: *Color.Palette = @ptrFromInt(gba.mem.palette + 0x200);
+/// Refers to affine transformation matrix components in OAM.
+/// Affine transformation matrices are interleaved with object attributes.
+/// Should only be updated during VBlank, to avoid graphical glitches.
+///
+/// Values start at index 3, and only every 4th value after that is really
+/// an affine value. Other values belong to object attributes.
+const affine_values: [*]volatile gba.FixedI16R8 = @ptrFromInt(gba.mem.oam);
 
-var current_attr: usize = 0;
+/// Represents an affine transformation matrix.
+pub const AffineTransform = extern struct {
+    /// Identity matrix. Applies no rotation, scaling, or shearing.
+    pub const Identity: AffineTransform = (
+        .init(gba.FixedI16R8.initInt(1), .{}, .{}, gba.FixedI16R8.initInt(1))
+    );
+    
+    /// Affine transformation matrix components, in row-major order.
+    values: [4]gba.FixedI16R8 = @splat(.{}),
+    
+    /// Initialize an `AffineTransform` matrix with the given components.
+    pub fn init(
+        a: gba.FixedI16R8,
+        b: gba.FixedI16R8,
+        c: gba.FixedI16R8,
+        d: gba.FixedI16R8,
+    ) AffineTransform {
+        return AffineTransform{ .values = .{ a, b, c, d } };
+    }
+    
+    /// Multiply one transformation matrix by another, and return the product.
+    /// The new matrix produces the same transform as applying one transform
+    /// and then the other.
+    pub fn mul(a: AffineTransform, b: AffineTransform) AffineTransform {
+        return .init(
+            a.values[0].mul(b.values[0]).add(a.values[1].mul(b.values[2])),
+            a.values[0].mul(b.values[1]).add(a.values[1].mul(b.values[3])),
+            a.values[2].mul(b.values[0]).add(a.values[3].mul(b.values[1])),
+            a.values[2].mul(b.values[1]).add(a.values[3].mul(b.values[3])),
+        );
+    }
+    
+    /// Return a transformation matrix that will scale an object by the
+    /// given amount on each axis.
+    pub fn scale(x: gba.FixedI16R8, y: gba.FixedI16R8) AffineTransform {
+        return .init(x, .{}, .{}, y);
+    }
+    
+    /// Return a rotation matrix that will scale an object by the
+    /// given amount on each axis. Uses `sin_fast` and `cos_fast`.
+    pub fn rotateFast(angle: gba.FixedU16R16) AffineTransform {
+        const sin_theta = angle.sinFast().toI16R8();
+        const cos_theta = angle.cosFast().toI16R8();
+        return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
+    }
+    
+    /// Return a rotation matrix that will scale an object by the
+    /// given amount on each axis. Uses `sin_lerp` and `cos_lerp`.
+    pub fn rotateLerp(angle: gba.FixedU16R16) AffineTransform {
+        const sin_theta = angle.sinLerp().toI16R8();
+        const cos_theta = angle.cosLerp().toI16R8();
+        return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
+    }
+};
 
-pub const Obj = packed struct {
-    pub const GfxMode = enum(u2) {
+pub const Obj = packed struct(u48) {
+    pub const Effect = enum(u2) {
         normal,
         alpha_blend,
         obj_window,
@@ -67,7 +94,8 @@ pub const Obj = packed struct {
         tall,
     };
 
-    /// WIDTHxHEIGHT
+    /// Enumeration of recognized sizes for objects.
+    /// Sizes are represented here as WIDTHxHEIGHT in pixels.
     pub const Size = enum(u4) {
         // Square
         @"8x8",
@@ -95,7 +123,7 @@ pub const Obj = packed struct {
         }
     };
 
-    const AffineMode = enum(u2) {
+    const Mode = enum(u2) {
         /// Normal rendering, uses `normal` transform controls
         normal,
         /// Uses `affine` transform controls
@@ -107,13 +135,18 @@ pub const Obj = packed struct {
         affine_double,
     };
 
-    /// Used to set transformation effects on an object
-    const Transformation = packed union {
+    /// Used to set transformation effects on an object.
+    const Transform = packed union {
+        /// Sprite flipping flags. Applies to normal (not affine) objects.
         flip: packed struct(u5) {
+            /// Unused bits.
             _: u3 = 0,
+            /// Flip the sprite horizontally, when set.
             h: bool = false,
+            /// Flip the sprite vertically, when set.
             v: bool = false,
         },
+        /// Affine transformation index. Applies to affine object.
         affine_index: u5,
     };
 
@@ -132,29 +165,47 @@ pub const Obj = packed struct {
         block: u1 = 0,
     };
 
-    /// For normal sprites, the top; for affine sprites, the center
+    /// Represents the Y position of the object on the screen.
+    /// For normal sprites, marks the top.
+    /// For affine sprites, marks the center
     y_pos: u8 = 0,
-    affine_mode: AffineMode = .normal,
-    mode: GfxMode = .normal,
-    /// Enables mosaic effects on this object
+    /// Determines whether to display the sprite normally, hide it, use an
+    /// affine transform, or use a double-size affine transform.
+    mode: Mode = .normal,
+    /// Enables special rendering effects.
+    effect: Effect = .normal,
+    /// Enables mosaic effects on this object.
     mosaic: bool = false,
-    palette_mode: Color.Bpp = .bpp_4,
-    /// Used in combination with size, see `setSize`
+    /// Whether to use a 16-color or 256-color palette for this object.
+    /// When using 4-bit color, the `Obj.palette` value indicates the
+    /// which 16-color palette to use.
+    palette_mode: gba.Color.Bpp = .bpp_4,
+    /// Used in combination with size. See `Obj.setSize`.
     shape: Shape = .square,
     /// For normal sprites, the left side; for affine sprites, the center
     x_pos: u9 = 0,
-    /// For normal sprites: whether to flip horizontally and/or vertically
+    /// For normal sprites:
+    /// Contains bits indicating whether to flip horizontally and/or vertically.
     ///
-    /// For affine sprites: the 5 bit index into the affine data
-    transform: Transformation = .{ .flip = .{} },
-    /// Used in combination with shape, see `setSize`
+    /// For affine sprites:
+    /// Contains a 5-bit index indicating which affine transformation matrix
+    /// should be used for this object.
+    transform: Transform = .{ .flip = .{} },
+    /// Used in combination with shape. See `Obj.setSize`.
     size: u2 = 0,
+    /// Base tile index of sprite.
+    /// In bitmap modes, this must be 512 or higher.
     tile: TileInfo = .{},
-    priority: Priority = .highest,
+    /// Higher priorities are drawn first, and therefore are covered up
+    /// by later sprites and backgrounds.
+    /// Sprites cover backgrounds of the same priority.
+    /// For sprites of the same priority, the higher-numbered objects are
+    /// drawn first.
+    priority: gba.display.Priority = .highest,
+    /// When the object is using 4-bit color, this value indicates which
+    /// 16-color sprite palette bank should be used.
+    /// Otherwise, for 8-bit color, this value is ignored.
     palette: u4 = 0,
-    // This field is used to store the Affine data.
-    // TODO: should maybe be undefined or left out?
-    // _: I8_8 = undefined,
 
     /// Sets size and shape to the appropriate values for the given object size.
     pub fn setSize(self: *Obj, size: Size) void {
@@ -163,81 +214,22 @@ pub const Obj = packed struct {
         self.shape = parts.shape;
     }
 
-    pub fn setPosition(self: *Obj, x: u9, y: u8) void {
+    /// Assign the X and Y position of the object.
+    pub inline fn setPosition(self: *Obj, x: u9, y: u8) void {
         self.x_pos = x;
         self.y_pos = y;
     }
-
-    pub fn getAffine(self: Obj) *Affine {
-        return &obj_affine_buffer.affine[self.transform.affine_index];
-    }
-
-    pub fn flipH(self: *Obj) void {
-        switch (self.affine_mode) {
-            .normal => self.transform.flip.h = !self.transform.flip.h,
-            // TODO: implement affine flips
-            .affine, .affine_double => {},
-            else => {},
-        }
-    }
-
-    pub fn flipV(self: *Obj) void {
-        switch (self.affine_mode) {
-            .normal => self.transform.flip.v = !self.transform.flip.v,
-            // TODO: implement affine flips
-            .affine, .affine_double => {},
-            else => {},
-        }
-    }
-
-    pub fn rotate180(self: *Obj) void {
-        switch (self.affine_mode) {
-            .normal => self.transform.flip = .{
-                .h = !self.transform.flip.h,
-                .v = !self.transform.flip.v,
-            },
-            // TODO: implement affine flips
-            .affine, .affine_double => {},
-            else => {},
-        }
-    }
 };
 
-pub const Affine = packed struct {
-    _0: u48,
-    pa: I8_8 = I8_8.fromInt(1),
-    _1: u48,
-    pb: I8_8 = .{},
-    _2: u48,
-    pc: I8_8 = .{},
-    _3: u48,
-    pd: I8_8 = I8_8.fromInt(1),
-
-    pub fn set(self: *Affine, pa: I8_8, pb: I8_8, pc: I8_8, pd: I8_8) void {
-        self.pa = pa;
-        self.pb = pb;
-        self.pc = pc;
-        self.pd = pd;
-    }
-
-    pub fn setIdentity(self: *Affine) void {
-        self.set(I8_8.fromInt(1), .{}, .{}, I8_8.fromInt(1));
-    }
-};
-
-// TODO: Better abstraction for this, maybe even using the `std.Allocator` API
-pub fn allocate() *Obj {
-    const result = &obj_affine_buffer.obj[current_attr];
-    current_attr += 1;
-    return result;
-}
-
-/// Writes the object attribute buffer to OAM data.
-///
-/// Should only be done during VBlank
-pub fn update(count: usize) void {
-    for (obj_affine_buffer.obj[0..count], oam.obj[0..count]) |buf_entry, *oam_entry| {
-        oam_entry.* = buf_entry;
-    }
-    current_attr = 0;
+/// Write an affine transformation matrix to OAM, for use with objects.
+/// Should only be updated during VBlank, to avoid graphical glitches.
+pub fn setObjectTransform(index: u5, transform: AffineTransform) void {
+    var value_index = 3 + (@as(u8, index) << 4);
+    affine_values[value_index] = transform.values[0];
+    value_index += 4;
+    affine_values[value_index] = transform.values[1];
+    value_index += 4;
+    affine_values[value_index] = transform.values[2];
+    value_index += 4;
+    affine_values[value_index] = transform.values[3];
 }

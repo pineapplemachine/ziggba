@@ -1,5 +1,6 @@
 const zigimg = @import("zigimg/zigimg.zig");
 const std = @import("std");
+const getImagePixelRgba32 = @import("image.zig").getImagePixelRgba32;
 
 /// Enumeration of possible bit depths for GBA tile data. (Bits per pixel.)
 pub const Bpp = @import("../gba/color.zig").Color.Bpp;
@@ -7,9 +8,9 @@ pub const Bpp = @import("../gba/color.zig").Color.Bpp;
 /// GBA 16-bit RGB555 color.
 pub const GBAColor = @import("../gba/color.zig").Color;
 /// RGB888 truecolor.
-pub const ColorRgb888 = zigimg.color.Rgb24;
+pub const ColorRgb24 = zigimg.color.Rgb24;
 /// RGBA8888 truecolor with alpha channel.
-pub const ColorRgba8888 = zigimg.color.Rgba32;
+pub const ColorRgba32 = zigimg.color.Rgba32;
 
 /// Enumeration of options for how many blocks converted tile image data
 /// is intended to fit within.
@@ -42,7 +43,7 @@ pub fn ConvertOptions(comptime PaletteCtxT: type) type {
         /// Allocator for intermediate memory allocations.
         allocator: std.mem.Allocator,
         /// Given a pixel location and color, get a palette index.
-        palette_fn: *const fn (x: u16, y: u16, color: ColorRgba8888, bpp: Bpp, ctx: PaletteCtxT) u8,
+        palette_fn: *const fn (x: u16, y: u16, color: ColorRgba32, bpp: Bpp, ctx: PaletteCtxT) u8,
         /// Context object shared between invocations of the palette callback.
         palette_ctx: PaletteCtxT,
         /// Value to use for padding behavior with pad_fit and
@@ -96,10 +97,10 @@ pub const ConvertError = error{
 
 /// Helper to convert GBA color (5 bits per channel) to truecolor
 /// (8 bits per channel).
-pub fn gbaColorToRgb888(color: GBAColor) ColorRgb888 {
+pub fn gbaColorToRgb24(color: GBAColor) ColorRgb24 {
     // For 5-bit values, `(x << 3) | (x >> 2)` is almost exactly
     // equivalent to `round(x * (255f / 31f))`.
-    return ColorRgb888{
+    return ColorRgb24{
         .r = ((@as(u8, color.r) << 3) | (color.r >> 2)),
         .g = ((@as(u8, color.g) << 3) | (color.g >> 2)),
         .b = ((@as(u8, color.b) << 3) | (color.b >> 2)),
@@ -108,17 +109,22 @@ pub fn gbaColorToRgb888(color: GBAColor) ColorRgb888 {
 
 /// Convenience function for finding a best fit color within a truecolor
 /// palette to match a color found in an image.
-/// When using this function, []ColorRgb888 should be provided as the CtxT
+///
+/// When using this function, []ColorRgb24 should be provided as the CtxT
 /// comptime argument to a convertTiles call. Only the first 16 items are
 /// considered for 4bpp tiles, and only the first 256 items for 8bpp tiles.
 /// The first palette color is treated as full transparency, to reflect
 /// GBA rendering behavior.
+///
+/// Pixels with less than full 100% opacity are always matched with palette
+/// index 0. Otherwise, a perceptual color distance algorithm is used to
+/// match the nearest color that isn't at index 0.
 pub fn getNearestPaletteColor(
     _: u16, // x
     _: u16, // y
-    color: ColorRgba8888,
+    color: ColorRgba32,
     bpp: Bpp,
-    pal: []const ColorRgb888,
+    pal: []const ColorRgb24,
 ) u8 {
     if (color.a < 0xff) {
         // Transparent pixels are always palette index 0
@@ -160,7 +166,7 @@ pub fn getNearestPaletteColor(
 pub fn getNearestGbaPaletteColor(
     _: u16, // x
     _: u16, // y
-    color: ColorRgba8888,
+    color: ColorRgba32,
     bpp: Bpp,
     pal: []const GBAColor,
 ) u8 {
@@ -173,7 +179,7 @@ pub fn getNearestGbaPaletteColor(
     var pal_nearest_i: u8 = 0;
     var pal_nearest_dist: i32 = 0;
     while (pal_i <= pal_i_max and pal_i < pal.len) {
-        const pal_col = gbaColorToRgb888(pal[pal_i]);
+        const pal_col = gbaColorToRgb24(pal[pal_i]);
         const dr = color.r - @as(i32, pal_col.r);
         const dg = color.g - @as(i32, pal_col.g);
         const db = color.b - @as(i32, pal_col.b);
@@ -301,7 +307,7 @@ pub fn convertImage(
                     pal_index = opt.pad;
                 }
                 else {
-                    const px = getImagePixelRgba8888(image, image_i);
+                    const px = getImagePixelRgba32(image, image_i);
                     pal_index = opt.palette_fn(
                         @truncate(image_x),
                         @truncate(image_y),
@@ -340,101 +346,5 @@ pub fn convertImage(
     return ConvertOutput{
         .data = try data.toOwnedSlice(),
         .count = tile_count,
-    };
-}
-
-/// Helper to get RGBA8888 color from an image.
-fn getImagePixelRgba8888(image: zigimg.Image, index: usize) ColorRgba8888 {
-    return switch (image.pixels) {
-        .invalid => .{ .r = 0, .g = 0, .b = 0 },
-        .indexed1 => |px| px.palette[px.indices[index]],
-        .indexed2 => |px| px.palette[px.indices[index]],
-        .indexed4 => |px| px.palette[px.indices[index]],
-        .indexed8 => |px| px.palette[px.indices[index]],
-        .indexed16 => |px| px.palette[px.indices[index]],
-        .grayscale1 => |px| {
-            const i: u8 = if (px[index].value == 0) 0 else 0xff;
-            return .{ .r = i, .g = i, .b = i };
-        },
-        .grayscale2 => |px| {
-            const i_table = [4]u8{ 0x00, 0x55, 0xaa, 0xff };
-            const i = i_table[px[index].value];
-            return .{ .r = i, .g = i, .b = i };
-        },
-        .grayscale4 => |px| {
-            const i = (@as(u8, px[index].value) << 4) | px[index].value;
-            return .{ .r = i, .g = i, .b = i };
-        },
-        .grayscale8 => |px| {
-            const i = px[index].value;
-            return .{ .r = i, .g = i, .b = i };
-        },
-        .grayscale8Alpha => |px| {
-            const i = px[index].value;
-            return .{ .r = i, .g = i, .b = i, .a = px[index].alpha };
-        },
-        .grayscale16 => |px| {
-            const i: u8 = @truncate(px[index].value);
-            return .{ .r = i, .g = i, .b = i };
-        },
-        .grayscale16Alpha => |px| {
-            const i: u8 = @truncate(px[index].value);
-            const a: u8 = @truncate(px[index].alpha);
-            return .{ .r = i, .g = i, .b = i, .a = a };
-        },
-        .rgb24 => |px| .{
-            .r = px[index].r,
-            .g = px[index].g,
-            .b = px[index].b,
-        },
-        .rgba32 => |px| px[index],
-        .rgb332 => |px| .{
-            .r = px[index].r,
-            .g = px[index].g,
-            .b = px[index].b,
-        },
-        .rgb565 => |px| .{
-            .r = px[index].r,
-            .g = px[index].g,
-            .b = px[index].b,
-        },
-        .rgb555 => |px| .{
-            .r = px[index].r,
-            .g = px[index].g,
-            .b = px[index].b,
-        },
-        .bgr555 => |px| .{
-            .r = px[index].r,
-            .g = px[index].g,
-            .b = px[index].b,
-        },
-        .bgr24 => |px| .{
-            .r = px[index].r,
-            .g = px[index].g,
-            .b = px[index].b,
-        },
-        .bgra32 => |px| .{
-            .r = px[index].r,
-            .g = px[index].g,
-            .b = px[index].b,
-            .a = px[index].a,
-        },
-        .rgb48 => |px| .{
-            .r = @truncate(px[index].r),
-            .g = @truncate(px[index].g),
-            .b = @truncate(px[index].b),
-        },
-        .rgba64 => |px| .{
-            .r = @truncate(px[index].r),
-            .g = @truncate(px[index].g),
-            .b = @truncate(px[index].b),
-            .a = @truncate(px[index].a),
-        },
-        .float32 => |px| .{
-            .r = @intFromFloat(@round(px[index].r)),
-            .g = @intFromFloat(@round(px[index].g)),
-            .b = @intFromFloat(@round(px[index].b)),
-            .a = @intFromFloat(@round(px[index].a)),
-        },
     };
 }

@@ -8,14 +8,23 @@ pub const bitmap = @import("bitmap.zig");
 pub const Color = @import("color.zig").Color;
 pub const debug = @import("debug.zig");
 pub const display = @import("display.zig");
+pub const fixed = @import("fixed.zig");
+pub const format = @import("format.zig");
 pub const Header = @import("header.zig").Header;
 pub const input = @import("input.zig");
 pub const interrupt = @import("interrupt.zig");
-pub const math = @import("math.zig");
 pub const mem = @import("mem.zig");
 pub const obj = @import("obj.zig");
 pub const sound = @import("sound.zig");
+pub const text = @import("text.zig");
 pub const timer = @import("timer.zig");
+
+pub const FixedI16R8 = fixed.FixedI16R8;
+pub const FixedU16R16 = fixed.FixedU16R16;
+pub const FixedI32R8 = fixed.FixedI32R8;
+pub const FixedI32R16 = fixed.FixedI32R16;
+pub const FixedVec2I32R8 = fixed.FixedVec2I32R8;
+pub const FixedVec2I32R16 = fixed.FixedVec2I32R16;
 
 /// Pointer to EWRAM (external work RAM).
 /// More plentiful than IWRAM, but slower.
