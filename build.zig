@@ -18,6 +18,11 @@ pub fn build(b: *std.Build) void {
         .text_charset_cjk_symbols = true,
     };
     
+    // Build font data
+    
+    const build_font_step = b.step("font", "Build font data for gba.text");
+    build_font_step.makeFn = gba.buildFontsStep;
+    
     // Examples
     
     _ = gba.addGBAExecutable(b, "charBlock", "examples/charBlock/charBlock.zig", .{});
@@ -33,7 +38,7 @@ pub fn build(b: *std.Build) void {
     _ = gba.addGBAExecutable(b, "screenBlock", "examples/screenBlock/screenBlock.zig", .{});
     _ = gba.addGBAExecutable(b, "tileDemo", "examples/tileDemo/tileDemo.zig", .{});
     
-    var bgAffine_palette = [_]gba.tiles.ColorRgb888 {
+    var bgAffine_palette = [_]gba.tiles.ColorRgb24 {
         .{ .r = 0, .g = 0, .b = 0 }, // Transparency
         .{ .r = 255, .g = 255, .b = 255 },
         .{ .r = 255, .g = 0, .b = 0 },
@@ -42,7 +47,7 @@ pub fn build(b: *std.Build) void {
     };
     _ = gba.addGBAExecutable(b, "bgAffine", "examples/bgAffine/bgAffine.zig", text_options);
     gba.tiles.convertSaveImagePath(
-        []gba.tiles.ColorRgb888,
+        []gba.tiles.ColorRgb24,
         "examples/bgAffine/tiles.png",
         "examples/bgAffine/tiles.bin",
         .{
@@ -53,14 +58,14 @@ pub fn build(b: *std.Build) void {
         },
     ) catch {};
     
-    var jesuMusic_palette = [_]gba.tiles.ColorRgb888 {
+    var jesuMusic_palette = [_]gba.tiles.ColorRgb24 {
         .{ .r = 0, .g = 0, .b = 0 }, // Transparency
         .{ .r = 255, .g = 255, .b = 255 },
         .{ .r = 0, .g = 0, .b = 0 },
     };
     _ = gba.addGBAExecutable(b, "jesuMusic", "examples/jesuMusic/jesuMusic.zig", .{});
     gba.tiles.convertSaveImagePath(
-        []gba.tiles.ColorRgb888,
+        []gba.tiles.ColorRgb24,
         "examples/jesuMusic/charset.png",
         "examples/jesuMusic/charset.bin",
         .{

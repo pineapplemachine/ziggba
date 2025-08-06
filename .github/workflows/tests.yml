@@ -22,5 +22,6 @@ jobs:
 
       - name: Build examples and run tests
         run: |
+          ./zig build font
           ./zig build
           ./zig build test

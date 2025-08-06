@@ -1,7 +1,6 @@
 Files in this directory are used by the `gba.text` API.
 
-Run `font.py` to generate 1bpp bitmap files ready for embedding into a ROM. The Pillow package must be installed.
-https://pypi.org/project/pillow/
+Run `zig build font` to generate 1bpp bitmap files ready for embedding into a ROM.
 
 font_latin
     Contains glyphs for Unicode code points 0x20 to 0x7f.

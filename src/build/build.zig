@@ -2,14 +2,9 @@
 
 const std = @import("std");
 const ImageConverter = @import("image_converter.zig").ImageConverter;
-const ArrayList = std.ArrayList;
-const FixedBufferAllocator = std.heap.FixedBufferAllocator;
-const Step = std.Build.Step;
-const builtin = std.builtin;
-const fmt = std.fmt;
-const fs = std.fs;
 
 pub const GBAColor = @import("../gba/color.zig").Color;
+pub const font = @import("font.zig");
 pub const tiles = @import("tiles.zig");
 pub const ImageSourceTarget = @import("image_converter.zig").ImageSourceTarget;
 
@@ -230,13 +225,13 @@ pub fn addGBAExecutable(
 }
 
 const Mode4ConvertStep = struct {
-    step: Step,
+    step: std.Build.Step,
     images: []const ImageSourceTarget,
     target_palette_path: []const u8,
 
     pub fn init(b: *std.Build, images: []const ImageSourceTarget, target_palette_path: []const u8) Mode4ConvertStep {
         return Mode4ConvertStep{
-            .step = Step.init(.{
+            .step = std.Build.Step.init(.{
                 .id = .custom,
                 .name = b.fmt("ConvertMode4Image {s}", .{target_palette_path}),
                 .owner = b,
@@ -247,9 +242,9 @@ const Mode4ConvertStep = struct {
         };
     }
 
-    fn make(step: *Step, options: Step.MakeOptions) anyerror!void {
+    fn make(step: *std.Build.Step, options: std.Build.Step.MakeOptions) anyerror!void {
         const self: *Mode4ConvertStep = @fieldParentPtr("step", step);
-        const ImageSourceTargetList = ArrayList(ImageSourceTarget);
+        const ImageSourceTargetList = std.ArrayList(ImageSourceTarget);
 
         var full_images = ImageSourceTargetList.init(step.owner.allocator);
         defer full_images.deinit();
@@ -273,4 +268,21 @@ pub fn convertMode4Images(compile_step: *std.Build.Step.Compile, images: []const
     const convert_image_step = compile_step.step.owner.allocator.create(Mode4ConvertStep) catch unreachable;
     convert_image_step.* = Mode4ConvertStep.init(compile_step.step.owner, images, target_palette_path);
     compile_step.step.dependOn(&convert_image_step.step);
+}
+
+pub fn buildFonts() !void {
+    const alloc = std.heap.page_allocator;
+    try font.packSaveFontPath("assets/font_latin.png", "assets/font_latin.bin", .init(8, 12), .init(0, 24, 128, 72), alloc);
+    try font.packSaveFontPath("assets/font_latin.png", "assets/font_latin_supplement.bin", .init(8, 12), .init(0, 120, 128, 72), alloc);
+    try font.packSaveFontPath("assets/font_greek.png", "assets/font_greek.bin", .init(8, 12), .init(0, 0, 128, 108), alloc);
+    try font.packSaveFontPath("assets/font_cyrillic.png", "assets/font_cyrillic.bin", .init(9, 12), .init(0, 0, 144, 192), alloc);
+    try font.packSaveFontPath("assets/font_arrows.png", "assets/font_arrows.bin", .init(10, 12), .init(0, 0, 160, 72), alloc);
+    try font.packSaveFontPath("assets/font_cjk_symbols.png", "assets/font_cjk_symbols.bin", .init(10, 12), .init(0, 0, 160, 48), alloc);
+    try font.packSaveFontPath("assets/font_kana.png", "assets/font_kana.bin", .init(10, 12), .init(0, 0, 160, 144), alloc);
+    try font.packSaveFontPath("assets/font_fullwidth.png", "assets/font_fullwidth_punctuation.bin", .init(10, 12), .init(0, 0, 160, 24), alloc);
+    try font.packSaveFontPath("assets/font_fullwidth.png", "assets/font_fullwidth_latin.bin", .init(10, 12), .init(0, 24, 160, 48), alloc);
+}
+
+pub fn buildFontsStep(_: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
+    try buildFonts();
 }
