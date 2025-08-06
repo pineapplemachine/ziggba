@@ -17,13 +17,20 @@ const charset_data_empty: [0]u8 = .{};
 /// Contains data regarding supported character sets for text rendering.
 pub const Charset = struct {
     pub const CharHeader = packed struct(u32) {
+        /// Width of character in pixels.
+        /// If this is 8 or less, then the character's bitmap data is stored
+        /// in 8-bit rows. Otherwise, it's stored in 16-bit rows.
         size_x: u4 = 0,
+        /// Height of character in pixels.
+        /// Indicates the number of rows of bitmap data belonging to this
+        /// character.
         size_y: u4 = 0,
+        /// A Y offset of this character, representing an amount of empty
+        /// space above the first populated row of the character.
         offset_y: u4 = 0,
-        kerning_dangle_top_right: bool = false,
-        kerning_gap_top_left: bool = false,
-        kerning_dangle_bottom_left: bool = false,
-        kerning_gap_bottom_right: bool = false,
+        /// Unused padding bits.
+        _: u4 = 0,
+        /// Offset of character bitmap within the binary charset data.
         data_offset: u16 = 0,
     };
     
@@ -184,6 +191,8 @@ pub const charset_fullwidth_latin = Charset{
 pub const all_charsets = [_]Charset{
     charset_latin,
     charset_latin_supplement,
+    charset_greek,
+    charset_arrows,
     charset_cjk_symbols,
     charset_kana,
     charset_fullwidth_punctuation,
@@ -278,7 +287,9 @@ const CodePointIterator = struct {
 
 const GlyphLayoutIterator = struct {
     // TODO: Might be helpful to support line wrapping
+    // TODO: Support combining characters (e.g. 0x0300-0x036f)
     
+    pub const default_space_width = 3;
     pub const full_height = 12;
     pub const full_width = 10;
     
@@ -363,15 +374,17 @@ const GlyphLayoutIterator = struct {
         max_width: u16 = 0xffff,
         max_height: u16 = 0xffff,
         line_height: u8 = full_height,
+        space_width: u8 = default_space_width,
+        pad_character_width: u8 = 0,
     };
     
     points: CodePointIterator,
     prev_point: i32 = -1,
-    prev_kerning_dangle_top_right: bool = false,
-    prev_kerning_gap_bottom_right: bool = false,
     max_width: u16 = 0xffff,
     max_height: u16 = 0xffff,
     line_height: u8 = full_height,
+    space_width: u8 = default_space_width,
+    pad_character_width: u8 = 0,
     x_initial: u16,
     x: u16,
     y: u16,
@@ -385,6 +398,8 @@ const GlyphLayoutIterator = struct {
             .x = options.x,
             .y = options.y + options.line_height - full_height,
             .line_height = options.line_height,
+            .space_width = options.space_width,
+            .pad_character_width = options.pad_character_width,
         };
     }
     
@@ -399,15 +414,13 @@ const GlyphLayoutIterator = struct {
         }
         switch(point) {
             ' ', 0xa0 => { // space and non-breaking space (nbsp)
-                self.x += 4;
+                self.x += self.space_width;
             },
             '\t' => { // horizontal tab/line tabulation
                 self.x = (self.x & 0xfff0) + 0x10;
             },
             '\n' => { // line feed
                 self.x = self.x_initial;
-                self.prev_kerning_gap_bottom_right = false;
-                self.prev_kerning_dangle_top_right = false;
                 self.y += self.line_height;
             },
             0x2002 => { // en space
@@ -465,29 +478,22 @@ const GlyphLayoutIterator = struct {
         const header = charset.getHeader(
             @as(u16, @intCast(point)) - charset.code_point_min
         );
-        defer self.prev_kerning_gap_bottom_right = header.kerning_gap_bottom_right;
-        defer self.prev_kerning_dangle_top_right = header.kerning_dangle_top_right;
-        if(glyph_align == .normal and (
-            (
-                header.kerning_dangle_bottom_left and
-                self.prev_kerning_gap_bottom_right
-            ) or
-            (
-                header.kerning_gap_top_left and
-                self.prev_kerning_dangle_top_right
-            )
-        )) {
-            self.x -= 1;
-        }
         var x = self.x;
         const y = self.y;
-        if(header.size_x >= full_width) {
-            self.x += header.size_x + 1;
+        const size_x = @max(header.size_x, self.pad_character_width);
+        if(size_x >= full_width) {
+            self.x += size_x + 1;
+            if(self.pad_character_width > header.size_x) {
+                x += (self.pad_character_width - header.size_x) >> 1;
+            }
         }
         else {
             switch(glyph_align) {
                 .normal => {
-                    self.x += header.size_x + 1;
+                    self.x += size_x + 1;
+                    if(self.pad_character_width > header.size_x) {
+                        x += (self.pad_character_width - header.size_x) >> 1;
+                    }
                 },
                 .fullwidth_left => {
                     self.x += full_width;
@@ -497,7 +503,7 @@ const GlyphLayoutIterator = struct {
                     self.x += full_width;
                 },
                 .fullwidth_center => {
-                    x += (full_width - header.size_x) >> 1;
+                    x += (full_width - size_x) >> 1;
                     self.x += full_width;
                 },
             }
@@ -557,6 +563,19 @@ pub const DrawToCharblock4BppOptions = struct {
     max_height: u16 = 0xffff,
     /// Added to Y position to represent a newline ('\n').
     line_height: u8 = 12,
+    /// Width in pixels of the space character (' ', 0x20).
+    /// Default is 3 pixels. For monospace text with ASCII digits and
+    /// upper-case letters, use 6 pixels.
+    space_width: u8 = GlyphLayoutIterator.default_space_width,
+    /// When a character is less wide than this number of pixels, make it
+    /// take up this amount of space anyway.
+    ///
+    /// Supplying a `space_width` of 6 and a `pad_character_width` of 5
+    /// will result in monospace text, if not using any extra wide characters.
+    ///
+    /// Except for some specially tagged fullwidth characters, the character
+    /// will be centered in the widened space.
+    pad_character_width: u8 = 0,
 };
 
 // TODO: Add similar functions for other kinds of render targets.
@@ -570,8 +589,11 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
         .max_width = @min(options.max_width, @as(u16, 8) << options.pitch_shift),
         .max_height = options.max_height,
         .line_height = options.line_height,
+        .space_width = options.space_width,
+        .pad_character_width = options.pad_character_width,
     });
     while(true) {
+        @setRuntimeSafety(false);
         const glyph = layoutGlyphs.next();
         if(glyph.isEof()) {
             return;

@@ -46,6 +46,33 @@ const gba_thumb_target_query = blk: {
     break :blk target;
 };
 
+pub fn addFontImports(b: *std.Build, module: *std.Build.Module) void {
+    module.addAnonymousImport("ziggba_font_latin.bin", .{
+        .root_source_file = b.path("assets/font_latin.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_latin_supplement.bin", .{
+        .root_source_file = b.path("assets/font_latin_supplement.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_greek.bin", .{
+        .root_source_file = b.path("assets/font_greek.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_arrows.bin", .{
+        .root_source_file = b.path("assets/font_arrows.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_kana.bin", .{
+        .root_source_file = b.path("assets/font_kana.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_fullwidth_punctuation.bin", .{
+        .root_source_file = b.path("assets/font_fullwidth_punctuation.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_fullwidth_latin.bin", .{
+        .root_source_file = b.path("assets/font_fullwidth_latin.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_cjk_symbols.bin", .{
+        .root_source_file = b.path("assets/font_cjk_symbols.bin"),
+    });
+}
+
 /// Add a build step to compile a static library.
 /// The library will be compiled to run on the GBA.
 pub fn addGBAStaticLibrary(
@@ -60,15 +87,7 @@ pub fn addGBAStaticLibrary(
         .root_module = module,
     });
     lib.root_module.addOptions("gba_build_options", options);
-    lib.root_module.addAnonymousImport("ziggba_font_latin.bin", .{
-        .root_source_file = b.path("assets/font_latin.bin"),
-    });
-    lib.root_module.addAnonymousImport("ziggba_font_latin_supplement.bin", .{
-        .root_source_file = b.path("assets/font_latin_supplement.bin"),
-    });
-    lib.root_module.addAnonymousImport("ziggba_font_kana.bin", .{
-        .root_source_file = b.path("assets/font_kana.bin"),
-    });
+    addFontImports(b, lib.root_module);
     lib.setLinkerScript(.{
         .src_path = .{
             .owner = b,
@@ -91,24 +110,7 @@ pub fn addGBAModule(
         .optimize = if (debug) .Debug else .ReleaseFast,
     });
     module.addOptions("ziggba_build_options", options);
-    module.addAnonymousImport("ziggba_font_latin.bin", .{
-        .root_source_file = b.path("assets/font_latin.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_latin_supplement.bin", .{
-        .root_source_file = b.path("assets/font_latin_supplement.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_kana.bin", .{
-        .root_source_file = b.path("assets/font_kana.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_fullwidth_punctuation.bin", .{
-        .root_source_file = b.path("assets/font_fullwidth_punctuation.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_fullwidth_latin.bin", .{
-        .root_source_file = b.path("assets/font_fullwidth_latin.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_cjk_symbols.bin", .{
-        .root_source_file = b.path("assets/font_cjk_symbols.bin"),
-    });
+    addFontImports(b, module);
     return module;
 }
 
@@ -116,6 +118,8 @@ pub fn addGBAOptions(b: *std.Build, options: Options) *std.Build.Step.Options {
     const build_options = b.addOptions();
     build_options.addOption(bool, "text_charset_latin", options.text_charset_latin);
     build_options.addOption(bool, "text_charset_latin_supplement", options.text_charset_latin_supplement);
+    build_options.addOption(bool, "text_charset_greek", options.text_charset_greek);
+    build_options.addOption(bool, "text_charset_arrows", options.text_charset_arrows);
     build_options.addOption(bool, "text_charset_kana", options.text_charset_kana);
     build_options.addOption(bool, "text_charset_fullwidth_punctuation", options.text_charset_fullwidth_punctuation);
     build_options.addOption(bool, "text_charset_fullwidth_latin", options.text_charset_fullwidth_latin);

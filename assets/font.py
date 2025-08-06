@@ -126,25 +126,8 @@ class Char:
             (max(0, self.y_max - self.y_min) << 4)
         )
         b.append(
-            max(0, self.y_min - self.im_rect_y) |
-            # Kerning flag intended to match 'f' and 'r'
-            ((
-                self.y_min_last - self.im_rect_y <= 5 and
-                self.y_min_last == self.y_max_last - 1
-            ) << 4) |
-            # Flag for chars that should have a reduced gap with the above
-            ((
-                self.y_min_first - self.im_rect_y > 5
-            ) << 5) |
-            # Kerning flag intended to match 'j'
-            ((
-                self.y_min_first - self.im_rect_y >= 9 and
-                self.y_min_first == self.y_max_first - 1
-            ) << 6) |
-            # Flag for chars that should have a reduced gap with the above
-            ((
-                self.y_max_last - self.im_rect_y < 9
-            ) << 7)
+            max(0, self.y_min - self.im_rect_y)
+            # Note: High 4 bits of this byte are currently unused
         )
         return bytes(b)
     
