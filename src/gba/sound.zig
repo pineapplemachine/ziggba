@@ -83,7 +83,6 @@ pub const PulseChannelControl = packed struct(u16) {
 /// This includes frequency control for the pulse and wave channels.
 pub const ChannelFrequency = packed struct(u16) {
     /// Initial sound rate. Write-only. Frequency is 2^17/(2048-rate).
-    /// See the Pitch enum for rates corresponding to musical notes.
     rate: u11 = 0,
     /// Unused bits.
     _: u3 = 0,
