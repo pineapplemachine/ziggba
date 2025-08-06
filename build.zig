@@ -10,6 +10,7 @@ pub fn build(b: *std.Build) void {
         .text_charset_latin = true,
         .text_charset_latin_supplement = true,
         .text_charset_greek = true,
+        .text_charset_cyrillic = true,
         .text_charset_arrows = true,
         .text_charset_kana = true,
         .text_charset_fullwidth_punctuation = true,
@@ -22,6 +23,7 @@ pub fn build(b: *std.Build) void {
     _ = gba.addGBAExecutable(b, "charBlock", "examples/charBlock/charBlock.zig", .{});
     _ = gba.addGBAExecutable(b, "debugPrint", "examples/debugPrint/debugPrint.zig", .{});
     _ = gba.addGBAExecutable(b, "first", "examples/first/first.zig", .{});
+    _ = gba.addGBAExecutable(b, "helloWorld", "examples/helloWorld/helloWorld.zig", text_options);
     _ = gba.addGBAExecutable(b, "keydemo", "examples/keydemo/keydemo.zig", .{});
     _ = gba.addGBAExecutable(b, "mode3draw", "examples/mode3draw/mode3draw.zig", .{});
     _ = gba.addGBAExecutable(b, "mode4draw", "examples/mode4draw/mode4draw.zig", .{});

@@ -113,6 +113,21 @@ pub const charset_greek = Charset{
     .data = &charset_greek_data,
 };
 
+const charset_cyrillic_data align(2) = blk: {
+    if (build_options.text_charset_cyrillic) {
+        break :blk @embedFile("ziggba_font_cyrillic.bin").*;
+    }
+    else {
+        break :blk &charset_data_empty;
+    }
+};
+pub const charset_cyrillic = Charset{
+    .enabled = build_options.text_charset_cyrillic,
+    .code_point_min = 0x0400,
+    .code_point_max = 0x04ff,
+    .data = &charset_cyrillic_data,
+};
+
 const charset_arrows_data align(2) = blk: {
     if (build_options.text_charset_arrows) {
         break :blk @embedFile("ziggba_font_arrows.bin").*;
@@ -192,6 +207,7 @@ pub const all_charsets = [_]Charset{
     charset_latin,
     charset_latin_supplement,
     charset_greek,
+    charset_cyrillic,
     charset_arrows,
     charset_cjk_symbols,
     charset_kana,

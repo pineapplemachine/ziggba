@@ -29,6 +29,7 @@ pub const Options = struct {
     text_charset_latin: bool = false,
     text_charset_latin_supplement: bool = false,
     text_charset_greek: bool = false,
+    text_charset_cyrillic: bool = false,
     text_charset_arrows: bool = false,
     text_charset_kana: bool = false,
     text_charset_fullwidth_punctuation: bool = false,
@@ -55,6 +56,9 @@ pub fn addFontImports(b: *std.Build, module: *std.Build.Module) void {
     });
     module.addAnonymousImport("ziggba_font_greek.bin", .{
         .root_source_file = b.path("assets/font_greek.bin"),
+    });
+    module.addAnonymousImport("ziggba_font_cyrillic.bin", .{
+        .root_source_file = b.path("assets/font_cyrillic.bin"),
     });
     module.addAnonymousImport("ziggba_font_arrows.bin", .{
         .root_source_file = b.path("assets/font_arrows.bin"),
@@ -119,6 +123,7 @@ pub fn addGBAOptions(b: *std.Build, options: Options) *std.Build.Step.Options {
     build_options.addOption(bool, "text_charset_latin", options.text_charset_latin);
     build_options.addOption(bool, "text_charset_latin_supplement", options.text_charset_latin_supplement);
     build_options.addOption(bool, "text_charset_greek", options.text_charset_greek);
+    build_options.addOption(bool, "text_charset_cyrillic", options.text_charset_cyrillic);
     build_options.addOption(bool, "text_charset_arrows", options.text_charset_arrows);
     build_options.addOption(bool, "text_charset_kana", options.text_charset_kana);
     build_options.addOption(bool, "text_charset_fullwidth_punctuation", options.text_charset_fullwidth_punctuation);
