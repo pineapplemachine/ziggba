@@ -47,7 +47,7 @@ pub const FormatDecimalIntOptions = struct {
     /// prepend enough `pad_left_char` to match this padded length.
     pad_left_len: u8 = 0,
     /// Padding byte, for use with `pad_left_len`.
-    pad_left_char: u8 = ' '
+    pad_left_char: u8 = ' ',
 };
 
 /// Write a human-readable decimal representation of an integer to a target
@@ -63,10 +63,10 @@ pub fn formatDecimalI32(
     value: i32,
     options: FormatDecimalIntOptions,
 ) u8 {
+    @setRuntimeSafety(false);
     var i: u8 = 0;
     // Special case: 0
     if(value == 0) {
-        // TODO: sign
         const z_len: u2 = if(options.always_sign) 2 else 1;
         if(options.pad_left_len > z_len) {
             for(0..options.pad_left_len - z_len) |_| {
