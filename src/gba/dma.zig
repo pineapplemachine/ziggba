@@ -80,10 +80,10 @@ pub const Dma = packed struct {
     };
 
     /// Source pointer to copy memory from.
-    /// For DMA 0, can only be internal memory
+    /// For DMA 0, can only be internal memory.
     source: *const anyopaque,
     /// Destination pointer to copy memory to.
-    /// For DMA 0-2, can only be internal memory
+    /// For DMA 0-2, can only be internal memory.
     dest: *anyopaque,
     /// Indicates various parameters for the transfer, including length.
     ctrl: Control,

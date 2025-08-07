@@ -19,7 +19,7 @@ isr_default_redirect:
 
 isr_default:
 
-    // Load REG_IE & REG_IF to determine what interrupt is being handled.
+    // Load REG_IE & REG_IF to determine the type of interrupt.
     mov     r0, #0x04000000
     ldr     ip, [r0, #0x200]!    // Load REG_IE
     ldr     r3, [r0, #2]         // Load REG_IF
@@ -37,7 +37,7 @@ isr_default:
     bic     r2, ip, r1           // Clear current irq in REG_IE
     strh    r2, [r0]             // Store modified REG_IE
     
-    // Store values on the stack.
+    // Store some values on the stack for later retrieval.
     mrs     r2, spsr
     stmfd   sp!, {r2-r3, ip, lr} // sprs, IME, (IE,IF), lr_irq
     
@@ -48,7 +48,7 @@ isr_default:
     msr     cpsr, r3
     
     // Call the `isr_default_redirect` handler, implemented in Zig.
-    // r0 contains REG_IE & REG_IF, as a function argument.
+    // r0 contains irq (REG_IE & REG_IF), as a function argument.
     stmfd   sp!, {r0,lr}         // &REG_IE, lr_sys
     mov     r0, r1
     ldr     r1, _isr_default_redirect_word
@@ -56,11 +56,9 @@ isr_default:
     mov     lr, pc
     bx      r1
     ldmfd   sp!, {r0,lr}         // &REG_IE, lr_sys
-    
-    // Begin unwinding.
     strb    r0, [r0, #8]         // Clear IME again (safety)
     
-    // Reset CPU mode to irq.
+    // Reset CPU mode back to irq.
     mrs     r3, cpsr
     bic     r3, r3, #0xdf
     orr     r3, r3, #0x92

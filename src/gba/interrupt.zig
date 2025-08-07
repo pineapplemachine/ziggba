@@ -5,7 +5,7 @@ const gba = @import("gba.zig");
 
 /// Location in EWRAM where the system expects to find an interrupt service
 /// routine (ISR) ARM function pointer.
-/// ZigGBA initializes this to point to `isr_default`.
+/// ZigGBA initializes this at startup to point to `isr_default`.
 /// Don't change this unless you're sure you know what you're doing!
 pub const isr_ptr: *volatile *const fn() callconv(.c) void = (
     @ptrFromInt(gba.mem.iwram + 0x7ffc)
@@ -143,19 +143,25 @@ pub const InterruptFlags = packed struct(u16) {
         }
     }
     
-    pub inline fn and_flags(a: InterruptFlags, b: InterruptFlags) InterruptFlags {
+    /// Get a new `InterruptFlags` which has only those flags set which are
+    /// set in both `a` and `b`.
+    pub inline fn andFlags(a: InterruptFlags, b: InterruptFlags) InterruptFlags {
         const bits_a: u16 = @bitCast(a);
         const bits_b: u16 = @bitCast(b);
         return @bitCast(bits_a & bits_b);
     }
     
-    pub inline fn or_flags(a: InterruptFlags, b: InterruptFlags) InterruptFlags {
+    /// Get a new `InterruptFlags` which has only those flags set which are
+    /// set in `a`, in `b`, or both.
+    pub inline fn orFlags(a: InterruptFlags, b: InterruptFlags) InterruptFlags {
         const bits_a: u16 = @bitCast(a);
         const bits_b: u16 = @bitCast(b);
         return @bitCast(bits_a | bits_b);
     }
     
-    pub inline fn xor_flags(a: InterruptFlags, b: InterruptFlags) InterruptFlags {
+    /// Get a new `InterruptFlags` which has only those flags set which are
+    /// set in either `a` or `b`, and not in both.
+    pub inline fn xorFlags(a: InterruptFlags, b: InterruptFlags) InterruptFlags {
         const bits_a: u16 = @bitCast(a);
         const bits_b: u16 = @bitCast(b);
         return @bitCast(bits_a ^ bits_b);
