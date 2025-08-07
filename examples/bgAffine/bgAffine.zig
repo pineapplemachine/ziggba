@@ -86,10 +86,16 @@ pub export fn main() void {
     var angle: gba.FixedU16R16 = .{};
     var input: gba.input.KeysState = .{};
     
+    // Enable VBlank interrupts.
+    // This will allow running the main loop once per frame.
+    gba.display.status.vblank_interrupt = true;
+    gba.interrupt.enable.vblank = true;
+    gba.interrupt.master.enable = true;
+    
     // Main loop.
     while (true) {
         // Run this loop only once per frame.
-        gba.display.naiveVSync();
+        gba.bios.waitVBlank();
         
         // Check the state of button inputs for this frame.
         input.poll();

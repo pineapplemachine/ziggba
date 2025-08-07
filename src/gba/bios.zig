@@ -241,8 +241,13 @@ pub fn resetRamRegisters(flags: RamResetFlags) void {
     call1Return0(.register_ram_reset, flags);
 }
 
+pub const WaitInterruptReturnType = enum(u1) {
+    return_immediately,
+    discard_old_wait_new,
+};
+
 pub fn waitInterrupt(
-    return_type: gba.interrupt.WaitReturn,
+    return_type: WaitInterruptReturnType,
     flags: gba.interrupt.Flags,
 ) void {
     call2Return0(.intr_wait, return_type, flags);

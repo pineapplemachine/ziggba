@@ -1,5 +1,6 @@
-const bios = @import("bios.zig");
-const mem = @import("mem.zig");
+//! This module implements a Zig entry point for a GBA ROM.
+
+const gba = @import("gba.zig");
 
 /// This function is called after boot and initialization.
 /// It must be defined in user code.
@@ -13,14 +14,18 @@ extern var __data_start__: u8;
 extern var __data_end__: u8;
 
 export fn _start_zig() noreturn {
-    // Use BIOS function to clear all data
-    bios.resetRamRegisters(bios.RamResetFlags.initFull());
-    // Clear .bss
-    mem.memset32(&__bss_start__, 0, @intFromPtr(&__bss_end__) - @intFromPtr(&__bss_start__));
-    // Copy .data section to EWRAM
-    mem.memcpy32(&__data_start__, &__data_lma, @intFromPtr(&__data_end__) - @intFromPtr(&__data_start__));
-    // Call user's main
+    // Use BIOS function to clear data.
+    gba.bios.resetRamRegisters(gba.bios.RamResetFlags.initFull());
+    // Clear .bss section.
+    gba.mem.memset32(&__bss_start__, 0, @intFromPtr(&__bss_end__) - @intFromPtr(&__bss_start__));
+    // Copy .data section to EWRAM.
+    gba.mem.memcpy32(&__data_start__, &__data_lma, @intFromPtr(&__data_end__) - @intFromPtr(&__data_start__));
+    // Initialize default ISR.
+    // TODO: Consider copying isr_default to IWRAM first?
+    gba.interrupt.isr_default_redirect = gba.interrupt.isr_default_redirect_null;
+    gba.interrupt.isr_ptr.* = &gba.interrupt.isr_default;
+    // Call user's main.
     main();
-    // If user's main ends, hang here
+    // If user's main ends, hang here.
     while (true) {}
 }
