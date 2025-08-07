@@ -469,4 +469,4 @@ pub const state: *align(2) const volatile KeysState = @ptrFromInt(gba.mem.io + 0
 
 /// Corresponds to REG_KEYCNT.
 /// Can be used to request an interrupt when certain buttons are pressed.
-pub const ctrl: *align(2) const volatile InterruptControl = @ptrFromInt(gba.mem.io + 0x130);
+pub const interrupt: *align(2) const volatile InterruptControl = @ptrFromInt(gba.mem.io + 0x130);

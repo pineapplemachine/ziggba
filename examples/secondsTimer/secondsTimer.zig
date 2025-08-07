@@ -1,19 +1,14 @@
 const gba = @import("gba");
-const display = gba.display;
-const bg = gba.bg;
-const Timer = gba.timer.Timer;
-const timers = gba.timer.timers;
-const bios = gba.bios;
 
 export const gameHeader linksection(".gbaheader") = gba.Header.init("SECSTIMER", "ASTE", "00", 0);
 
 fn initMap() void {
     // Init background
-    bg.ctrl[0] = bg.Control{
+    gba.bg.ctrl[0] = gba.bg.Control{
         .screen_base_block = 28,
         .tile_map_size = .{ .normal = .size_32x32 },
     };
-    bg.scroll[0].set(0, 0);
+    gba.bg.scroll[0].set(0, 0);
 
     // Create tiles for numeric digits
     gba.display.bg_charblocks[0].bpp_4[0] = @bitCast([_]u32{
@@ -65,7 +60,9 @@ fn initMap() void {
     gba.display.bg_palette.colors[1] = gba.Color.rgb(31, 31, 31);
 
     // Initialize the map to all blank tiles
-    const bg0_map: [*]volatile bg.TextScreenEntry = @ptrCast(&bg.screen_block_ram[28]);
+    const bg0_map: [*]volatile gba.bg.TextScreenEntry = (
+        @ptrCast(&gba.bg.screen_block_ram[28])
+    );
     for (0..32 * 32) |map_index| {
         bg0_map[map_index].palette_index = 0;
         bg0_map[map_index].tile_index = 10;
@@ -74,7 +71,7 @@ fn initMap() void {
 
 pub export fn main() void {
     initMap();
-    display.ctrl.* = display.Control{
+    gba.display.ctrl.* = gba.display.Control{
         .bg0 = true,
     };
 
@@ -83,14 +80,14 @@ pub export fn main() void {
     // which is the same as once per second.
     // When it oveflows, Timer 2 will be incremented by 1 due
     // to its "cascade" flag.
-    timers[1] = Timer{
+    gba.timers[1] = gba.Timer{
         .counter = @truncate(-0x4000),
         .ctrl = .{
             .freq = .cycles_1024,
             .enable = true,
         },
     };
-    timers[2] = Timer{
+    gba.timers[2] = gba.Timer{
         .counter = 0,
         .ctrl = .{
             .mode = .cascade,
@@ -98,13 +95,15 @@ pub export fn main() void {
         },
     };
 
-    const bg0_map: [*]volatile bg.TextScreenEntry = @ptrCast(&bg.screen_block_ram[28]);
+    const bg0_map: [*]volatile gba.bg.TextScreenEntry = (
+        @ptrCast(&gba.bg.screen_block_ram[28])
+    );
 
     while (true) {
-        display.naiveVSync();
+        gba.display.naiveVSync();
 
         // Convert elapsed seconds to a 2-digit display
-        const digits = bios.div(timers[2].counter, 10);
+        const digits = gba.bios.div(gba.timers[2].counter, 10);
         bg0_map[33].tile_index = @intCast(digits.quotient);
         bg0_map[34].tile_index = @intCast(digits.remainder);
     }

@@ -14,6 +14,7 @@ fn libRoot() []const u8 {
 
 const gba_linker_script = libRoot() ++ "/../gba/gba.ld";
 const gba_crt0_asm = libRoot() ++ "/../gba/crt0.s";
+const gba_isr_asm = libRoot() ++ "/../gba/isr.s";
 const gba_start_zig_file = libRoot() ++ "/../gba/start.zig";
 const gba_lib_file = libRoot() ++ "/../gba/gba.zig";
 
@@ -184,6 +185,12 @@ pub fn addGBAExecutable(
         .src_path = .{
             .owner = b,
             .sub_path = gba_crt0_asm,
+        },
+    });
+    exe.addAssemblyFile(.{
+        .src_path = .{
+            .owner = b,
+            .sub_path = gba_isr_asm,
         },
     });
     if (use_gdb) {

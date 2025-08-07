@@ -24,65 +24,6 @@ pub const rom = 0x08000000;
 /// Base address for save RAM
 pub const sram = 0x0E000000;
 
-/// Source and destination addresses only use the least significant
-/// 27 bits (for internal memory) or 28 bits (for any memory)
-pub const Dma = packed struct {
-    pub const DestAddrControl = enum(u2) {
-        increment = 0,
-        decrement = 1,
-        fixed = 2,
-        inc_reload = 3,
-    };
-
-    pub const SourceAddrControl = enum(u2) {
-        increment = 0,
-        decrement = 1,
-        fixed = 2,
-    };
-
-    pub const TransferType = enum(u1) {
-        half_word,
-        word,
-    };
-
-    pub const StartTiming = enum(u2) {
-        immediate = 0,
-        vblank = 1,
-        hblank = 2,
-        /// DMA0: Forbidden
-        ///
-        /// DMA1-2: Sound FIFO
-        ///
-        /// DMA3: Video Capture
-        special = 3,
-    };
-
-    pub const Control = packed struct(u32) {
-        /// For DMA0-2, only 14 bits are used
-        count: u16 = 0,
-        _: u5 = 0,
-        dest: DestAddrControl = .increment,
-        source: SourceAddrControl = .increment,
-        /// Must be false if gamepak_drq is used (DMA3 only)
-        dma_repeat: bool = false,
-        transfer_type: TransferType = .half_word,
-        /// DMA3 only
-        gamepak_drq: bool = false,
-        start_timing: StartTiming = .immediate,
-        irq_at_end: bool = false,
-        enabled: bool = false,
-    };
-
-    /// For DMA 0, can only be internal memory
-    source: *const anyopaque,
-    /// For DMA 0-2, can only be internal memory
-    dest: *anyopaque,
-    ctrl: Control,
-};
-
-/// Direct Memory Access
-pub const dma: *[4]Dma = @ptrFromInt(gba.mem.io + 0xB0);
-
 // TODO: maybe put this in IWRAM ?
 pub fn memcpy32(noalias dest: anytype, noalias source: anytype, count: usize) void {
     if (count < 4) {
