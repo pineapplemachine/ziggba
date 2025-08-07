@@ -20,7 +20,7 @@ pub const obj = @import("obj.zig");
 pub const sound = @import("sound.zig");
 pub const text = @import("text.zig");
 pub const Timer = @import("timer.zig").Timer;
-pub const timer = @import("timer.zig").timer;
+pub const timers = @import("timer.zig").timers;
 
 pub const FixedI16R8 = fixed.FixedI16R8;
 pub const FixedU16R16 = fixed.FixedU16R16;

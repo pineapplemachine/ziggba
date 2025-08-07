@@ -80,14 +80,14 @@ pub export fn main() void {
     // which is the same as once per second.
     // When it oveflows, Timer 2 will be incremented by 1 due
     // to its "cascade" flag.
-    gba.timer[1] = gba.Timer{
+    gba.timers[1] = gba.Timer{
         .counter = @truncate(-0x4000),
         .ctrl = .{
             .freq = .cycles_1024,
             .enable = true,
         },
     };
-    gba.timer[2] = gba.Timer{
+    gba.timers[2] = gba.Timer{
         .counter = 0,
         .ctrl = .{
             .mode = .cascade,
@@ -103,7 +103,7 @@ pub export fn main() void {
         gba.display.naiveVSync();
 
         // Convert elapsed seconds to a 2-digit display
-        const digits = gba.bios.div(gba.timer[2].counter, 10);
+        const digits = gba.bios.div(gba.timers[2].counter, 10);
         bg0_map[33].tile_index = @intCast(digits.quotient);
         bg0_map[34].tile_index = @intCast(digits.remainder);
     }
