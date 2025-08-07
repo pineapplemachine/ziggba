@@ -253,6 +253,16 @@ pub fn waitInterrupt(
     call2Return0(.intr_wait, return_type, flags);
 }
 
+/// Halt execution until a VBlank interrupt triggers.
+/// VBlank happens once per frame, after finishing drawing the frame.
+/// You probably want to call this function once at the beginning of your
+/// main game loop.
+/// Note that several flags must be set before this will work as you
+/// probably expect.
+///
+/// See `gba.display.status.vblank_interrupt`, `gba.interrupt.enable.vblank`,
+/// and `gba.interrupt.master.enable`. All three of these flags must be set in
+/// order for VBlank interrupts to occur.
 pub fn waitVBlank() void {
     // TODO: The bios just loads these arguments on the registers and calls IntrWait
     // So this might be better if you're not hand-writing assembly?
