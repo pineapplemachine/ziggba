@@ -25,6 +25,7 @@ SECTIONS
     {
         KEEP(*(.gbaheader))
         KEEP(*(.gba_crt0))
+        KEEP(*(.gba_isr))
         *(EXCLUDE_FILE (*.iwram*) .text*)
         . ALIGN(4);
     } >rom = 0xff
@@ -49,6 +50,7 @@ SECTIONS
     __data_lma = .;
     .data : AT(__data_lma) {
         __data_start__ = ABSOLUTE(.);
+        KEEP(*(.gba_isr_data))
         *(.data)
         . = ALIGN(4);
         __data_end__ = ABSOLUTE(.);

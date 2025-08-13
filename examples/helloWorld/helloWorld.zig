@@ -16,14 +16,7 @@ pub export fn main() void {
         .tile_map_size = .{ .normal = .size_32x32 },
     };
     const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
-    for(0..normal_bg_map.width()) |x| {
-        for(0..normal_bg_map.height()) |y| {
-            const tile_i = (x | (y << 5));
-            normal_bg_map.set(@truncate(x), @truncate(y), .{
-                .tile = @truncate(tile_i),
-            });
-        }
-    }
+    normal_bg_map.getBaseScreenblock().fillLinear(.{});
     
     // Draw text to the tile memory used by the initialized background.
     gba.text.drawToCharblock4Bpp(.{

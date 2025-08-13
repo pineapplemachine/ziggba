@@ -42,8 +42,7 @@ pub const Screenblock = extern union {
     /// Array of affine entry pairs.
     affine_pairs: [1024]AffinePair,
     /// Array of individual tile indices for an affine map.
-    ///
-    /// Don't write to this array!
+    /// Don't write to this array with a screenblock in VRAM!
     /// It won't behave the way that you are probably expecting it to.
     affine_entries: [2048]AffineEntry,
     
@@ -86,6 +85,74 @@ pub const Screenblock = extern union {
         pair &= ~(@as(u16, 0xff) << shift);
         pair |= @as(u16, entry) << shift;
         self.affine_pairs[pair_index] = @bitCast(pair);
+    }
+    
+    /// Fill every tile in this screenblock with a given entry.
+    pub fn fill(self: *volatile Screenblock, entry: Screenblock.Entry) void {
+        for(0..self.entries.len) |i| {
+            self.entries[i] = entry;
+        }
+    }
+    
+    /// Fill every tile within a rect in this screenblock with a given entry.
+    pub fn fillRect(
+        self: *volatile Screenblock,
+        entry: Screenblock.Entry,
+        rect_x: u5,
+        rect_y: u5,
+        rect_width: u6,
+        rect_height: u6,
+    ) void {
+        assert((rect_x + rect_width) <= 32 and (rect_y + rect_height) <= 32);
+        // TODO: Define a common Rect type and use it for params here
+        for(0..rect_height) |i_y| {
+            var i = rect_x + ((rect_y + i_y) << 5);
+            for(0..rect_width) |_| {
+                self.entries[i] = entry;
+                i += 1;
+            }
+        }
+    }
+    
+    /// Fill every tile in this screenblock with a given entry,
+    /// but add each tile's index within the screenblock to the that entry's
+    /// `Screenblock.Entry.tile` value.
+    ///
+    /// This may be helpful to initialize a screenblock where every tile is
+    /// unique.
+    pub fn fillLinear(self: *volatile Screenblock, base_entry: Screenblock.Entry) void {
+        var entry = base_entry;
+        for(0..self.entries.len) |i| {
+            self.entries[i] = entry;
+            entry.tile += 1;
+        }
+    }
+    
+    /// Fill every tile within a rect in this screenblock with a given entry,
+    /// but add each tile's index within the rectangle to the that entry's
+    /// `Screenblock.Entry.tile` value. (Indices are column-major.)
+    ///
+    /// This may be helpful to initialize a portion of a screenblock where
+    /// every tile is unique.
+    pub fn fillRectLinear(
+        self: *volatile Screenblock,
+        base_entry: Screenblock.Entry,
+        rect_x: u5,
+        rect_y: u5,
+        rect_width: u6,
+        rect_height: u6,
+    ) void {
+        assert((rect_x + rect_width) <= 32 and (rect_y + rect_height) <= 32);
+        // TODO: Define a common Rect type and use it for params here
+        var entry = base_entry;
+        for(0..rect_height) |i_y| {
+            var i = rect_x + ((rect_y + i_y) << 5);
+            for(0..rect_width) |_| {
+                self.entries[i] = entry;
+                entry.tile += 1;
+                i += 1;
+            }
+        }
     }
 };
 
@@ -141,6 +208,15 @@ pub const BackgroundMap = struct {
         screenblock.set(@truncate(x), @truncate(y), entry);
     }
     
+    pub fn getScreenblock(self: BackgroundMap, i: u2) *volatile Screenblock {
+        assert(i < self.getScreenblockCount());
+        return &screenblocks[self.screenblock_index + i];
+    }
+    
+    pub fn getBaseScreenblock(self: BackgroundMap) *volatile Screenblock {
+        return &screenblocks[self.screenblock_index];
+    }
+    
     /// Given a tile coordinate, get the index of the screenblock which it
     /// belongs to.
     pub inline fn getScreenblockIndex(self: BackgroundMap, x: u6, y: u6) u5 {
@@ -156,6 +232,221 @@ pub const BackgroundMap = struct {
     /// Returns 1 for 32x32, 2 for 64x32 or 32x64, or 4 for 64x64.
     pub inline fn getScreenblockCount(self: BackgroundMap) u3 {
         return @as(u3, 1) << @intFromEnum(self.size.x) << @intFromEnum(self.size.y);
+    }
+    
+    /// Fill every tile in this map with a given entry.
+    pub fn fill(self: BackgroundMap, entry: Screenblock.Entry) void {
+        const screenblock_count = self.size.getScreenblockCount();
+        const entry_count: u32 = @as(u32, screenblock_count) << 10;
+        const entries: [*]Screenblock.Entry = (
+            @ptrCast(&screenblocks[self.screenblock_index].entries)
+        );
+        for(0..entry_count) |i| {
+            entries[i] = entry;
+        }
+    }
+    
+    /// Fill every tile within a rect in this background with a given entry.
+    pub fn fillRect(
+        self: BackgroundMap,
+        entry: Screenblock.Entry,
+        rect_x: u6,
+        rect_y: u6,
+        rect_width: u7,
+        rect_height: u7,
+    ) void {
+        assert((rect_x + rect_width) <= 32 and (rect_y + rect_height) <= 32);
+        switch(self.size) {
+            .size_32x32 => {
+                screenblocks[self.screenblock_index].fillRect(
+                    entry,
+                    @intCast(rect_x),
+                    @intCast(rect_y),
+                    @intCast(rect_width),
+                    @intCast(rect_height),
+                );
+            },
+            .size_64x32 => {
+                if(rect_x > 32) {
+                    screenblocks[self.screenblock_index + 1].fillRect(
+                        entry,
+                        @intCast(rect_x - 32),
+                        @intCast(rect_y),
+                        @intCast(rect_width),
+                        @intCast(rect_height),
+                    );
+                }
+                else if(rect_x + rect_width > 32) {
+                    const lo_x = 32 - rect_x;
+                    screenblocks[self.screenblock_index].fillRect(
+                        entry,
+                        @intCast(rect_x),
+                        @intCast(rect_y),
+                        @intCast(lo_x),
+                        @intCast(rect_height),
+                    );
+                    screenblocks[self.screenblock_index + 1].fillRect(
+                        entry,
+                        0,
+                        @intCast(rect_y),
+                        @intCast(rect_width - lo_x),
+                        @intCast(rect_height),
+                    );
+                }
+                else {
+                    screenblocks[self.screenblock_index].fillRect(
+                        entry,
+                        @intCast(rect_x),
+                        @intCast(rect_y),
+                        @intCast(rect_width),
+                        @intCast(rect_height),
+                    );
+                }
+            },
+            .size_32x64 => {
+                if(rect_y > 32) {
+                    screenblocks[self.screenblock_index + 1].fillRect(
+                        entry,
+                        @intCast(rect_x),
+                        @intCast(rect_y - 32),
+                        @intCast(rect_width),
+                        @intCast(rect_height),
+                    );
+                }
+                else if(rect_y + rect_height > 32) {
+                    const lo_y = 32 - rect_y;
+                    screenblocks[self.screenblock_index].fillRect(
+                        entry,
+                        @intCast(rect_x),
+                        @intCast(rect_y),
+                        @intCast(rect_width),
+                        @intCast(lo_y),
+                    );
+                    screenblocks[self.screenblock_index + 1].fillRect(
+                        entry,
+                        @intCast(rect_x),
+                        0,
+                        @intCast(rect_width),
+                        @intCast(rect_height - lo_y),
+                    );
+                }
+                else {
+                    screenblocks[self.screenblock_index].fillRect(
+                        entry,
+                        @intCast(rect_x),
+                        @intCast(rect_y),
+                        @intCast(rect_width),
+                        @intCast(rect_height),
+                    );
+                }
+            },
+            .size_64x64 => {
+                if(rect_x > 32) {
+                    if(rect_y > 32) {
+                        screenblocks[self.screenblock_index + 3].fillRect(
+                            entry,
+                            @intCast(rect_x - 32),
+                            @intCast(rect_y - 32),
+                            @intCast(rect_width),
+                            @intCast(rect_height),
+                        );
+                    }
+                    else if(rect_y + rect_height > 32) {
+                        const lo_y = 32 - rect_y;
+                        screenblocks[self.screenblock_index + 1].fillRect(
+                            entry,
+                            @intCast(rect_x - 32),
+                            @intCast(rect_y),
+                            @intCast(rect_width),
+                            @intCast(lo_y),
+                        );
+                        screenblocks[self.screenblock_index + 3].fillRect(
+                            entry,
+                            @intCast(rect_x - 32),
+                            0,
+                            @intCast(rect_width),
+                            @intCast(rect_height - lo_y),
+                        );
+                    }
+                    else {
+                        screenblocks[self.screenblock_index + 1].fillRect(
+                            entry,
+                            @intCast(rect_x - 32),
+                            @intCast(rect_y),
+                            @intCast(rect_width),
+                            @intCast(rect_height),
+                        );
+                    }
+                }
+                else if(rect_x + rect_width > 32) {
+                    const lo_x = 32 - rect_x;
+                    if(rect_y > 32) {
+                        screenblocks[self.screenblock_index + 2].fillRect(
+                            entry,
+                            @intCast(rect_x),
+                            @intCast(rect_y - 32),
+                            @intCast(lo_x),
+                            @intCast(rect_height),
+                        );
+                        screenblocks[self.screenblock_index + 3].fillRect(
+                            entry,
+                            0,
+                            @intCast(rect_y - 32),
+                            @intCast(rect_width - lo_x),
+                            @intCast(rect_height),
+                        );
+                    }
+                    else if(rect_y + rect_height > 32) {
+                        const lo_y = 32 - rect_y;
+                        screenblocks[self.screenblock_index].fillRect(
+                            entry,
+                            @intCast(rect_x),
+                            @intCast(rect_y),
+                            @intCast(lo_x),
+                            @intCast(lo_y),
+                        );
+                        screenblocks[self.screenblock_index + 1].fillRect(
+                            entry,
+                            0,
+                            @intCast(rect_y),
+                            @intCast(rect_width - lo_x),
+                            @intCast(lo_y),
+                        );
+                        screenblocks[self.screenblock_index + 2].fillRect(
+                            entry,
+                            @intCast(rect_x),
+                            0,
+                            @intCast(lo_x),
+                            @intCast(rect_height - lo_y),
+                        );
+                        screenblocks[self.screenblock_index + 3].fillRect(
+                            entry,
+                            0,
+                            0,
+                            @intCast(rect_width - lo_x),
+                            @intCast(rect_height - lo_y),
+                        );
+                    }
+                    else {
+                        screenblocks[self.screenblock_index].fillRect(
+                            entry,
+                            @intCast(rect_x),
+                            @intCast(rect_y),
+                            @intCast(lo_x),
+                            @intCast(rect_height),
+                        );
+                        screenblocks[self.screenblock_index + 1].fillRect(
+                            entry,
+                            0,
+                            @intCast(rect_y),
+                            @intCast(rect_width - lo_x),
+                            @intCast(rect_height),
+                        );
+                    }
+                }
+            },
+            else => unreachable,
+        }
     }
 };
 

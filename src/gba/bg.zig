@@ -24,22 +24,39 @@ pub const Size = packed union {
         };
         
         /// When 0, the background is 32 tiles wide. When 1, 64 tiles wide.
-        x: Value,
+        x: Value = .size_32,
         /// When 0, the background is 32 tiles tall. When 1, 64 tiles tall.
-        y: Value,
+        y: Value = .size_32,
+        
+        /// Get the number of screenblocks used by a background of this size.
+        pub fn getScreenblockCount(self: Normal) u3 {
+            return (@as(u3, @intFromEnum(self.x)) + 1) << @intFromEnum(self.y);
+        }
     };
 
     /// Enumeration of possible sizes for affine backgrounds.
     /// Affine backgrounds are always square.
     pub const Affine = enum(u2) {
         /// 16 tiles wide and tall. Uses 256 bytes of one screenblock.
-        size_16,
+        size_16 = 0,
         /// 32 tiles wide and tall. Uses 1024 bytes (i.e. half) of one screenblock.
-        size_32,
+        size_32 = 1,
         /// 64 tiles wide and tall. Uses two screenblocks.
-        size_64,
+        size_64 = 2,
         /// 128 tiles wide and tall. Uses eight screenblocks.
-        size_128,
+        size_128 = 3,
+        
+        /// Get the number of screenblocks used by a background of this size.
+        /// Note that `size_16` and `size_32` use only a part of one
+        /// screenblock.
+        pub fn getScreenblockCount(self: Normal) u4 {
+            return switch(self) {
+                .size_16 => 1,
+                .size_32 => 1,
+                .size_64 => 2,
+                .size_128 => 8,
+            };
+        }
     };
 
     /// Determines size for non-affine backgrounds.

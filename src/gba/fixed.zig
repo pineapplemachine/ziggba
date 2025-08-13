@@ -6,8 +6,8 @@
 //! The `FixedI16R8` type is used for the GBA's affine transformation
 //! matrix components.
 //!
-//! The `FixedI16R14` type is used by the GBA BIOS for inputs to the
-//! `ArcTan` and `ArcTan2` BIOS calls.
+//! The `FixedI16R14` type is used by the GBA BIOS for input to the
+//! `ArcTan` BIOS call.
 //!
 //! The `FixedU16R16` type is used by the GBA BIOS to represent angles
 //! in the `BgAffineSet` and `ObjAffineSet` BIOS calls. In most cases,
@@ -143,6 +143,7 @@ pub const FixedI16R8 = packed struct(i16) {
     pub const zero: FixedI16R8 = .initRaw(0);
     pub const one: FixedI16R8 = .initInt(1);
     
+    /// Raw internal value.
     value: i16 = 0,
     
     pub inline fn initRaw(raw_value: i16) FixedI16R8 {
@@ -157,44 +158,54 @@ pub const FixedI16R8 = packed struct(i16) {
         return FixedI16R8.initRaw(@intFromFloat(value * 0x100));
     }
     
+    /// Convert to an integer, truncating the value's fractional portion.
     pub inline fn toInt(self: FixedI16R8) i8 {
         return @intCast(self.value >> 8);
     }
     
+    /// Convert to a `FixedI32R16` value.
     pub inline fn toI32R16(self: FixedI32R16) FixedI32R16 {
         return FixedI32R16.initRaw(@as(i32, self.value) << 8);
     }
     
+    /// Convert to a `FixedU16R16` value.
     pub inline fn toU16R16(self: FixedI16R8) FixedU16R16 {
         return FixedU16R16.initRaw(self.value << 8);
     }
     
+    /// Convert to a `FixedI32R8` value.
     pub inline fn toI32R8(self: FixedI32R8) FixedI32R8 {
         return FixedI32R8.initRaw(@intCast(self.value));
     }
     
+    /// Get a negated value.
     pub inline fn negate(self: FixedI16R8) FixedI16R8 {
         return FixedI16R8.initRaw(-self.value);
     }
     
+    /// Get an absolute value.
     pub inline fn abs(self: FixedI16R8) FixedI16R8 {
         return if(self.value >= 0) self else FixedI16R8.initRaw(-self.value);
     }
     
+    /// Add two values.
     pub inline fn add(a: FixedI16R8, b: FixedI16R8) FixedI16R8 {
         return FixedI16R8.initRaw(a.value + b.value);
     }
     
+    /// Subtract `b` from `a`.
     pub inline fn sub(a: FixedI16R8, b: FixedI16R8) FixedI16R8 {
         return FixedI16R8.initRaw(a.value - b.value);
     }
     
+    /// Multiply two values.
     pub fn mul(a: FixedI16R8, b: FixedI16R8) FixedI16R8 {
         return FixedI16R8.initRaw(@truncate(
             (@as(i32, a.value) * @as(i32, b.value)) >> 16
         ));
     }
     
+    /// Divide two values.
     pub fn div(a: FixedI16R8, b: FixedI16R8) FixedI16R8 {
         const qr = gba.bios.div(@as(i32, a.value) << 8, b.value);
         return FixedI16R8.initRaw(qr.quotient);
@@ -205,18 +216,22 @@ pub const FixedI16R8 = packed struct(i16) {
         return a.value == b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than `b`.
     pub inline fn lessThan(a: FixedI16R8, b: FixedI16R8) bool {
         return a.value < b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than `b`.
     pub inline fn greaterThan(a: FixedI16R8, b: FixedI16R8) bool {
         return a.value > b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than or equal to `b`.
     pub inline fn lessOrEqual(a: FixedI16R8, b: FixedI16R8) bool {
         return a.value <= b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than or equal to `b`.
     pub inline fn greaterOrEqual(a: FixedI16R8, b: FixedI16R8) bool {
         return a.value <= b.value;
     }
@@ -246,6 +261,7 @@ pub const FixedI16R14 = packed struct(i16) {
     pub const zero: FixedI16R14 = .initRaw(0);
     pub const one: FixedI16R14 = .initInt(1);
     
+    /// Raw internal value.
     value: i16 = 0,
     
     pub inline fn initRaw(raw_value: i16) FixedI16R14 {
@@ -264,38 +280,47 @@ pub const FixedI16R14 = packed struct(i16) {
         return FixedI16R14.initRaw(@intFromFloat(value * 0x4000));
     }
     
+    /// Convert to an integer, truncating the value's fractional portion.
     pub inline fn toInt(self: FixedI16R14) i2 {
         return @intCast(self.value >> 14);
     }
     
+    /// Convert to a `FixedI16R8` value.
     pub inline fn toI16R8(self: FixedI16R14) FixedI16R8 {
         return FixedI16R8.initRaw(self.value >> 6);
     }
     
+    /// Convert to a `FixedI32R16` value.
     pub inline fn toI32R16(self: FixedI16R14) FixedI32R16 {
         return FixedI32R16.initRaw(@as(i32, self.value) << 2);
     }
     
+    /// Convert to a `FixedU16R16` value.
     pub inline fn toU16R16(self: FixedI16R14) FixedU16R16 {
         return FixedU16R16.initRaw(self.value << 2);
     }
     
+    /// Convert to a `FixedI32R8` value.
     pub inline fn toI32R8(self: FixedI16R14) FixedI32R8 {
         return FixedI32R8.initRaw(@as(i32, self.value) >> 6);
     }
     
+    /// Get a negated value.
     pub inline fn negate(self: FixedI16R14) FixedI16R14 {
         return FixedI16R14.initRaw(-self.value);
     }
     
+    /// Get an absolute value.
     pub inline fn abs(self: FixedI16R14) FixedI16R14 {
         return if(self.value >= 0) self else FixedI16R14.initRaw(-self.value);
     }
     
+    /// Add two values.
     pub inline fn add(a: FixedI16R14, b: FixedI16R14) FixedI16R14 {
         return FixedI16R14.initRaw(a.value + b.value);
     }
     
+    /// Subtract `b` from `a`.
     pub inline fn sub(a: FixedI16R14, b: FixedI16R14) FixedI16R14 {
         return FixedI16R14.initRaw(a.value - b.value);
     }
@@ -305,18 +330,22 @@ pub const FixedI16R14 = packed struct(i16) {
         return a.value == b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than `b`.
     pub inline fn lessThan(a: FixedI16R14, b: FixedI16R14) bool {
         return a.value < b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than `b`.
     pub inline fn greaterThan(a: FixedI16R14, b: FixedI16R14) bool {
         return a.value > b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than or equal to `b`.
     pub inline fn lessOrEqual(a: FixedI16R14, b: FixedI16R14) bool {
         return a.value <= b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than or equal to `b`.
     pub inline fn greaterOrEqual(a: FixedI16R14, b: FixedI16R14) bool {
         return a.value <= b.value;
     }
@@ -332,6 +361,7 @@ pub const FixedI16R14 = packed struct(i16) {
 pub const FixedU16R16 = packed struct(u16) {
     pub const zero: FixedU16R16 = .initRaw(0);
     
+    /// Raw internal value.
     value: u16 = 0,
     
     pub inline fn initRaw(raw_value: u16) FixedU16R16 {
@@ -358,14 +388,17 @@ pub const FixedU16R16 = packed struct(u16) {
         return FixedU16R16.initFloat64(@mod(rad / 6.283185307179586, 1.0));
     }
     
+    /// Convert to a `FixedI16R8` value.
     pub inline fn toI16R8(self: FixedU16R16) FixedU16R16 {
         return FixedI16R8.initRaw(self.value >> 8);
     }
     
+    /// Convert to a `FixedI32R8` value.
     pub inline fn toI32R8(self: FixedU16R16) FixedI32R8 {
         return FixedI32R8.initRaw(self.value >> 8);
     }
     
+    /// Convert to a `FixedI32R16` value.
     pub inline fn toI32R16(self: FixedU16R16) FixedI32R16 {
         return FixedI32R16.initRaw(self.value);
     }
@@ -376,10 +409,12 @@ pub const FixedU16R16 = packed struct(u16) {
         return FixedU16R16.initRaw(self.value +% 0x8000);
     }
     
+    /// Add two values.
     pub inline fn add(a: FixedU16R16, b: FixedU16R16) FixedU16R16 {
         return FixedU16R16.initRaw(a.value + b.value);
     }
     
+    /// Subtract `b` from `a`.
     pub inline fn sub(a: FixedU16R16, b: FixedU16R16) FixedU16R16 {
         return FixedU16R16.initRaw(a.value - b.value);
     }
@@ -389,18 +424,22 @@ pub const FixedU16R16 = packed struct(u16) {
         return a.value == b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than `b`.
     pub inline fn lessThan(a: FixedU16R16, b: FixedU16R16) bool {
         return a.value < b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than `b`.
     pub inline fn greaterThan(a: FixedU16R16, b: FixedU16R16) bool {
         return a.value > b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than or equal to `b`.
     pub inline fn lessOrEqual(a: FixedU16R16, b: FixedU16R16) bool {
         return a.value <= b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than or equal to `b`.
     pub inline fn greaterOrEqual(a: FixedU16R16, b: FixedU16R16) bool {
         return a.value <= b.value;
     }
@@ -452,6 +491,7 @@ pub const FixedI32R8 = packed struct(i32) {
     pub const zero: FixedI32R8 = .initRaw(0);
     pub const one: FixedI32R8 = .initInt(1);
     
+    /// Raw internal value.
     value: i32 = 0,
     
     pub inline fn initRaw(raw_value: i32) FixedI32R8 {
@@ -470,38 +510,47 @@ pub const FixedI32R8 = packed struct(i32) {
         return FixedI32R8.initRaw(@intFromFloat(value * 0x100));
     }
     
+    /// Convert to an integer, truncating the value's fractional portion.
     pub inline fn toInt(self: FixedI32R8) i16 {
         return @intCast(self.value >> 16);
     }
     
+    /// Convert to a `FixedI16R8` value.
     pub inline fn toI16R8(self: FixedI32R8) FixedI16R8 {
         return FixedI16R8.initRaw(@intCast(self.value));
     }
     
+    /// Convert to a `FixedU16R16` value.
     pub inline fn toU16R16(self: FixedI32R8) FixedU16R16 {
         return FixedU16R16.initRaw(@intCast((self.value & 0xff) << 8));
     }
     
+    /// Convert to a `FixedI32R16` value.
     pub inline fn toI32R16(self: FixedI32R8) FixedI32R16 {
         return FixedI16R8.initRaw(@intCast(self.value << 8));
     }
     
+    /// Get a negated value.
     pub inline fn negate(self: FixedI32R8) FixedI32R8 {
         return FixedI32R8.initRaw(-self.value);
     }
     
+    /// Get an absolute value.
     pub inline fn abs(self: FixedI32R8) FixedI32R8 {
         return if(self.value >= 0) self else FixedI32R8.initRaw(-self.value);
     }
     
+    /// Add two values.
     pub inline fn add(a: FixedI32R8, b: FixedI32R8) FixedI32R8 {
         return FixedI32R8.initRaw(a.value + b.value);
     }
     
+    /// Subtract `b` from `a`.
     pub inline fn sub(a: FixedI32R8, b: FixedI32R8) FixedI32R8 {
         return FixedI32R8.initRaw(a.value - b.value);
     }
     
+    /// Multiply two values.
     pub fn mul(a: FixedI32R8, b: FixedI32R8) FixedI32R8 {
         // https://stackoverflow.com/a/1815371
         var x: i32 = (a.value & 0xffff) * (b.value & 0xffff);
@@ -520,18 +569,22 @@ pub const FixedI32R8 = packed struct(i32) {
         return a.value == b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than `b`.
     pub inline fn lessThan(a: FixedI32R8, b: FixedI32R8) bool {
         return a.value < b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than `b`.
     pub inline fn greaterThan(a: FixedI32R8, b: FixedI32R8) bool {
         return a.value > b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than or equal to `b`.
     pub inline fn lessOrEqual(a: FixedI32R8, b: FixedI32R8) bool {
         return a.value <= b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than or equal to `b`.
     pub inline fn greaterOrEqual(a: FixedI32R8, b: FixedI32R8) bool {
         return a.value <= b.value;
     }
@@ -624,6 +677,7 @@ pub const FixedI32R16 = packed struct(i32) {
     pub const zero: FixedI32R16 = .initRaw(0);
     pub const one: FixedI32R16 = .initInt(1);
     
+    /// Raw internal value.
     value: i32 = 0,
     
     pub inline fn initRaw(raw_value: i32) FixedI32R16 {
@@ -642,38 +696,47 @@ pub const FixedI32R16 = packed struct(i32) {
         return FixedI32R16.initRaw(@intFromFloat(value * 0x10000));
     }
     
+    /// Convert to an integer, truncating the value's fractional portion.
     pub inline fn toInt(self: FixedI32R16) i16 {
         return @intCast(self.value >> 16);
     }
     
+    /// Convert to a `FixedI16R8` value.
     pub inline fn toI16R8(self: FixedI32R16) FixedI16R8 {
         return FixedI16R8.initRaw(@intCast(self.value >> 8));
     }
     
+    /// Convert to a `FixedU16R16` value.
     pub inline fn toU16R16(self: FixedI32R16) FixedU16R16 {
         return FixedU16R16.initRaw(@intCast(self.value & 0xffff));
     }
     
+    /// Convert to a `FixedI32R8` value.
     pub inline fn toI32R8(self: FixedI32R16) FixedI32R8 {
         return FixedI32R8.initRaw(@intCast(self.value >> 8));
     }
     
+    /// Get a negated value.
     pub inline fn negate(self: FixedI32R16) FixedI32R16 {
         return FixedI32R16.initRaw(-self.value);
     }
     
+    /// Get an absolute value.
     pub inline fn abs(self: FixedI32R16) FixedI32R16 {
         return if(self.value >= 0) self else FixedI32R16.initRaw(-self.value);
     }
     
+    /// Add two values.
     pub inline fn add(a: FixedI32R16, b: FixedI32R16) FixedI32R16 {
         return FixedI32R16.initRaw(a.value + b.value);
     }
     
+    /// Subtract `b` from `a`.
     pub inline fn sub(a: FixedI32R16, b: FixedI32R16) FixedI32R16 {
         return FixedI32R16.initRaw(a.value - b.value);
     }
     
+    /// Multiply two values.
     pub fn mul(a: FixedI32R16, b: FixedI32R16) FixedI32R16 {
         // https://stackoverflow.com/a/1815371
         var x: i32 = (a.value & 0xffff) * (b.value & 0xffff);
@@ -703,18 +766,22 @@ pub const FixedI32R16 = packed struct(i32) {
         return a.value == b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than `b`.
     pub inline fn lessThan(a: FixedI32R16, b: FixedI32R16) bool {
         return a.value < b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than `b`.
     pub inline fn greaterThan(a: FixedI32R16, b: FixedI32R16) bool {
         return a.value > b.value;
     }
     
+    /// Compare two values. Returns true when `a` is less than or equal to `b`.
     pub inline fn lessOrEqual(a: FixedI32R16, b: FixedI32R16) bool {
         return a.value <= b.value;
     }
     
+    /// Compare two values. Returns true when `a` is greater than or equal to `b`.
     pub inline fn greaterOrEqual(a: FixedI32R16, b: FixedI32R16) bool {
         return a.value <= b.value;
     }
@@ -756,6 +823,7 @@ pub const FixedVec2I32R8 = extern struct {
         };
     }
     
+    /// Multiply two values.
     pub fn mul(a: FixedVec2I32R8, b: FixedVec2I32R8) FixedVec2I32R8 {
         return .{
             .x = a.x.mul(b.x),
@@ -808,6 +876,7 @@ pub const FixedVec2I32R16 = extern struct {
         };
     }
     
+    /// Multiply two values.
     pub fn mul(a: FixedVec2I32R16, b: FixedVec2I32R16) FixedVec2I32R16 {
         return .{
             .x = a.x.mul(b.x),

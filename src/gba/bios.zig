@@ -241,13 +241,28 @@ pub fn resetRamRegisters(flags: RamResetFlags) void {
     call1Return0(.register_ram_reset, flags);
 }
 
+pub const WaitInterruptReturnType = enum(u1) {
+    return_immediately,
+    discard_old_wait_new,
+};
+
 pub fn waitInterrupt(
-    return_type: gba.interrupt.WaitReturn,
+    return_type: WaitInterruptReturnType,
     flags: gba.interrupt.Flags,
 ) void {
     call2Return0(.intr_wait, return_type, flags);
 }
 
+/// Halt execution until a VBlank interrupt triggers.
+/// VBlank happens once per frame, after finishing drawing the frame.
+/// You probably want to call this function once at the beginning of your
+/// main game loop.
+/// Note that several flags must be set before this will work as you
+/// probably expect.
+///
+/// See `gba.display.status.vblank_interrupt`, `gba.interrupt.enable.vblank`,
+/// and `gba.interrupt.master.enable`. All three of these flags must be set in
+/// order for VBlank interrupts to occur.
 pub fn waitVBlank() void {
     // TODO: The bios just loads these arguments on the registers and calls IntrWait
     // So this might be better if you're not hand-writing assembly?

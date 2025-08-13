@@ -133,28 +133,43 @@ pub const Control = packed struct(u16) {
     window_obj: bool = false,
 };
 
-/// Display Control Register
-///
-/// (`REG_DISPCNT`)
+/// Display control register. Corresponds to REG_DISPCNT.
 pub const ctrl: *volatile display.Control = @ptrFromInt(gba.mem.io);
 
-pub const RefreshState = enum(u1) {
-    draw,
-    blank,
-};
-
+/// Represents the contents of REG_DISPSTAT.
 pub const Status = packed struct(u16) {
-    /// Read only
-    v_refresh: RefreshState,
-    /// Read only
-    h_refresh: RefreshState,
-    /// Read only
-    vcount_triggered: bool,
-    vblank_irq: bool = false,
-    hblank_irq: bool = false,
-    vcount_trigger: bool = false,
+    /// Enumeration of possible states for VBlank and HBlank, per the
+    /// `vblank` and `hblank` status flags.
+    pub const Refresh = enum(u1) {
+        draw = 0,
+        blank = 1,
+    };
+
+    /// VBlank flag. Set inside VBlank, clear in VDraw.
+    /// Set in line 160 to 226. Not set for line 227.
+    /// Read-only.
+    vblank: Refresh = .draw,
+    /// HBlank flag. Set inside HBlank.
+    /// Toggled in all lines, 0 to 227.
+    /// Read-only.
+    hblank: Refresh = .draw,
+    /// VCount flag. Set when the current scanline matches the scanline
+    /// trigger, i.e. REG_VCOUNT is equal to `vcount_select`.
+    /// Read-only.
+    vcount: bool = false,
+    /// Enable VBlank interrupts.
+    vblank_interrupt: bool = false,
+    /// Enable HBlank interrupts.
+    hblank_interrupt: bool = false,
+    /// Enable VCount interrupts.
+    /// An interrupt is triggered when REG_VCOUNT is equal to `vcount_select`.
+    vcount_interrupt: bool = false,
+    /// Unused bits.
     _: u2 = 0,
-    vcount_trigger_at: u8 = 0,
+    /// VCount trigger value. If the current scanline matches this value,
+    /// then `vcount` is set. If `vcount_interrupt` is true, then an interrupt
+    /// is triggered as well.
+    vcount_select: u8 = 0,
 };
 
 /// Display Status Register

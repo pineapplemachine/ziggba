@@ -1,5 +1,4 @@
 const gba = @import("gba");
-const std = @import("std");
 
 export var header linksection(".gbaheader") = gba.Header.init("BGAFFINE", "ABAE", "00", 0);
 
@@ -33,18 +32,8 @@ pub export fn main() void {
         .tile_map_size = .{ .normal = .size_32x32 },
     };
     const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
-    for(0..normal_bg_map.width()) |x| {
-        for(0..16) |y| {
-            normal_bg_map.set(@truncate(x), @truncate(y), .{ .tile = 128 });
-        }
-        for(0..4) |y| {
-            const tile_i = 128 + (x | (y << 5));
-            normal_bg_map.set(@truncate(x), @truncate(16 + y), .{
-                .tile = @truncate(tile_i),
-                .palette = 0,
-            });
-        }
-    }
+    normal_bg_map.getBaseScreenblock().fillRect(.{ .tile = 128 }, 0, 0, 32, 16);
+    normal_bg_map.getBaseScreenblock().fillRectLinear(.{ .tile = 128 }, 0, 16, 32, 4);
     
     // Initialize an affine background layer.
     gba.bg.ctrl[2] = .{
@@ -72,7 +61,7 @@ pub export fn main() void {
         .color = 15,
         .x = 8,
         .y = 14,
-        .text = std.fmt.bufPrint(&text_buffer, "Angle:", .{}) catch unreachable,
+        .text = "Angle:",
     });
     
     // Initialize the display.
@@ -86,10 +75,16 @@ pub export fn main() void {
     var angle: gba.FixedU16R16 = .{};
     var input: gba.input.KeysState = .{};
     
+    // Enable VBlank interrupts.
+    // This will allow running the main loop once per frame.
+    gba.display.status.vblank_interrupt = true;
+    gba.interrupt.enable.vblank = true;
+    gba.interrupt.master.enable = true;
+    
     // Main loop.
     while (true) {
         // Run this loop only once per frame.
-        gba.display.naiveVSync();
+        gba.bios.waitVBlank();
         
         // Check the state of button inputs for this frame.
         input.poll();
