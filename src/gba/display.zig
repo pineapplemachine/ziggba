@@ -148,15 +148,15 @@ pub const Status = packed struct(u16) {
     /// VBlank flag. Set inside VBlank, clear in VDraw.
     /// Set in line 160 to 226. Not set for line 227.
     /// Read-only.
-    vblank: Refresh,
+    vblank: Refresh = .draw,
     /// HBlank flag. Set inside HBlank.
     /// Toggled in all lines, 0 to 227.
     /// Read-only.
-    hblank: Refresh,
+    hblank: Refresh = .draw,
     /// VCount flag. Set when the current scanline matches the scanline
     /// trigger, i.e. REG_VCOUNT is equal to `vcount_select`.
     /// Read-only.
-    vcount: bool,
+    vcount: bool = false,
     /// Enable VBlank interrupts.
     vblank_interrupt: bool = false,
     /// Enable HBlank interrupts.
