@@ -67,19 +67,19 @@ pub const InterruptFlags = packed struct(u16) {
     vcount: bool = false,
     /// Timer 0 counter overflow interrupt.
     /// Interrupts only occur according to a flag in REG_TM0CNT.
-    /// See `gba.timer[0].ctrl.interrupt`.
+    /// See `gba.timers[0].ctrl.interrupt`.
     timer_0: bool = false,
     /// Timer 1 counter overflow interrupt.
     /// Interrupts only occur according to a flag in REG_TM1CNT.
-    /// See `gba.timer[1].ctrl.interrupt`.
+    /// See `gba.timers[1].ctrl.interrupt`.
     timer_1: bool = false,
     /// Timer 2 counter overflow interrupt.
     /// Interrupts only occur according to a flag in REG_TM2CNT.
-    /// See `gba.timer[2].ctrl.interrupt`.
+    /// See `gba.timers[2].ctrl.interrupt`.
     timer_2: bool = false,
     /// Timer 3 counter overflow interrupt.
     /// Interrupts only occur according to a flag in REG_TM3CNT.
-    /// See `gba.timer[3].ctrl.interrupt`.
+    /// See `gba.timers[3].ctrl.interrupt`.
     timer_3: bool = false,
     /// Serial communication interrupt.
     /// May require REG_SCCNT.
@@ -87,22 +87,22 @@ pub const InterruptFlags = packed struct(u16) {
     /// DMA 0 interrupt.
     /// Interrupt is raised upon a full transfer being complete.
     /// Also requires REG_DMA0CNT.
-    /// See `gba.dma[0].ctrl.irq_at_end`.
+    /// See `gba.dma[0].ctrl.interrupt`.
     dma_0: bool = false,
     /// DMA 1 interrupt.
     /// Interrupt is raised upon a full transfer being complete.
     /// Also requires REG_DMA1CNT.
-    /// See `gba.dma[0].ctrl.irq_at_end`.
+    /// See `gba.dma[1].ctrl.interrupt`.
     dma_1: bool = false,
     /// DMA 2 interrupt.
     /// Interrupt is raised upon a full transfer being complete.
     /// Also requires REG_DMA2CNT.
-    /// See `gba.dma[0].ctrl.irq_at_end`.
+    /// See `gba.dma[2].ctrl.interrupt`.
     dma_2: bool = false,
     /// DMA 3 interrupt.
     /// Interrupt is raised upon a full transfer being complete.
     /// Also requires REG_DMA3CNT.
-    /// See `gba.dma[0].ctrl.irq_at_end`.
+    /// See `gba.dma[3].ctrl.interrupt`.
     dma_3: bool = false,
     /// Keypad interrupt.
     /// Interrupt is raised according to options specified via the REG_KEYCNT

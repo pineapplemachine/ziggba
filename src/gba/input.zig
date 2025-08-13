@@ -452,12 +452,12 @@ pub const InterruptControl = packed struct(u16) {
     /// If selected, the system's L (left) shoulder button affects interrupt behavior.
     button_l: KeyState = .ignore,
     /// Unused bits.
-    _: u4,
+    _: u4 = 0,
     /// Whether to enable interrupts when the input state condition is met.
-    interrupt: bool,
+    interrupt: bool = false,
     /// Determines whether to trigger an interrupt when any of the selected
     /// keys are pressed, or when all of them are pressed.
-    condition: Condition,
+    condition: Condition = .any,
 };
 
 /// Records the current state of the GBA's buttons (also called "keys").
@@ -465,8 +465,8 @@ pub const InterruptControl = packed struct(u16) {
 /// Corresponds to REG_KEYINPUT.
 /// Note that a 0 bit indicates a pressed button and a 1 bit indicates a
 /// not-pressed button.
-pub const state: *align(2) const volatile KeysState = @ptrFromInt(gba.mem.io + 0x130);
+pub const state: *align(2) volatile KeysState = @ptrFromInt(gba.mem.io + 0x130);
 
 /// Corresponds to REG_KEYCNT.
 /// Can be used to request an interrupt when certain buttons are pressed.
-pub const interrupt: *align(2) const volatile InterruptControl = @ptrFromInt(gba.mem.io + 0x130);
+pub const interrupt: *align(2) volatile InterruptControl = @ptrFromInt(gba.mem.io + 0x132);
