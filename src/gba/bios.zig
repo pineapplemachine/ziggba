@@ -1,88 +1,189 @@
 const builtin = @import("builtin");
 const std = @import("std");
 const gba = @import("gba.zig");
+const assert = @import("std").debug.assert;
 
-pub const SWI = enum(u8) {
+// TODO: use extern asm like mem.zig?
+
+/// Enumeration of software interrupt codes (SWI) recognized by the GBA BIOS.
+///
+/// GBATEK categorizes SWI codes 0x00 through 0x0f as "Basic Functions",
+/// 0x10 through 0x18 as "Decompression Functions", 0x19 through 0x2a as
+/// "Sound (and Multiboot/HardReset/CustomHalt)".
+pub const Swi = enum(u8) {
+    /// Clears 0x200 bytes of RAM, from addresses 0x3007e00 through 0x3007fff,
+    /// which contains stacks and BIOS IRQ vector/flags.
+    /// Initializes the system, supervisor, and IRQ stack pointers.
+    /// Sets `r0` through `r12`, `LR_svc`, `SPSR_svc`, `LR_irq`,
+    /// and `SPSR_irq` to zero.
+    /// Enters system mode. Does not return to the caller.
+    /// Named `SoftReset` in both Tonc and GBATEK documentation.
     soft_reset = 0x00,
+    /// Resets I/O hardware registers and RAM as specified using flags passed
+    /// via `r0`. See `RegisterRamResetFlags`.
+    /// Named `RegisterRamReset` in both Tonc and GBATEK documentation.
     register_ram_reset = 0x01,
-    /// Halts CPU until an interrupt request occurs.
+    /// Halts the CPU, switching to a low-power mode, until an interrupt
+    /// request occurs.
+    /// You probably want to enable some interrupts before using this SWI.
+    /// Named `Halt` in both Tonc and GBATEK documentation.
     halt = 0x02,
-    /// Very low power mode. CPU, System Clock, Sound, Video,
-    /// SIO-Shift Clock, DMAs, and Timers are stopped.
-    ///
-    /// Only the Keypad, Gamepak, or
-    ///
-    /// Video, sound, and external hardware should be disabled
-    /// before calling.
+    /// Switches the system to a very low power mode.
+    /// The system can only wake from this state via keypad, gamepak,
+    /// or serial interrupts, and only if those interrupts were enabled
+    /// beforehand.
+    /// You probably want to turn off video and sound before using this SWI.
+    /// Named `Stop` in both Tonc and GBATEK documentation.
     stop = 0x03,
-    /// Interrupt handler must add flag at `0x3007FF8h`
+    /// Wait in a halt state until one or more of the specified interrupts
+    /// occur. This is similar to the `halt` SWI, but it applies only to the
+    /// specified interrupts.
+    /// Reads `r0` to determine behavior with already-set interrupt flags.
+    /// Which flags to wait for are passed via `r1`.
+    /// Named `IntrWait` in both Tonc and GBATEK documentation.
     intr_wait = 0x04,
-    /// BIOS calls `IntrWait(.DiscardOldFlagsAndWaitNewFlags, InterruptFlags.initOne(.VBlank))`
-    ///
-    /// Interrupt handler must add flag to 0x3007FF8h
+    /// Wait in a halt state until a VBlank interrupt occurs.
+    /// This BIOS call internally calls `intr_wait` with `r0 = 1` and `r1 = 1`.
+    /// You probably want to enable VBlank interrupts before using this SWI.
+    /// Named `VBlankIntrWait` in both Tonc and GBATEK documentation.
     vblank_intr_wait = 0x05,
-    /// Arguments: `.{ numerator, denominator }`
+    /// Signed division, `r0 / r1`.
+    /// Writes quotient to `r0`, remainder to `r1`, and the absolute value
+    /// of the quotient as an unsigned integer to `r3`.
+    /// Usually gets caught in an endless loop upon division by zero.
+    /// Named `Div` in both Tonc and GBATEK documentation.
     div = 0x06,
-    /// Arguments: `.{ denominator, numerator }`
+    /// Signed division, `r1 / r0`.
+    /// Writes quotient to `r0`, remainder to `r1`, and the absolute value
+    /// of the quotient as an unsigned integer to `r3`.
+    /// Slower than `div`. Exists for compatibility reasons.
+    /// Named `DivArm` in both Tonc and GBATEK documentation.
     div_arm = 0x07,
+    /// Integer square root.
+    /// Accepts an unsigned 32-bit number in `r0` and to compute the square
+    /// root of and writes the result back to `r0`.
+    /// Named `Sqrt` in both Tonc and GBATEK documentation.
     sqrt = 0x08,
+    /// Arctangent.
+    /// Accepts a signed 16-bit fixed point value in `r0` with radix 2^14. 
+    /// Produces an unsigned 16-bit fixed point value in `r0` with radix 2^16
+    /// measuring an angle result in revolutions.
+    /// See `gba.FixedI16R14` and `gba.FixedU16R16`.
+    /// This implementation may produce inaccurate values. In most situations,
+    /// you should prefer to use the `arctan2` SWI instead.
+    /// Named `ArcTan` in both Tonc and GBATEK documentation.
     arctan = 0x09,
-    arctan2 = 0x0A,
-    cpu_set = 0x0B,
-    cpu_fast_set = 0x0C,
-    bios_checksum = 0x0D,
-    bg_affine_set = 0x0E,
-    obj_affine_set = 0x0F,
-
+    /// Two-argument arctangent.
+    /// Accepts two signed 16-bit values representing a Y/X ratio, X in `r0`
+    /// and Y in `r1`.
+    /// Produces an unsigned 16-bit fixed point value in `r0` with radix 2^16
+    /// measuring an angle result in revolutions. (See `gba.FixedU16R16`.)
+    /// Named `ArcTan2` in both Tonc and GBATEK documentation.
+    arctan2 = 0x0a,
+    /// Named `CpuSet` in both Tonc and GBATEK documentation.
+    cpu_set = 0x0b,
+    /// Named `CpuFastSet` in both Tonc and GBATEK documentation.
+    cpu_fast_set = 0x0c,
+    /// Named `GetBiosChecksum` in Tonc documentation and
+    /// `BiosChecksum` in GBATEK documentation.
+    bios_checksum = 0x0d,
+    /// Can be used to calculate rotation and scaling parameters
+    /// for affine backgrounds.
+    /// Named `BgAffineSet` in both Tonc and GBATEK documentation.
+    bg_affine_set = 0x0e,
+    /// Can be used to calculate rotation and scaling parameters
+    /// for affine objects/sprites.
+    /// Named `ObjAffineSet` in both Tonc and GBATEK documentation.
+    obj_affine_set = 0x0f,
+    /// Copy data while changing bit depth.
+    /// Named `BitUnPack` in both Tonc and GBATEK documentation.
     bit_unpack = 0x10,
+    /// Expands LZ77-compressed data. Writes 8-bit units.
+    /// Named `LZ77UnCompWRAM` in Tonc documentation and
+    /// `LZ77UnCompReadNormalWrite8bit` in GBATEK documentation.
     lz77_uncomp_wram = 0x11,
+    /// Expands LZ77-compressed data. Writes 16-bit units.
+    /// Named `LZ77UnCompVRAM` in Tonc documentation and
+    /// `LZ77UnCompReadNormalWrite16bit` in GBATEK documentation.
     lz77_uncomp_vram = 0x12,
+    /// Named `HuffUnComp` in Tonc documentation and
+    /// `HuffUnCompReadNormal` in GBATEK documentation.
     huff_uncomp = 0x13,
-    /// 8 bit writes
+    /// Expands RLE-compressed data (run-length encoding). Writes 8-bit units.
+    /// Named `RLUnCompWRAM` in Tonc documentation and
+    /// `RLUnCompReadNormalWrite8bit` in GBATEK documentation.
     rl_uncomp_wram = 0x14,
-    /// 16 bit writes
+    /// Expands RLE-compressed data (run-length encoding). Writes 16-bit units.
+    /// Named `RLUnCompVRAM` in Tonc documentation and
+    /// `RLUnCompReadNormalWrite16bit` in GBATEK documentation.
     rl_uncomp_vram = 0x15,
-    /// 8 bit
+    /// Named `Diff8bitUnFilterWRAM` in Tonc documentation and
+    /// `Diff8bitUnFilterWrite8bit` in GBATEK documentation.
     diff_8bit_unfilter_wram = 0x16,
-    /// 16 bit
+    /// Named `Diff8bitUnFilterVRAM` in Tonc documentation and
+    /// `Diff8bitUnFilterWrite16bit` in GBATEK documentation.
     diff_8bit_unfilter_vram = 0x17,
+    /// Named `Diff16bitUnFilter` in both Tonc and GBATEK documentation.
     diff_16bit_unfilter = 0x18,
+    /// Named `SoundBias` in Tonc documentation and
+    /// `SoundBiasChange` in GBATEK documentation.
     sound_bias_change = 0x19,
-    sound_driver_init = 0x1A,
-    sound_driver_mode = 0x1B,
-    sound_driver_main = 0x1C,
-    /// Short syscall that resets sound DMA
-    ///
-    /// Call immediately after VBlank interrupt
-    sound_driver_vsync = 0x1D,
-    sound_channel_clear = 0x1E,
-    midi_key_2_freq = 0x1F,
-    /// Undocumented
+    /// Named `SoundDriverInit` in both Tonc and GBATEK documentation.
+    sound_driver_init = 0x1a,
+    /// Named `SoundDriverMode` in both Tonc and GBATEK documentation.
+    sound_driver_mode = 0x1b,
+    /// Named `SoundDriverMain` in both Tonc and GBATEK documentation.
+    sound_driver_main = 0x1c,
+    /// A short system call that resets the sound DMA.
+    /// This function should normally be called immediately after a
+    /// VBlank interrupt.
+    /// Named `SoundDriverVSync` in both Tonc and GBATEK documentation.
+    sound_driver_vsync = 0x1d,
+    /// Named `SoundChannelClear` in both Tonc and GBATEK documentation.
+    sound_channel_clear = 0x1e,
+    /// Named `MidiKey2Freq` in both Tonc and GBATEK documentation.
+    midi_key_2_freq = 0x1f,
+    /// Undocumented.
+    /// Named `MusicPlayerOpen` in both Tonc and GBATEK documentation.
     music_player_open = 0x20,
-    /// Undocumented
+    /// Undocumented.
+    /// Named `MusicPlayerStart` in both Tonc and GBATEK documentation.
     music_player_start = 0x21,
-    /// Undocumented
+    /// Undocumented.
+    /// Named `MusicPlayerStop` in both Tonc and GBATEK documentation.
     music_player_stop = 0x22,
-    /// Undocumented
+    /// Undocumented.
+    /// Named `MusicPlayerContinue` in both Tonc and GBATEK documentation.
     music_player_continue = 0x23,
-    /// Undocumented
+    /// Undocumented.
+    /// Named `MusicPlayerFadeOut` in both Tonc and GBATEK documentation.
     music_player_fade_out = 0x24,
+    /// Named `MultiBoot` in both Tonc and GBATEK documentation.
     multi_boot = 0x25,
-    /// Undocumented
-    ///
-    /// Very slow
+    /// Undocumented.
+    /// Reboots the GBA, including replaying the Nintendo intro.
+    /// Named `HardReset` in both Tonc and GBATEK documentation.
     hard_reset = 0x26,
-    /// Undocumented
+    /// Undocumented.
+    /// Named `CustomHalt` in both Tonc and GBATEK documentation.
     custom_halt = 0x27,
+    /// This function is used to stop sound DMA.
+    /// Named `SoundDriverVSyncOff` in both Tonc and GBATEK documentation.
     sound_driver_vsync_off = 0x28,
+    /// This function restarts the sound DMA after a prior
+    /// `sound_driver_vsync_off` SWI.
+    /// Named `SoundDriverVSyncOn` in both Tonc and GBATEK documentation.
     sound_driver_vsync_on = 0x29,
-    /// Undocumented
-    get_jump_list = 0x2A,
-
-    agb_print = 0xFA,
+    /// Undocumented.
+    /// Named `SoundGetJumpList` in both Tonc and GBATEK documentation.
+    get_jump_list = 0x2a,
+    /// Unofficial SWI supported by some emulators, including mGBA.
+    /// Prints UTF-8 encoded text from a buffer to a debug log.
+    /// See `gba.debug`.
+    agb_print_flush = 0xfa,
 
     // TODO: add a way to use ARM versions rather than just thumb
-    fn getAsm(comptime code: SWI) []const u8 {
+    fn getAsm(comptime code: Swi) []const u8 {
         var buffer: [16]u8 = undefined;
         return std.fmt.bufPrint(
             &buffer,
@@ -91,7 +192,7 @@ pub const SWI = enum(u8) {
         ) catch unreachable;
     }
 
-    fn ReturnType(comptime self: SWI) type {
+    fn ReturnType(comptime self: Swi) type {
         return switch (self) {
             .div, .div_arm => DivResult,
             .bios_checksum, .sqrt => u16,
@@ -103,50 +204,70 @@ pub const SWI = enum(u8) {
     }
 };
 
-pub const RamResetFlags = std.EnumSet(enum {
-    clear_ewram,
-    clear_iwram,
-    clear_palette,
-    clear_vram,
-    clear_oam,
-    reset_sio_registers,
-    reset_sound_registers,
-    reset_other_registers,
-});
+/// Flags accepted by the `registerRamReset` BIOS call.
+pub const RegisterRamResetFlags = packed struct(u8) {
+    pub const none: RegisterRamResetFlags = .{};
+    pub const all: RegisterRamResetFlags = @bitCast(@as(u8, 0xff));
+    
+    /// Clear on-board WRAM (EWRAM).
+    ewram: bool = false,
+    /// Clear on-chip WRAM (IWRAM), excluding the last 0x200 bytes.
+    iwram: bool = false,
+    /// Clear palette memory.
+    palette: bool = false,
+    /// Clear VRAM.
+    vram: bool = false,
+    /// Clear OAM. (Zero-filled; does not disable objects.)
+    oam: bool = false,
+    /// Reset SIO registers.
+    /// Also switch to general-purpose mode.
+    /// Least-significant bits of SIODATA32 are always destroyed, even if this
+    /// flag is set to false.
+    sio_registers: bool = false,
+    /// Reset sound registers.
+    sound_registers: bool = false,
+    /// Reset all other registers besides SIO and sound.
+    other_registers: bool = false,
+};
 
+/// Type returned by the `div` and `divArm` BIOS calls.
 pub const DivResult = packed struct {
     quotient: i32,
     remainder: i32,
     absolute_quotient: u32,
 };
 
-/// Whether the write pointer should move with the read pointer
-/// or fill the destination space with the value at src[0]
-const FixedSourceAddr = enum(u1) {
-    copy,
-    fill,
+pub const CpuSetOptions = packed struct(u32) {
+    pub const Size = enum(u1) {
+        bits_16 = 0,
+        bits_32 = 1,
+    };
+    
+    /// The number of words or half-words to write, depending on `size`.
+    count: u21,
+    /// Unused bits.
+    _1: u3 = 0,
+    /// Whether the write pointer should move with the read pointer,
+    /// or whether the destination space should be filled with the value
+    /// at `source[0]`.
+    fixed: bool,
+    /// Indicates whether to operate on 16-bit or 32-bit units.
+    size: Size,
+    /// Unused bits.
+    _2: u6 = 0,
 };
 
-const CpuSetArgs = packed struct {
-    /// the number of words / half-words to write
+pub const CpuFastSetOptions = packed struct(u32) {
+    /// The number of words to write.
     count: u21,
-    _: u3 = 0,
-    /// Whether the write pointer should move with the read pointer
-    /// or fill the destination space with the value at src[0]
-    fixed_src_addr: FixedSourceAddr,
-    data_size: enum(u1) {
-        half_word,
-        word,
-    },
-};
-
-pub const CpuFastSetArgs = packed struct {
-    /// the number of words to write
-    count: u21,
-    _: u3 = 0,
-    /// Whether the write pointer should move with the read pointer
-    /// or fill the destination space with the value at src[0]
-    fixed_src_addr: FixedSourceAddr,
+    /// Unused bits.
+    _1: u3 = 0,
+    /// Whether the write pointer should move with the read pointer,
+    /// or whether the destination space should be filled with the value
+    /// at `source[0]`.
+    fixed: bool,
+    /// Unused bits.
+    _2: u7 = 0,
 };
 
 pub const CompressionType = enum(u4) {
@@ -157,7 +278,7 @@ pub const CompressionType = enum(u4) {
 };
 
 pub const DecompressionHeader = packed struct(u32) {
-    data_size: u4 = 0,
+    size: u4 = 0,
     type: CompressionType,
     decompressed_size: u24,
 };
@@ -236,8 +357,7 @@ pub fn softReset() void {
     call0Return0(.register_soft_reset);
 }
 
-// TODO: These could be made into non-tuples
-pub fn resetRamRegisters(flags: RamResetFlags) void {
+pub fn registerRamReset(flags: RegisterRamResetFlags) void {
     call1Return0(.register_ram_reset, flags);
 }
 
@@ -264,9 +384,6 @@ pub fn waitInterrupt(
 /// and `gba.interrupt.master.enable`. All three of these flags must be set in
 /// order for VBlank interrupts to occur.
 pub fn waitVBlank() void {
-    // TODO: The bios just loads these arguments on the registers and calls IntrWait
-    // So this might be better if you're not hand-writing assembly?
-    // call2Return0(.intr_wait, .{ .discard_old_wait_new, GBA.InterruptFlags.initOne(.vblank) });
     call0Return0(.vblank_intr_wait);
 }
 
@@ -298,7 +415,7 @@ pub fn div(numerator: i32, denominator: i32) DivResult {
 ///
 /// Normally uses a GBA BIOS function, but also implements a fallback to run
 /// as you would expect in tests and at comptime where the GBA BIOS is not
-/// available
+/// available.
 pub fn divArm(numerator: i32, denominator: i32) DivResult {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
         return .{
@@ -312,120 +429,263 @@ pub fn divArm(numerator: i32, denominator: i32) DivResult {
     }
 }
 
+/// Compute the square root of an integer. Rounds down.
+///
+/// Normally uses a GBA BIOS function, but also implements a fallback to run
+/// as you would expect in tests and at comptime where the GBA BIOS is not
+/// available.
 pub fn sqrt(x: u32) u16 {
-    return call1Return1(.sqrt, x);
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        const fx: f64 = @floatFromInt(x);
+        return @intFromFloat(@sqrt(fx));
+    }
+    else {
+        return call1Return1(.sqrt, x);
+    }
 }
 
+/// Compute the arctangent of `x`.
+/// This BIOS call may produce inaccurate values. In most situations,
+/// you should prefer to use `arctan2` instead.
 pub fn arctan(x: gba.FixedU16R14) gba.FixedU16R16 {
     return call1Return1(.arctan, x);
 }
 
+/// Compute the two-argument arctangent of `y / x`.
+///
+/// Note the unconventional order of arguments, first `x` then `y`.
+/// This is the order used by libtonc and reflects the order by which
+/// values are passed in registers.
 pub fn arctan2(x: i16, y: i16) gba.FixedU16R16 {
     return call2Return1(.arctan2, x, y);
 }
 
-// TODO: Is there a reasonable way to make this generic over any 16bit type without a type parameter?
-/// Copies all half-words from `source` into `dest`.
-pub fn cpuCopy16(source: []const volatile u16, dest: []volatile u16) void {
-    if (source.len != dest.len) {
-        @compileError("source and destination must be the same size");
+/// Wraps the system's `CpuSet` BIOS call.
+///
+/// Normally uses a GBA BIOS function, but also implements a fallback to run
+/// as you would expect in tests and at comptime where the GBA BIOS is not
+/// available.
+pub fn cpuSet(
+    source: [*]const volatile u16,
+    destination: [*]volatile u16,
+    options: CpuSetOptions,
+) void {
+    assert(options.size == .bits_16 or (@intFromPtr(source) & 0x3 == 0));
+    assert(options.size == .bits_16 or (@intFromPtr(destination) & 0x3 == 0));
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        const count = options.count << @intFromEnum(options.size);
+        if(options.fixed) {
+            @memset(destination[0..count], source[0]);
+        }
+        else {
+            @memcpy(destination[0..count], source[0..count]);
+        }
     }
-    call3Return0(.cpu_set, source.ptr, dest.ptr, CpuSetArgs{ .count = @truncate(dest.len), .data_size = .half_word, .fixed_src_addr = .copy });
+    else {
+        asm volatile (
+            "swi 0x0b"
+            :
+            : [source] "{r0}" (source),
+              [destination] "{r1}" (destination),
+              [options] "{r2}" (options),
+            : "r0", "r1", "r2", "cc", "memory"
+        );
+    }
 }
 
-// TODO: Is there a reasonable way to make this generic over any 16bit type without a type parameter?
+/// Wraps the system's `CpuFastSet` BIOS call.
+///
+/// Normally uses a GBA BIOS function, but also implements a fallback to run
+/// as you would expect in tests and at comptime where the GBA BIOS is not
+/// available.
+pub fn cpuFastSet(
+    source: [*]const volatile u32,
+    destination: [*]volatile u32,
+    options: CpuFastSetOptions,
+) void {
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        // CpuFastSet rounds up to a multiple of 8 words.
+        const count_lsb = options.count & 0x7;
+        const count = (options.count & 0x1ffff8) + @intFromBool(count_lsb != 0);
+        if(options.fixed) {
+            @memset(destination[0..count], source[0]);
+        }
+        else {
+            @memcpy(destination[0..count], source[0..count]);
+        }
+    }
+    else {
+        asm volatile (
+            "swi 0x0c"
+            :
+            : [source] "{r0}" (source),
+              [destination] "{r1}" (destination),
+              [options] "{r2}" (options),
+            : "r0", "r1", "r2", "cc", "memory"
+        );
+    }
+}
+
+/// Copies all 16-bit half-words from `source` into `dest`.
+pub inline fn cpuSetCopy16(
+    source: [*]const volatile u16,
+    destination: [*]volatile u16,
+    count: u21,
+) void {
+    cpuSet(source, destination, .{
+        .count = count,
+        .size = .bits_16,
+        .fixed = false,
+    });
+}
+
+/// Copies all 32-bit words from `source` into `dest`.
+pub inline fn cpuSetCopy32(
+    source: [*]const volatile u32,
+    destination: [*]volatile u32,
+    count: u21,
+) void {
+    cpuSet(@ptrCast(source), @ptrCast(destination), .{
+        .count = count,
+        .size = .bits_32,
+        .fixed = false,
+    });
+}
+
 /// Fills `dest` with the value at `source`.
-pub fn cpuSet16(source: *const volatile u16, dest: []volatile u16) void {
-    call3Return0(.cpu_set, source, dest.ptr, CpuSetArgs{ .count = @truncate(dest.len), .data_size = .half_word, .fixed_src_addr = .fill });
+pub inline fn cpuSetFill16(
+    source: *const volatile u16,
+    destination: [*]volatile u16,
+    count: u21,
+) void {
+    cpuSet(source, destination, .{
+        .count = count,
+        .size = .bits_16,
+        .fixed = true,
+    });
 }
 
-// TODO: Is there a reasonable way to make this generic over any 32bit type without a type parameter?
-/// Copies all half-words from `source` into `dest`.
-pub fn cpuCopy32(source: []const volatile u32, dest: []volatile u32) void {
-    std.debug.assert(source.len == dest.len);
-    call3Return0(.cpu_set, source.ptr, dest.ptr, CpuSetArgs{ .count = @truncate(dest.len), .data_size = .word, .fixed_src_addr = .copy });
+/// Fills `destination` with the value at `source`.
+pub inline fn cpuSetFill32(
+    source: *const volatile u32,
+    destination: [*]volatile u32,
+    count: u21,
+) void {
+    cpuSet(@ptrCast(source), @ptrCast(destination), .{
+        .count = count,
+        .size = .bits_32,
+        .fixed = true,
+    });
 }
 
-// TODO: Is there a reasonable way to make this generic over any 32bit type without a type parameter?
-/// Fills `dest` with the value at `source`.
-pub fn cpuSet32(source: *const volatile u32, dest: []volatile u32) void {
-    call3Return0(.cpu_set, source, dest.ptr, CpuSetArgs{ .count = @truncate(dest.len), .data_size = .word, .fixed_src_addr = .fill });
+/// Copies data in chunks of 8 words/32 bytes from `source` into `destination`.
+pub inline fn cpuFastCopy32(
+    source: [*]const volatile u32,
+    destination: [*]volatile u32,
+    count: u21,
+) void {
+    // If you really want to use `CpuFastSet` with its rounding-up behavior,
+    // then call `gba.bios.cpuFastCopy` instead to bypass this check.
+    assert((count & 0x7) == 0);
+    call3Return0(.cpu_fast_set, source, destination, CpuFastSetOptions{
+        .count = count,
+        .fixed = false,
+    });
 }
 
-/// Copies chunks of 32 bytes from `source` into `dest`.
-pub fn cpuFastCopy(source: []const volatile u32, dest: []volatile u32) void {
-    // The GBA will round up the number of bytes to write to the nearest multiple of 32.
-    // This is perfectly legal, but may not be the desired behavior, hence the debug assert.
-    std.debug.assert(dest.len % 8 == 0);
-    std.debug.assert(source.len == dest.len);
-    call3Return0(.cpu_fast_set, source, dest, CpuFastSetArgs{ .count = @truncate(dest.len), .fixed_src_addr = .copy });
+/// Copies the value at `source` into `destination`, in chunks of
+/// 8 words/32 bytes.
+pub fn cpuFastSet32(
+    source: *const volatile u32,
+    destination: [*]volatile u32,
+    count: u21,
+) void {
+    // If you really want to use `CpuFastSet` with its rounding-up behavior,
+    // then call `gba.bios.cpuFastCopy` instead to bypass this check.
+    assert((count & 0x7) == 0);
+    call3Return0(.cpu_fast_set, source, destination, CpuFastSetOptions{
+        .count = count,
+        .fixed = true,
+    });
 }
 
-/// Copies the value at `source` into `dest` in chunks of 32 bytes.
-pub fn cpuFastSet(source: *const volatile u32, dest: []volatile u32) void {
-    // The GBA will round up the number of bytes to write to the nearest multiple of 32.
-    // This is perfectly legal, but may not be the desired behavior, hence the debug assert.
-    std.debug.assert(dest.len % 8 == 0);
-    call3Return0(.cpu_fast_set, source, dest.ptr, CpuFastSetArgs{ .count = @truncate(dest.len), .fixed_src_addr = .fill });
-}
-
-pub fn bgAffineSet(source: []align(4) const volatile BgAffineSource, dest: *volatile gba.bg.Affine) void {
+pub fn bgAffineSet(
+    source: []align(4) const volatile BgAffineSource,
+    dest: *volatile gba.bg.Affine,
+) void {
     call3Return0(.bg_affine_set, source, dest, source.len);
 }
 
 /// Takes a slice of affine calculation parameters and a pointer to the `pa` field of
 /// the first `obj.Affine` to perform them on.
-pub fn objAffineSet(source: []align(4) const volatile ObjAffineSource, dest: *volatile gba.obj.AffineTransform) void {
+pub fn objAffineSet(
+    source: []align(4) const volatile ObjAffineSource,
+    dest: *volatile gba.obj.AffineTransform,
+) void {
     call4Return0(.obj_affine_set, source, dest, source.len, 8);
 }
 
-// TODO: objAffineSet2?
-
-// TODO: Might be able to pull bit unpacking stuff into comptime type
-// pub fn BitUnpacker(comptime P: type, comptime U: type) type {
-//     const packed_bits = switch (@bitSizeOf(P)) {
-//         1, 2, 4, 8 => |s| s,
-//         else => @compileError("packed type can only have bit width of 1, 2, 4, or 8."),
-//     };
-//     const unpacked_bits = switch (@bitSizeOf(U)) {
-//         1, 2, 4, 8, 16, 32 => |s| s,
-//         else => @compileError("unpacked type can only have bit width of 1, 2, 4, 8, 16, or 32."),
-//     };
-// }
-
-pub fn bitUnpack(source: []const u8, dest: *align(4) const anyopaque, args: *const BitUnpackArgs) void {
+pub fn bitUnpack(
+    source: []const u8,
+    dest: *align(4) const anyopaque,
+    args: *const BitUnpackArgs,
+) void {
     call3Return0(.bit_unpack, source, dest, args);
 }
 
-pub fn decompressLZ77WRAM(source: *const DecompressionHeader, dest: *anyopaque) void {
+pub fn lz77UnCompWRAM(
+    source: *const DecompressionHeader,
+    dest: *anyopaque,
+) void {
     call2Return0(.lz77_uncomp_wram, source, dest);
 }
 
-pub fn decompressLZ77VRAM(source: *const DecompressionHeader, dest: *anyopaque) void {
+pub fn lz77UnCompVRAM(
+    source: *const DecompressionHeader,
+    dest: *anyopaque,
+) void {
     call2Return0(.lz77_uncomp_vram, source, dest);
 }
 
-pub fn decompressHuffmann(source: *const DecompressionHeader, dest: *anyopaque) void {
+pub fn huffUnComp(
+    source: *const DecompressionHeader,
+    dest: *anyopaque,
+) void {
     call2Return0(.huff_uncomp, source, dest);
 }
 
-pub fn decompressRunLengthWRAM(source: *const DecompressionHeader, dest: *anyopaque) void {
+pub fn rlUnCompWRAM(
+    source: *const DecompressionHeader,
+    dest: *anyopaque,
+) void {
     call2Return0(.rl_uncomp_wram, source, dest);
 }
 
-pub fn decompressRunLengthVRAM(source: *const DecompressionHeader, dest: *anyopaque) void {
+pub fn rlUnCompVRAM(
+    source: *const DecompressionHeader,
+    dest: *anyopaque,
+) void {
     call2Return0(.rl_uncomp_vram, source, dest);
 }
 
-pub fn unfilterDiff8BitWRAM(source: *const DecompressionHeader, dest: *anyopaque) void {
+pub fn diff8bitUnFilterWRAM(
+    source: *const DecompressionHeader,
+    dest: *anyopaque,
+) void {
     call2Return0(.diff_8bit_unfilter_wram, source, dest);
 }
 
-pub fn unfilterDiff8BitVRAM(source: *const DecompressionHeader, dest: *anyopaque) void {
+pub fn diff8bitUnFilterVRAM(
+    source: *const DecompressionHeader,
+    dest: *anyopaque,
+) void {
     call2Return0(.diff_8bit_unfilter_vram, source, dest);
 }
 
-pub fn unfilterDiff16Bit(source: *const DecompressionHeader, dest: *anyopaque) void {
+pub fn diff16bitUnFilter(
+    source: *const DecompressionHeader,
+    dest: *anyopaque,
+) void {
     call2Return0(.diff_16bit_unfilter, source, dest);
 }
 
@@ -436,16 +696,16 @@ pub fn unfilterDiff16Bit(source: *const DecompressionHeader, dest: *anyopaque) v
 // .MIDIKey2Freq => .{ *const anyopaque, u8, u8 },
 // .MultiBoot => .{ *const volatile anyopaque, TransferMode },
 
-pub fn debugFlush() void {
-    call0Return0(.agb_print);
+pub fn agbPrintFlush() void {
+    call0Return0(.agb_print_flush);
 }
 
-fn call0Return0(comptime swi: SWI) void {
+fn call0Return0(comptime swi: Swi) void {
     const assembly = comptime swi.getAsm();
     asm volatile (assembly);
 }
 
-fn call0Return1(comptime swi: SWI) swi.ReturnType() {
+fn call0Return1(comptime swi: Swi) swi.ReturnType() {
     const assembly = comptime swi.getAsm();
     const ret: swi.ReturnType() = undefined;
     asm volatile (assembly
@@ -456,7 +716,7 @@ fn call0Return1(comptime swi: SWI) swi.ReturnType() {
     return ret;
 }
 
-inline fn call1Return0(comptime swi: SWI, r0: anytype) void {
+inline fn call1Return0(comptime swi: Swi, r0: anytype) void {
     const assembly = comptime swi.getAsm();
     return asm volatile (assembly
         :
@@ -465,7 +725,7 @@ inline fn call1Return0(comptime swi: SWI, r0: anytype) void {
     );
 }
 
-fn call1Return1(comptime swi: SWI, r0: anytype) swi.ReturnType() {
+fn call1Return1(comptime swi: Swi, r0: anytype) swi.ReturnType() {
     const assembly = comptime swi.getAsm();
     var ret: swi.ReturnType() = undefined;
     asm volatile (assembly
@@ -476,7 +736,7 @@ fn call1Return1(comptime swi: SWI, r0: anytype) swi.ReturnType() {
     return ret;
 }
 
-fn call2Return0(comptime swi: SWI, r0: anytype, r1: anytype) void {
+fn call2Return0(comptime swi: Swi, r0: anytype, r1: anytype) void {
     const assembly = comptime swi.getAsm();
     asm volatile (assembly
         :
@@ -486,7 +746,7 @@ fn call2Return0(comptime swi: SWI, r0: anytype, r1: anytype) void {
     );
 }
 
-fn call2Return1(comptime swi: SWI, r0: anytype, r1: anytype) swi.ReturnType() {
+fn call2Return1(comptime swi: Swi, r0: anytype, r1: anytype) swi.ReturnType() {
     const assembly = comptime swi.getAsm();
     var ret: swi.ReturnType() = undefined;
     asm volatile (assembly
@@ -498,8 +758,8 @@ fn call2Return1(comptime swi: SWI, r0: anytype, r1: anytype) swi.ReturnType() {
     return ret;
 }
 
-// Specialized code for division, as it uses multiple return registers
-fn call2Return3(comptime swi: SWI, r0: i32, r1: i32) DivResult {
+// Specialized code for division, as it uses multiple return registers.
+fn call2Return3(comptime swi: Swi, r0: i32, r1: i32) DivResult {
     const assembly = comptime swi.getAsm();
     var quo: i32 = undefined;
     var rem: i32 = undefined;
@@ -519,7 +779,7 @@ fn call2Return3(comptime swi: SWI, r0: i32, r1: i32) DivResult {
     };
 }
 
-fn call3Return0(comptime swi: SWI, r0: anytype, r1: anytype, r2: anytype) void {
+fn call3Return0(comptime swi: Swi, r0: anytype, r1: anytype, r2: anytype) void {
     const assembly = comptime swi.getAsm();
     asm volatile (assembly
         :
@@ -530,7 +790,7 @@ fn call3Return0(comptime swi: SWI, r0: anytype, r1: anytype, r2: anytype) void {
     );
 }
 
-fn call3Return1(comptime swi: SWI, r0: anytype, r1: anytype, r2: anytype) swi.ReturnType() {
+fn call3Return1(comptime swi: Swi, r0: anytype, r1: anytype, r2: anytype) swi.ReturnType() {
     const assembly = comptime swi.getAsm();
     var ret: swi.ReturnType() = undefined;
     asm volatile (assembly
@@ -543,7 +803,7 @@ fn call3Return1(comptime swi: SWI, r0: anytype, r1: anytype, r2: anytype) swi.Re
     return ret;
 }
 
-fn call4Return0(comptime swi: SWI, r0: anytype, r1: anytype, r2: anytype, r3: anytype) void {
+fn call4Return0(comptime swi: Swi, r0: anytype, r1: anytype, r2: anytype, r3: anytype) void {
     const assembly = comptime swi.getAsm();
     asm volatile (assembly
         :

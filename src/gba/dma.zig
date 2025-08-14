@@ -1,6 +1,14 @@
 const gba = @import("gba.zig");
 
-/// Source and destination addresses only use the least significant
+/// DMA (direct memory access) can be used to copy or fill data between
+/// regions in memory.
+/// You should expect DMA copies to be little faster than `gba.bios.cpuFastCopy`
+/// and fills to be a little slower than `gba.bios.cpuFastSet`.
+/// The faster copies come with the tradeoff of disabling interrupts while the
+/// operation is ongoing, because the CPU is stopped while the DMA controller
+/// does its work.
+///
+/// Note that source and destination addresses only use the least significant
 /// 27 bits (for internal memory) or 28 bits (for any memory)
 pub const Dma = packed struct {
     pub const DestinationAdjustment = enum(u2) {
@@ -89,5 +97,5 @@ pub const Dma = packed struct {
     ctrl: Control,
 };
 
-/// Direct Memory Access.
+/// Direct memory access.
 pub const dma: *[4]Dma = @ptrFromInt(gba.mem.io + 0xB0);

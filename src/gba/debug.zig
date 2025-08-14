@@ -61,7 +61,7 @@ pub fn init() void {
 pub fn print(comptime formatString: []const u8, args: anytype) !void {
     lockPrint();
     defer unlockPrint();
-    defer bios.debugFlush();
+    defer bios.agbPrintFlush();
 
     var debugStream = DebugStream.init();
     try fmt.format(debugStream.outStream(), formatString, args);
@@ -70,7 +70,7 @@ pub fn print(comptime formatString: []const u8, args: anytype) !void {
 pub fn write(message: []const u8) !void {
     lockPrint();
     defer unlockPrint();
-    defer bios.debugFlush();
+    defer bios.agbPrintFlush();
 
     if (message.len >= AGB_BUFFER_SIZE) {
         for (message[0..AGB_BUFFER_SIZE]) |char| {

@@ -139,7 +139,11 @@ fn Bitmap(comptime Color: type, comptime width: u8, comptime height: u8) type {
 
         pub fn fill(color: Color) void {
             // TODO: clean this up when zig allows @ptrCast on slices changing length
-            gba.bios.cpuFastSet(@ptrCast(&fullWordColor(color)), @as(*volatile [page_size / 4]u32, @ptrCast(@alignCast(gba.display.currentPage()))));
+            gba.bios.cpuFastSet32(
+                @ptrCast(&fullWordColor(color)),
+                @ptrCast(@alignCast(gba.display.currentPage())),
+                page_size >> 2,
+            );
         }
     };
 }
