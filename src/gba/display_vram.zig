@@ -750,10 +750,10 @@ pub fn memcpyTiles4Bpp(
 ) void {
     const offset = tile_offset + (@as(u16, block) << 9);
     assert(offset + data.len <= 0xc00); // 6 banks * 0x200 tiles/bank
-    gba.mem.memcpy32(
-        vram + (offset << 4),
-        @as([*]align(2) const u8, @ptrCast(@alignCast(data))),
-        data.len << 5,
+    gba.mem.memcpy16(
+        @ptrCast(vram + (offset << 4)),
+        @ptrCast(data),
+        data.len << 4, // Tile4Bpp is 32 bytes long
     );
 }
 
@@ -772,10 +772,10 @@ pub fn memcpyTiles8Bpp(
 ) void {
     const offset = tile_offset + (@as(u16, block) << 8);
     assert(offset + data.len <= 0x600); // 6 banks * 0x100 tiles/bank
-    gba.mem.memcpy32(
-        vram + (offset << 5),
-        @as([*]align(2) const u8, @ptrCast(@alignCast(data))),
-        data.len << 6,
+    gba.mem.memcpy16(
+        @ptrCast(vram + (offset << 5)),
+        @ptrCast(data),
+        data.len << 5, // Tile8Bpp is 64 bytes long
     );
 }
 

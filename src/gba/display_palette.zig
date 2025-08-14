@@ -38,10 +38,10 @@ pub fn memcpyBackgroundPalette(
     data: []align(2) const gba.Color,
 ) void {
     assert(color_offset + data.len <= bg_palette.colors.len);
-    gba.mem.memcpy32(
-        &bg_palette.colors[color_offset],
-        @as([*]align(2) const u8, @ptrCast(@alignCast(data))),
-        data.len << 1,
+    gba.mem.memcpy16(
+        @ptrCast(&bg_palette.colors[color_offset]),
+        @ptrCast(data),
+        data.len,
     );
 }
 
@@ -67,10 +67,10 @@ pub fn memcpyObjectPalette(
     data: []align(2) const gba.Color,
 ) void {
     assert(color_offset + data.len <= obj_palette.colors.len);
-    gba.mem.memcpy32(
-        &obj_palette.colors[color_offset],
-        @as([*]align(2) const u8, @ptrCast(@alignCast(data))),
-        data.len << 1,
+    gba.mem.memcpy16(
+        @ptrCast(&obj_palette.colors[color_offset]),
+        @ptrCast(data),
+        data.len,
     );
 }
 

@@ -26,6 +26,7 @@ SECTIONS
         KEEP(*(.gbaheader))
         KEEP(*(.gba_crt0))
         KEEP(*(.gba_isr))
+        KEEP(*(.gba_mem))
         *(EXCLUDE_FILE (*.iwram*) .text*)
         . ALIGN(4);
     } >rom = 0xff
@@ -46,6 +47,14 @@ SECTIONS
     __exidx_start = .;
     .ARM.exidx   : { *(.ARM.exidx* .gnu.linkonce.armexidx.*) } >rom
     __exidx_end = .;
+
+    __iwram_lma = .;
+    .iwram : AT(__iwram_lma) {
+        __iwram_start__ = ABSOLUTE(.);
+        KEEP(*(.gba_mem_iwram))
+        . = ALIGN(4);
+        __iwram_end__ = ABSOLUTE(.);
+    } >iwram = 0xff
 
     __data_lma = .;
     .data : AT(__data_lma) {
