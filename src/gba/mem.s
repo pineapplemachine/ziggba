@@ -97,11 +97,11 @@ memcpy_arm:
 .memcpy_arm_cpy16_check_len:
     and     r3, r2, #1          // lsb = n & 1
     beq     .memcpy_arm_cpy16_fallthrough // branch if lsb == 0
-    // Handle single extra byte
+    // Handle single extra byte at end
     add     r12, r1, r2         // r12 = src + n
-    ldrh    r3, [r12, #-1]      // load mem @ r12 - 1 to r3
+    ldrb    r3, [r12, #-1]      // load mem @ r12 - 1 to r3
     add     r12, r0, r2         // r12 = dst + n
-    strh    r3, [r12, #-1]      // store r3 to mem @ r12 - 1
+    strb    r3, [r12, #-1]      // store r3 to mem @ r12 - 1
 .memcpy_arm_cpy16_fallthrough:
     movs    r2, r2, lsr #1      // n >>= 1
     // Falls through to memcpy16_arm like a tail call
@@ -126,7 +126,7 @@ memcpy16_arm:
     bhi     .memcpy16_arm_loop_16 // branch if n != 0
     bx      lr                  // return to thumb caller
 .memcpy16_arm_dst_32_aligned:
-    and     r3, r1, #1          // lsb = src & 1
+    and     r3, r1, #3          // lsb = src & 3
     beq     .memcpy16_arm_cpy32_check_len // branch if lsb == 0
     b       .memcpy16_arm_loop_16 // branch (unconditional)
 .memcpy16_arm_both_32_unaligned:
@@ -136,11 +136,11 @@ memcpy16_arm:
 .memcpy16_arm_cpy32_check_len:
     and     r3, r2, #1          // lsb = n & 1
     beq     .memcpy16_arm_cpy32_fallthrough // branch if lsb == 0
-    // Handle single extra byte
+    // Handle single extra half-word at end
     add     r12, r1, r2         // r12 = src + n
-    ldrb    r3, [r12, #-1]      // load mem @ r12 - 1 to r3
+    ldrh    r3, [r12, #-1]      // load mem @ r12 - 1 to r3
     add     r12, r0, r2         // r12 = dst + n
-    strb    r3, [r12, #-1]      // store r3 to mem @ r12 - 1
+    strh    r3, [r12, #-1]      // store r3 to mem @ r12 - 1
 .memcpy16_arm_cpy32_fallthrough:
     movs    r2, r2, lsr #1      // n >>= 1
     // Falls through to memcpy32_arm like a tail call
