@@ -46,17 +46,17 @@ extern fn memset32_thumb(dst: [*]volatile u32, src: u32, n: u32) callconv(.c) vo
 /// is not available.
 pub fn memcpy(
     /// Write copied memory here.
-    destination: [*]volatile u8,
+    destination: *volatile anyopaque,
     /// Read memory from here.
-    source: [*]const volatile u8,
+    source: *const volatile anyopaque,
     /// Number of bytes to copy.
-    count: u32,
+    count_bytes: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memcpy(destination[0..count], source[0..count]);
+        @memcpy(destination[0..count_bytes], source[0..count_bytes]);
     }
     else {
-        memcpy_thumb(destination, source, count);
+        memcpy_thumb(@ptrCast(destination), @ptrCast(source), count_bytes);
     }
 }
 
@@ -69,19 +69,17 @@ pub fn memcpy(
 /// is not available.
 pub fn memcpy16(
     /// Write copied memory here. Must be half-word-aligned.
-    destination: [*]volatile u16,
+    destination: *align(2) volatile anyopaque,
     /// Read memory from here. Must be half-word-aligned.
-    source: [*]const volatile u16,
+    source: *align(2) const volatile anyopaque,
     /// Number of 16-bit half words to copy.
-    count: u32,
+    count_half_words: u32,
 ) void {
-    assert((@intFromPtr(source) & 1) == 0); // Check alignment
-    assert((@intFromPtr(destination) & 1) == 0); // Check alignment
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memcpy(destination[0..count], source[0..count]);
+        @memcpy(destination[0..count_half_words], source[0..count_half_words]);
     }
     else {
-        memcpy16_thumb(destination, source, count);
+        memcpy16_thumb(@ptrCast(destination), @ptrCast(source), count_half_words);
     }
 }
 
@@ -94,19 +92,17 @@ pub fn memcpy16(
 /// is not available.
 pub fn memcpy32(
     /// Write copied memory here. Must be word-aligned.
-    destination: [*]volatile u32,
+    destination: *align(4) volatile anyopaque,
     /// Read memory from here. Must be word-aligned.
-    source: [*]const volatile u32,
+    source: *align(4) const volatile anyopaque,
     /// Number of 32-bit words to copy.
-    count: u32,
+    count_words: u32,
 ) void {
-    assert((@intFromPtr(source) & 3) == 0); // Check alignment
-    assert((@intFromPtr(destination) & 3) == 0); // Check alignment
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memcpy(destination[0..count], source[0..count]);
+        @memcpy(destination[0..count_words], source[0..count_words]);
     }
     else {
-        memcpy32_thumb(destination, source, count);
+        memcpy32_thumb(@ptrCast(destination), @ptrCast(source), count_words);
     }
 }
 
@@ -119,17 +115,17 @@ pub fn memcpy32(
 /// is not available.
 pub fn memset(
     /// Write here, filling memory with `value`.
-    destination: [*]volatile u8,
+    destination: *volatile anyopaque,
     /// Value to store in the destination buffer.
     value: u8,
     /// Number of bytes to copy.
-    count: u32,
+    count_bytes: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memset(destination[0..count], value);
+        @memset(destination[0..count_bytes], value);
     }
     else {
-        memset_thumb(destination, value, count);
+        memset_thumb(@ptrCast(destination), @ptrCast(value), count_bytes);
     }
 }
 
@@ -141,18 +137,18 @@ pub fn memset(
 /// is not available.
 pub fn memset16(
     /// Write here, filling memory with `value`. Must be half-word-aligned.
-    destination: [*]volatile u16,
+    destination: *align(2) volatile anyopaque,
     /// Value to store in the destination buffer.
     value: u16,
     /// Number of 16-bit half words to copy.
-    count: u32,
+    count_half_words: u32,
 ) void {
     assert((@intFromPtr(destination) & 1) == 0); // Check alignment
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memset(destination[0..count], value);
+        @memset(destination[0..count_half_words], value);
     }
     else {
-        memset16_thumb(destination, value, count);
+        memset16_thumb(@ptrCast(destination), @ptrCast(value), count_half_words);
     }
 }
 
@@ -164,17 +160,17 @@ pub fn memset16(
 /// is not available.
 pub fn memset32(
     /// Write here, filling memory with `value`. Must be word-aligned.
-    destination: [*]volatile u32,
+    destination: *align(4) volatile anyopaque,
     /// Value to store in the destination buffer.
     value: u32,
     /// Number of 32-bit words to copy.
-    count: u32,
+    count_words: u32,
 ) void {
     assert((@intFromPtr(destination) & 3) == 0); // Check alignment
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memset(destination[0..count], value);
+        @memset(destination[0..count_words], value);
     }
     else {
-        memset32_thumb(destination, value, count);
+        memset32_thumb(@ptrCast(destination), @ptrCast(value), count_words);
     }
 }

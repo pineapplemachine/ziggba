@@ -1,9 +1,65 @@
+//! This module provides interfaces for calling the GBA's BIOS-provided
+//! functions via software interrupts (SWI).
+//! These functions perform common operations using (usually) very
+//! optimized code.
+
 const builtin = @import("builtin");
 const std = @import("std");
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
-// TODO: use extern asm like mem.zig?
+// Imports for math-related BIOS calls.
+pub const DivResult = @import("bios_math.zig").DivResult;
+pub const BgAffineSource = @import("bios_math.zig").BgAffineSource;
+pub const ObjAffineSource = @import("bios_math.zig").ObjAffineSource;
+pub const div = @import("bios_math.zig").div;
+pub const divArm = @import("bios_math.zig").divArm;
+pub const sqrt = @import("bios_math.zig").sqrt;
+pub const arctan = @import("bios_math.zig").arctan;
+pub const arctan2 = @import("bios_math.zig").arctan2;
+pub const bgAffineSet = @import("bios_math.zig").bgAffineSet;
+pub const objAffineSetOam = @import("bios_math.zig").objAffineSetOam;
+pub const objAffineSetStruct = @import("bios_math.zig").objAffineSetStruct;
+pub const objAffineSet = @import("bios_math.zig").objAffineSet;
+
+// Imports relating to `CpuSet` and `CpuFastSet` BIOS calls.
+pub const CpuSetOptions = @import("bios_cpuset.zig").CpuSetOptions;
+pub const CpuFastSetOptions = @import("bios_cpuset.zig").CpuFastSetOptions;
+pub const cpuSet = @import("bios_cpuset.zig").cpuSet;
+pub const cpuFastSet = @import("bios_cpuset.zig").cpuFastSet;
+pub const cpuSetCopy16 = @import("bios_cpuset.zig").cpuSetCopy16;
+pub const cpuSetCopy32 = @import("bios_cpuset.zig").cpuSetCopy32;
+pub const cpuSetFill16 = @import("bios_cpuset.zig").cpuSetFill16;
+pub const cpuSetFill32 = @import("bios_cpuset.zig").cpuSetFill32;
+pub const cpuFastCopy32 = @import("bios_cpuset.zig").cpuFastCopy32;
+pub const cpuFastSet32 = @import("bios_cpuset.zig").cpuFastSet32;
+
+// Imports for BIOS calls which decompress or decode data.
+pub const UnCompHeader = @import("bios_decompression.zig").UnCompHeader;
+pub const BitUnPackOptions = @import("bios_decompression.zig").BitUnPackOptions;
+pub const bitUnPack = @import("bios_decompression.zig").bitUnPack;
+pub const lz77UnCompWRAM = @import("bios_decompression.zig").lz77UnCompWRAM;
+pub const lz77UnCompVRAM = @import("bios_decompression.zig").lz77UnCompVRAM;
+pub const huffUnComp = @import("bios_decompression.zig").huffUnComp;
+pub const rlUnCompWRAM = @import("bios_decompression.zig").rlUnCompWRAM;
+pub const rlUnCompVRAM = @import("bios_decompression.zig").rlUnCompVRAM;
+pub const diff8bitUnFilterWRAM = @import("bios_decompression.zig").diff8bitUnFilterWRAM;
+pub const diff8bitUnFilterVRAM = @import("bios_decompression.zig").diff8bitUnFilterVRAM;
+pub const diff16bitUnFilter = @import("bios_decompression.zig").diff16bitUnFilter;
+
+// Imports for sound-related BIOS calls.
+pub const SoundDriverModeOptions = @import("bios_sound.zig").SoundDriverModeOptions;
+pub const WaveData = @import("bios_sound.zig").WaveData;
+pub const SoundArea = @import("bios_sound.zig").SoundArea;
+pub const soundBiasChange = @import("bios_sound.zig").soundBiasChange;
+pub const soundDriverInit = @import("bios_sound.zig").soundDriverInit;
+pub const soundDriverMode = @import("bios_sound.zig").soundDriverMode;
+pub const soundDriverMain = @import("bios_sound.zig").soundDriverMain;
+pub const soundDriverVSync = @import("bios_sound.zig").soundDriverVSync;
+pub const soundChannelClear = @import("bios_sound.zig").soundChannelClear;
+pub const midiKey2Freq = @import("bios_sound.zig").midiKey2Freq;
+pub const soundDriverVSyncOff = @import("bios_sound.zig").soundDriverVSyncOff;
+pub const soundDriverVSyncOn = @import("bios_sound.zig").soundDriverVSyncOn;
 
 /// Enumeration of software interrupt codes (SWI) recognized by the GBA BIOS.
 ///
@@ -98,22 +154,24 @@ pub const Swi = enum(u8) {
     /// Copy data while changing bit depth.
     /// Named `BitUnPack` in both Tonc and GBATEK documentation.
     bit_unpack = 0x10,
-    /// Expands LZ77-compressed data. Writes 8-bit units.
+    /// Inflates LZ77-compressed data. Writes 8-bit units.
     /// Named `LZ77UnCompWRAM` in Tonc documentation and
     /// `LZ77UnCompReadNormalWrite8bit` in GBATEK documentation.
     lz77_uncomp_wram = 0x11,
-    /// Expands LZ77-compressed data. Writes 16-bit units.
+    /// Inflates LZ77-compressed data. Writes 16-bit units.
     /// Named `LZ77UnCompVRAM` in Tonc documentation and
     /// `LZ77UnCompReadNormalWrite16bit` in GBATEK documentation.
     lz77_uncomp_vram = 0x12,
     /// Named `HuffUnComp` in Tonc documentation and
     /// `HuffUnCompReadNormal` in GBATEK documentation.
     huff_uncomp = 0x13,
-    /// Expands RLE-compressed data (run-length encoding). Writes 8-bit units.
+    /// Inflates run-length compressed data (run-length encoding).
+    /// Writes 8-bit units.
     /// Named `RLUnCompWRAM` in Tonc documentation and
     /// `RLUnCompReadNormalWrite8bit` in GBATEK documentation.
     rl_uncomp_wram = 0x14,
-    /// Expands RLE-compressed data (run-length encoding). Writes 16-bit units.
+    /// Inflates run-length compressed data (run-length encoding).
+    /// Writes 16-bit units.
     /// Named `RLUnCompVRAM` in Tonc documentation and
     /// `RLUnCompReadNormalWrite16bit` in GBATEK documentation.
     rl_uncomp_vram = 0x15,
@@ -125,8 +183,8 @@ pub const Swi = enum(u8) {
     diff_8bit_unfilter_vram = 0x17,
     /// Named `Diff16bitUnFilter` in both Tonc and GBATEK documentation.
     diff_16bit_unfilter = 0x18,
-    /// Named `SoundBias` in Tonc documentation and
-    /// `SoundBiasChange` in GBATEK documentation.
+    /// Named `SoundBiasChange` in Tonc documentation and
+    /// `SoundBias` in GBATEK documentation.
     sound_bias_change = 0x19,
     /// Named `SoundDriverInit` in both Tonc and GBATEK documentation.
     sound_driver_init = 0x1a,
@@ -181,28 +239,15 @@ pub const Swi = enum(u8) {
     /// Prints UTF-8 encoded text from a buffer to a debug log.
     /// See `gba.debug`.
     agb_print_flush = 0xfa,
-
-    // TODO: add a way to use ARM versions rather than just thumb
-    fn getAsm(comptime code: Swi) []const u8 {
-        var buffer: [16]u8 = undefined;
-        return std.fmt.bufPrint(
-            &buffer,
-            "swi 0x{X}",
-            .{@intFromEnum(code)},
-        ) catch unreachable;
-    }
-
-    fn ReturnType(comptime self: Swi) type {
-        return switch (self) {
-            .div, .div_arm => DivResult,
-            .bios_checksum, .sqrt => u16,
-            .midi_key_2_freq => u32,
-            .arctan, .arctan2 => gba.FixedU16R16,
-            .multi_boot => bool,
-            else => void,
-        };
-    }
 };
+
+/// Resets the GBA and runs the code at address 0x02000000 or 0x08000000,
+/// depending on the contents of a hardware register at 0x03007ffa.
+/// (0 means 0x08000000 and anything else means 0x02000000.)
+/// Wraps a `SoftReset` BIOS call.
+pub fn softReset() void {
+    asm volatile ("swi 0x00");
+}
 
 /// Flags accepted by the `registerRamReset` BIOS call.
 pub const RegisterRamResetFlags = packed struct(u8) {
@@ -230,147 +275,57 @@ pub const RegisterRamResetFlags = packed struct(u8) {
     other_registers: bool = false,
 };
 
-/// Type returned by the `div` and `divArm` BIOS calls.
-pub const DivResult = packed struct {
-    quotient: i32,
-    remainder: i32,
-    absolute_quotient: u32,
-};
-
-pub const CpuSetOptions = packed struct(u32) {
-    pub const Size = enum(u1) {
-        bits_16 = 0,
-        bits_32 = 1,
-    };
-    
-    /// The number of words or half-words to write, depending on `size`.
-    count: u21,
-    /// Unused bits.
-    _1: u3 = 0,
-    /// Whether the write pointer should move with the read pointer,
-    /// or whether the destination space should be filled with the value
-    /// at `source[0]`.
-    fixed: bool,
-    /// Indicates whether to operate on 16-bit or 32-bit units.
-    size: Size,
-    /// Unused bits.
-    _2: u6 = 0,
-};
-
-pub const CpuFastSetOptions = packed struct(u32) {
-    /// The number of words to write.
-    count: u21,
-    /// Unused bits.
-    _1: u3 = 0,
-    /// Whether the write pointer should move with the read pointer,
-    /// or whether the destination space should be filled with the value
-    /// at `source[0]`.
-    fixed: bool,
-    /// Unused bits.
-    _2: u7 = 0,
-};
-
-pub const CompressionType = enum(u4) {
-    lz77 = 1,
-    huffman = 2,
-    run_length = 3,
-    diff_filtered = 8,
-};
-
-pub const DecompressionHeader = packed struct(u32) {
-    size: u4 = 0,
-    type: CompressionType,
-    decompressed_size: u24,
-};
-
-pub const SoundDriverModeArgs = packed struct(u32) {
-    reverb_value: u7 = 0,
-    reverb: bool = false,
-    simultaneous_channels: u4 = 8,
-    master_volume: u4 = 15,
-    frequency: enum(u4) {
-        @"5734_hz" = 1,
-        @"7884_hz" = 2,
-        @"10512_hz" = 3,
-        @"13379_hz" = 4,
-        @"15768_hz" = 5,
-        @"18157_hz" = 6,
-        @"21024_hz" = 7,
-        @"26758_hz" = 8,
-        @"31536_hz" = 9,
-        @"36314_hz" = 10,
-        @"40137_hz" = 11,
-        @"42048_hz" = 12,
-    } = .@"13379_hz",
-    /// TODO: better representation
-    da_bits: u4,
-};
-
-pub const TransferMode = enum(u32) {
-    normal_256_khz,
-    multiplay,
-    normal_2_mhz,
-};
-
-pub const BgAffineSource = extern struct {
-    original_x: gba.FixedI32R8 align(4),
-    original_y: gba.FixedI32R8 align(4),
-    display_x: i16,
-    display_y: i16,
-    scale_x: gba.FixedI16R8,
-    scale_y: gba.FixedI16R8,
-    /// BIOS ignores the low 8 bits.
-    angle: gba.FixedU16R16,
-};
-
-pub const ObjAffineSource = packed struct {
-    scale_x: gba.FixedI16R8,
-    scale_y: gba.FixedI16R8,
-    /// BIOS ignores the low 8 bits.
-    angle: gba.FixedU16R16,
-};
-
-pub const BitUnpackArgs = packed struct {
-    src_len_bytes: u16,
-    src_bit_width: enum(u8) {
-        @"1" = 1,
-        @"2" = 2,
-        @"4" = 4,
-        @"8" = 8,
-    },
-    dest_bit_width: enum(u8) {
-        @"1" = 1,
-        @"2" = 2,
-        @"4" = 4,
-        @"8" = 8,
-        @"16" = 16,
-        @"32" = 32,
-    },
-    data_offset: u31,
-    zero_data: bool,
-};
-
-/// Resets the GBA and runs the code at address 0x02000000 or 0x08000000,
-/// depending on the contents of 0x03007ffa.
-/// (0 means 0x08000000 and anything else means 0x02000000.)
-pub fn softReset() void {
-    call0Return0(.register_soft_reset);
-}
-
+/// Wraps a `RegisterRamReset` BIOS call.
 pub fn registerRamReset(flags: RegisterRamResetFlags) void {
-    call1Return0(.register_ram_reset, flags);
+    asm volatile (
+        "swi 0x01"
+        :
+        : [flags] "{r0}" (flags),
+        : "r0"
+    );
 }
 
-pub const WaitInterruptReturnType = enum(u1) {
-    return_immediately,
-    discard_old_wait_new,
+/// Halts the CPU, switching to a low-power mode, until an interrupt
+/// request occurs.
+/// You probably want to enable some interrupts before using this.
+/// Wraps a `Halt` BIOS call.
+pub fn halt() void {
+    asm volatile ("swi 0x02");
+}
+
+/// Switches the system to a very low power mode.
+/// The system can only wake from this state via keypad, gamepak,
+/// or serial interrupts, and only if those interrupts were enabled
+/// beforehand.
+/// You probably want to turn off video and sound before using this.
+/// Wraps a `Stop` BIOS call.
+pub fn stop() void {
+    asm volatile ("swi 0x03");
+}
+
+/// Determines `intrWait` behavior.
+pub const IntrWaitType = enum(u1) {
+    /// Return immediately if a flag was already set.
+    return_immediately = 0,
+    /// Discard old flags and wait until a flag is newly set.
+    discard_old_wait_new = 1,
 };
 
-pub fn waitInterrupt(
-    return_type: WaitInterruptReturnType,
-    flags: gba.interrupt.Flags,
+/// Wait in a halt state until one or more of the specified interrupts
+/// occur. This is similar to the `halt` SWI, but it applies only to the
+/// specified interrupts.
+/// Wraps an `IntrWait` BIOS call.
+pub fn intrWait(
+    wait_type: IntrWaitType,
+    interrupt_flags: gba.interrupt.Flags,
 ) void {
-    call2Return0(.intr_wait, return_type, flags);
+    asm volatile (
+        "swi 0x04"
+        :
+        : [wait_type] "{r0}" (wait_type),
+          [interrupt_flags] "{r1}" (interrupt_flags),
+        : "r0", "r1"
+    );
 }
 
 /// Halt execution until a VBlank interrupt triggers.
@@ -379,438 +334,65 @@ pub fn waitInterrupt(
 /// main game loop.
 /// Note that several flags must be set before this will work as you
 /// probably expect.
+/// Wraps a `VBlankIntrWait` BIOS call.
 ///
 /// See `gba.display.status.vblank_interrupt`, `gba.interrupt.enable.vblank`,
 /// and `gba.interrupt.master.enable`. All three of these flags must be set in
 /// order for VBlank interrupts to occur.
-pub fn waitVBlank() void {
-    call0Return0(.vblank_intr_wait);
+pub fn vblankIntrWait() void {
+    asm volatile ("swi 0x05");
 }
 
-/// Divide the numerator by the denominator.
-///
-/// Beware calling this function with a denominator of zero.
-/// Doing so may result in an endless loop.
-///
-/// Normally uses a GBA BIOS function, but also implements a fallback to run
-/// as you would expect in tests and at comptime where the GBA BIOS is not
-/// available.
-pub fn div(numerator: i32, denominator: i32) DivResult {
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        return .{
-            .quotient = @divTrunc(numerator, denominator),
-            .remainder = @rem(numerator, denominator),
-            .absolute_quotient = @abs(numerator) / @abs(denominator),
-        };
-    }
-    else {
-        return call2Return3(.div, numerator, denominator);
-    }
+pub const MultiBootParam = extern struct {
+    /// Undocumented bytes.
+    _1: [0x14]u8 = @splat(0),
+    handshake_data: u8,
+    /// Undocumented bytes.
+    _2: [4]u8 = 0,
+    client_data: [3]u8,
+    palette_data: u8,
+    /// Undocumented bytes.
+    _3: u8 = 0,
+    client_bit: u8,
+    /// Undocumented bytes.
+    _4: u8 = 0,
+    /// Typically 0x800000c0.
+    boot_src: *u32,
+    /// Typically 0x800000c0 plus length.
+    boot_end: *u32,
+    /// Undocumented bytes.
+    _5: [0x24]u8 = @splat(0),
+};
+
+pub const MultiBootTransferMode = enum(u32) {
+    normal_256_khz = 0,
+    multiplay = 1,
+    normal_2_mhz = 2,
+};
+
+/// Wraps a `MultiBoot` BIOS call.
+pub fn multiBoot(
+    param: *MultiBootParam,
+    transfer_mode: MultiBootTransferMode,
+) bool {
+    return asm volatile (
+        "swi 0x25"
+        : [ret] "={r0}" (-> bool),
+        : [param] "{r0}" (param),
+          [transfer_mode] "{r1}" (transfer_mode),
+        : "r0", "r1"
+    );
 }
 
-/// Divide the numerator by the denominator.
-///
-/// This call is 3 cycles slower than `div`.
-/// It exists for compatibility with ARM's library.
-///
-/// Normally uses a GBA BIOS function, but also implements a fallback to run
-/// as you would expect in tests and at comptime where the GBA BIOS is not
-/// available.
-pub fn divArm(numerator: i32, denominator: i32) DivResult {
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        return .{
-            .quotient = @divTrunc(numerator, denominator),
-            .remainder = @rem(numerator, denominator),
-            .absolute_quotient = @abs(numerator) / @abs(denominator),
-        };
-    }
-    else {
-        return call2Return3(.div_arm, denominator, numerator);
-    }
+/// Reboots the GBA, including replaying the Nintendo intro.
+/// Wraps a `HardReset` BIOS call.
+pub fn hardReset() void {
+    asm volatile ("swi 0x26");
 }
 
-/// Compute the square root of an integer. Rounds down.
-///
-/// Normally uses a GBA BIOS function, but also implements a fallback to run
-/// as you would expect in tests and at comptime where the GBA BIOS is not
-/// available.
-pub fn sqrt(x: u32) u16 {
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        const fx: f64 = @floatFromInt(x);
-        return @intFromFloat(@sqrt(fx));
-    }
-    else {
-        return call1Return1(.sqrt, x);
-    }
-}
-
-/// Compute the arctangent of `x`.
-/// This BIOS call may produce inaccurate values. In most situations,
-/// you should prefer to use `arctan2` instead.
-pub fn arctan(x: gba.FixedU16R14) gba.FixedU16R16 {
-    return call1Return1(.arctan, x);
-}
-
-/// Compute the two-argument arctangent of `y / x`.
-///
-/// Note the unconventional order of arguments, first `x` then `y`.
-/// This is the order used by libtonc and reflects the order by which
-/// values are passed in registers.
-pub fn arctan2(x: i16, y: i16) gba.FixedU16R16 {
-    return call2Return1(.arctan2, x, y);
-}
-
-/// Wraps the system's `CpuSet` BIOS call.
-///
-/// Normally uses a GBA BIOS function, but also implements a fallback to run
-/// as you would expect in tests and at comptime where the GBA BIOS is not
-/// available.
-pub fn cpuSet(
-    source: [*]const volatile u16,
-    destination: [*]volatile u16,
-    options: CpuSetOptions,
-) void {
-    assert(options.size == .bits_16 or (@intFromPtr(source) & 0x3 == 0));
-    assert(options.size == .bits_16 or (@intFromPtr(destination) & 0x3 == 0));
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        const count = options.count << @intFromEnum(options.size);
-        if(options.fixed) {
-            @memset(destination[0..count], source[0]);
-        }
-        else {
-            @memcpy(destination[0..count], source[0..count]);
-        }
-    }
-    else {
-        asm volatile (
-            "swi 0x0b"
-            :
-            : [source] "{r0}" (source),
-              [destination] "{r1}" (destination),
-              [options] "{r2}" (options),
-            : "r0", "r1", "r2", "cc", "memory"
-        );
-    }
-}
-
-/// Wraps the system's `CpuFastSet` BIOS call.
-///
-/// Normally uses a GBA BIOS function, but also implements a fallback to run
-/// as you would expect in tests and at comptime where the GBA BIOS is not
-/// available.
-pub fn cpuFastSet(
-    source: [*]const volatile u32,
-    destination: [*]volatile u32,
-    options: CpuFastSetOptions,
-) void {
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        // CpuFastSet rounds up to a multiple of 8 words.
-        const count_lsb = options.count & 0x7;
-        const count = (options.count & 0x1ffff8) + @intFromBool(count_lsb != 0);
-        if(options.fixed) {
-            @memset(destination[0..count], source[0]);
-        }
-        else {
-            @memcpy(destination[0..count], source[0..count]);
-        }
-    }
-    else {
-        asm volatile (
-            "swi 0x0c"
-            :
-            : [source] "{r0}" (source),
-              [destination] "{r1}" (destination),
-              [options] "{r2}" (options),
-            : "r0", "r1", "r2", "cc", "memory"
-        );
-    }
-}
-
-/// Copies all 16-bit half-words from `source` into `dest`.
-pub inline fn cpuSetCopy16(
-    source: [*]const volatile u16,
-    destination: [*]volatile u16,
-    count: u21,
-) void {
-    cpuSet(source, destination, .{
-        .count = count,
-        .size = .bits_16,
-        .fixed = false,
-    });
-}
-
-/// Copies all 32-bit words from `source` into `dest`.
-pub inline fn cpuSetCopy32(
-    source: [*]const volatile u32,
-    destination: [*]volatile u32,
-    count: u21,
-) void {
-    cpuSet(@ptrCast(source), @ptrCast(destination), .{
-        .count = count,
-        .size = .bits_32,
-        .fixed = false,
-    });
-}
-
-/// Fills `dest` with the value at `source`.
-pub inline fn cpuSetFill16(
-    source: *const volatile u16,
-    destination: [*]volatile u16,
-    count: u21,
-) void {
-    cpuSet(source, destination, .{
-        .count = count,
-        .size = .bits_16,
-        .fixed = true,
-    });
-}
-
-/// Fills `destination` with the value at `source`.
-pub inline fn cpuSetFill32(
-    source: *const volatile u32,
-    destination: [*]volatile u32,
-    count: u21,
-) void {
-    cpuSet(@ptrCast(source), @ptrCast(destination), .{
-        .count = count,
-        .size = .bits_32,
-        .fixed = true,
-    });
-}
-
-/// Copies data in chunks of 8 words/32 bytes from `source` into `destination`.
-pub inline fn cpuFastCopy32(
-    source: [*]const volatile u32,
-    destination: [*]volatile u32,
-    count: u21,
-) void {
-    // If you really want to use `CpuFastSet` with its rounding-up behavior,
-    // then call `gba.bios.cpuFastCopy` instead to bypass this check.
-    assert((count & 0x7) == 0);
-    call3Return0(.cpu_fast_set, source, destination, CpuFastSetOptions{
-        .count = count,
-        .fixed = false,
-    });
-}
-
-/// Copies the value at `source` into `destination`, in chunks of
-/// 8 words/32 bytes.
-pub fn cpuFastSet32(
-    source: *const volatile u32,
-    destination: [*]volatile u32,
-    count: u21,
-) void {
-    // If you really want to use `CpuFastSet` with its rounding-up behavior,
-    // then call `gba.bios.cpuFastCopy` instead to bypass this check.
-    assert((count & 0x7) == 0);
-    call3Return0(.cpu_fast_set, source, destination, CpuFastSetOptions{
-        .count = count,
-        .fixed = true,
-    });
-}
-
-pub fn bgAffineSet(
-    source: []align(4) const volatile BgAffineSource,
-    dest: *volatile gba.bg.Affine,
-) void {
-    call3Return0(.bg_affine_set, source, dest, source.len);
-}
-
-/// Takes a slice of affine calculation parameters and a pointer to the `pa` field of
-/// the first `obj.Affine` to perform them on.
-pub fn objAffineSet(
-    source: []align(4) const volatile ObjAffineSource,
-    dest: *volatile gba.obj.AffineTransform,
-) void {
-    call4Return0(.obj_affine_set, source, dest, source.len, 8);
-}
-
-pub fn bitUnpack(
-    source: []const u8,
-    dest: *align(4) const anyopaque,
-    args: *const BitUnpackArgs,
-) void {
-    call3Return0(.bit_unpack, source, dest, args);
-}
-
-pub fn lz77UnCompWRAM(
-    source: *const DecompressionHeader,
-    dest: *anyopaque,
-) void {
-    call2Return0(.lz77_uncomp_wram, source, dest);
-}
-
-pub fn lz77UnCompVRAM(
-    source: *const DecompressionHeader,
-    dest: *anyopaque,
-) void {
-    call2Return0(.lz77_uncomp_vram, source, dest);
-}
-
-pub fn huffUnComp(
-    source: *const DecompressionHeader,
-    dest: *anyopaque,
-) void {
-    call2Return0(.huff_uncomp, source, dest);
-}
-
-pub fn rlUnCompWRAM(
-    source: *const DecompressionHeader,
-    dest: *anyopaque,
-) void {
-    call2Return0(.rl_uncomp_wram, source, dest);
-}
-
-pub fn rlUnCompVRAM(
-    source: *const DecompressionHeader,
-    dest: *anyopaque,
-) void {
-    call2Return0(.rl_uncomp_vram, source, dest);
-}
-
-pub fn diff8bitUnFilterWRAM(
-    source: *const DecompressionHeader,
-    dest: *anyopaque,
-) void {
-    call2Return0(.diff_8bit_unfilter_wram, source, dest);
-}
-
-pub fn diff8bitUnFilterVRAM(
-    source: *const DecompressionHeader,
-    dest: *anyopaque,
-) void {
-    call2Return0(.diff_8bit_unfilter_vram, source, dest);
-}
-
-pub fn diff16bitUnFilter(
-    source: *const DecompressionHeader,
-    dest: *anyopaque,
-) void {
-    call2Return0(.diff_16bit_unfilter, source, dest);
-}
-
-// // TODO: define actual sound driver struct
-// .SoundDriverInit => .{ *const volatile anyopaque },
-// .SoundDriverMode => .{ SoundDriverModeArgs },
-// // TODO: WaveData*, Midi stuff
-// .MIDIKey2Freq => .{ *const anyopaque, u8, u8 },
-// .MultiBoot => .{ *const volatile anyopaque, TransferMode },
-
+/// Unofficial SWI supported by some emulators, including mGBA.
+/// Prints UTF-8 encoded text from a buffer to a debug log.
+/// See `gba.debug`.
 pub fn agbPrintFlush() void {
-    call0Return0(.agb_print_flush);
-}
-
-fn call0Return0(comptime swi: Swi) void {
-    const assembly = comptime swi.getAsm();
-    asm volatile (assembly);
-}
-
-fn call0Return1(comptime swi: Swi) swi.ReturnType() {
-    const assembly = comptime swi.getAsm();
-    const ret: swi.ReturnType() = undefined;
-    asm volatile (assembly
-        : [ret] "={r0}" (ret),
-        :
-        : "r0"
-    );
-    return ret;
-}
-
-inline fn call1Return0(comptime swi: Swi, r0: anytype) void {
-    const assembly = comptime swi.getAsm();
-    return asm volatile (assembly
-        :
-        : [r0] "{r0}" (r0),
-        : "r0"
-    );
-}
-
-fn call1Return1(comptime swi: Swi, r0: anytype) swi.ReturnType() {
-    const assembly = comptime swi.getAsm();
-    var ret: swi.ReturnType() = undefined;
-    asm volatile (assembly
-        : [ret] "={r0}" (ret),
-        : [r0] "{r0}" (r0),
-        : "r0"
-    );
-    return ret;
-}
-
-fn call2Return0(comptime swi: Swi, r0: anytype, r1: anytype) void {
-    const assembly = comptime swi.getAsm();
-    asm volatile (assembly
-        :
-        : [r0] "{r0}" (r0),
-          [r1] "{r1}" (r1),
-        : "r0", "r1"
-    );
-}
-
-fn call2Return1(comptime swi: Swi, r0: anytype, r1: anytype) swi.ReturnType() {
-    const assembly = comptime swi.getAsm();
-    var ret: swi.ReturnType() = undefined;
-    asm volatile (assembly
-        : [ret] "={r0}" (ret),
-        : [r0] "{r0}" (r0),
-          [r1] "{r1}" (r1),
-        : "r0", "r1"
-    );
-    return ret;
-}
-
-// Specialized code for division, as it uses multiple return registers.
-fn call2Return3(comptime swi: Swi, r0: i32, r1: i32) DivResult {
-    const assembly = comptime swi.getAsm();
-    var quo: i32 = undefined;
-    var rem: i32 = undefined;
-    var abs: u32 = undefined;
-    asm volatile (assembly
-        : [quo] "={r0}" (quo),
-          [rem] "={r1}" (rem),
-          [abs] "={r3}" (abs),
-        : [r0] "{r0}" (r0),
-          [r1] "{r1}" (r1),
-    );
-
-    return .{
-        .quotient = quo,
-        .remainder = rem,
-        .absolute_quotient = abs,
-    };
-}
-
-fn call3Return0(comptime swi: Swi, r0: anytype, r1: anytype, r2: anytype) void {
-    const assembly = comptime swi.getAsm();
-    asm volatile (assembly
-        :
-        : [r0] "{r0}" (r0),
-          [r1] "{r1}" (r1),
-          [r2] "{r2}" (r2),
-        : "r0", "r1", "r2"
-    );
-}
-
-fn call3Return1(comptime swi: Swi, r0: anytype, r1: anytype, r2: anytype) swi.ReturnType() {
-    const assembly = comptime swi.getAsm();
-    var ret: swi.ReturnType() = undefined;
-    asm volatile (assembly
-        : [ret] "={r0}" (ret),
-        : [r0] "{r0}" (r0),
-          [r1] "{r1}" (r1),
-          [r2] "{r2}" (r2),
-        : "r0", "r1", "r2"
-    );
-    return ret;
-}
-
-fn call4Return0(comptime swi: Swi, r0: anytype, r1: anytype, r2: anytype, r3: anytype) void {
-    const assembly = comptime swi.getAsm();
-    asm volatile (assembly
-        :
-        : [r0] "{r0}" (r0),
-          [r1] "{r1}" (r1),
-          [r2] "{r2}" (r2),
-          [r3] "{r3}" (r3),
-        : "r0", "r1", "r2", "r3"
-    );
+    asm volatile ("swi 0xfa");
 }

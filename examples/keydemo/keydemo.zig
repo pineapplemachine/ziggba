@@ -4,11 +4,7 @@ const gba_pic = @import("gba_pic.zig");
 export var header linksection(".gbaheader") = gba.Header.init("KEYDEMO", "AKDE", "00", 0);
 
 fn loadImageData() void {
-    gba.mem.memcpy(
-        @ptrCast(gba.display.vram),
-        @ptrCast(&gba_pic.bitmap),
-        gba_pic.bitmap.len * 4,
-    );
+    gba.mem.memcpy(gba.display.vram, &gba_pic.bitmap, gba_pic.bitmap.len << 2);
     gba.display.memcpyBackgroundPalette(0, @ptrCast(&gba_pic.pal));
 }
 

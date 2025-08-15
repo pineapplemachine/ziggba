@@ -84,7 +84,7 @@ pub export fn main() void {
     // Main loop.
     while (true) {
         // Run this loop only once per frame.
-        gba.bios.waitVBlank();
+        gba.bios.vblankIntrWait();
         
         // Check the state of button inputs for this frame.
         input.poll();

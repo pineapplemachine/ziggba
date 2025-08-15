@@ -10,11 +10,7 @@ fn loadData() void {
     const screenblock = &gba.display.screenblocks[screenblock_index];
     gba.display.memcpyBackgroundPalette(0, @ptrCast(&brin.pal));
     gba.display.memcpyBackgroundTiles4Bpp(0, @ptrCast(&brin.tiles));
-    gba.mem.memcpy16(
-        @ptrCast(screenblock),
-        @ptrCast(&brin.map),
-        brin.map.len,
-    );
+    gba.mem.memcpy16(screenblock, &brin.map, brin.map.len);
 }
 
 pub export fn main() void {

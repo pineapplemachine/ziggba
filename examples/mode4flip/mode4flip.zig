@@ -7,16 +7,8 @@ const back_image_data align(4) = @embedFile("back.agi");
 const palette_data align(4) = @embedFile("mode4flip.agp");
 
 fn loadImageData() void {
-    gba.mem.memcpy(
-        @ptrCast(gba.display.vram),
-        @ptrCast(front_image_data),
-        front_image_data.len,
-    );
-    gba.mem.memcpy(
-        @ptrCast(gba.display.back_page),
-        @ptrCast(back_image_data),
-        back_image_data.len,
-    );
+    gba.mem.memcpy(gba.display.vram, front_image_data, front_image_data.len);
+    gba.mem.memcpy(gba.display.back_page, back_image_data, back_image_data.len);
     gba.display.memcpyBackgroundPalette(0, @ptrCast(@alignCast(palette_data)));
 }
 
