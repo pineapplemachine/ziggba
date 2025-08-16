@@ -55,6 +55,8 @@ SECTIONS
         . = ALIGN(4);
         __iwram_end__ = ABSOLUTE(.);
     } >iwram = 0xff
+    
+    . = __iwram_lma + __iwram_end__ - __iwram_start__;
 
     __data_lma = .;
     .data : AT(__data_lma) {
