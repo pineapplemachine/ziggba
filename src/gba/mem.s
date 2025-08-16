@@ -82,8 +82,10 @@ memcpy_arm:
 .memcpy_arm_loop_8:
     // Fallback loop for unreconcilable alignment
     subs    r2, r2, #1          // n -= 1
-    ldrbcs  r3, [r1]!           // if n >= 0: load mem @ src to r3; src += 1
-    strbcs  r3, [r0]!           // if n >= 0: store r3 mem @ dst; dst += 1
+    ldrbcs  r3, [r1]            // if n >= 0: load mem @ src to r3
+    strbcs  r3, [r0]            // if n >= 0: store r3 mem @ dst
+    add     r1, #1              // src += 1
+    add     r0, #1              // dst += 1
     bhi     .memcpy_arm_loop_8  // branch if n != 0
     bx      lr                  // return to thumb caller
 .memcpy_arm_dst_16_aligned:
@@ -92,8 +94,10 @@ memcpy_arm:
     b       .memcpy_arm_loop_8  // branch (unconditional)
 .memcpy_arm_both_16_unaligned:
     subs    r2, r2, #1          // n -= 1
-    ldrh    r3, [r1]!           // load mem @ src to r3; src += 2
-    strh    r3, [r0]!           // store r3 mem @ dst; dst += 2
+    ldrb    r3, [r1]            // load mem @ src to r3
+    strb    r3, [r0]            // store r3 mem @ dst
+    add     r1, #1              // src += 1
+    add     r0, #1              // dst += 1
 .memcpy_arm_cpy16_check_len:
     ands    r3, r2, #1          // lsb = n & 1
     beq     .memcpy_arm_cpy16_fallthrough // branch if lsb == 0
@@ -121,8 +125,10 @@ memcpy16_arm:
 .memcpy16_arm_loop_16:
     // Fallback loop for unreconcilable alignment
     subs    r2, r2, #1          // n -= 1
-    ldrhcs  r3, [r1]!           // if n >= 0: load mem @ src to r3; src += 2
-    strhcs  r3, [r0]!           // if n >= 0: store r3 mem @ dst; dst += 2
+    ldrhcs  r3, [r1]            // if n >= 0: load mem @ src to r3
+    strhcs  r3, [r0]            // if n >= 0: store r3 mem @ dst
+    add     r1, #2              // src += 2
+    add     r0, #2              // dst += 2
     bhi     .memcpy16_arm_loop_16 // branch if n != 0
     bx      lr                  // return to thumb caller
 .memcpy16_arm_dst_32_aligned:
@@ -131,16 +137,18 @@ memcpy16_arm:
     b       .memcpy16_arm_loop_16 // branch (unconditional)
 .memcpy16_arm_both_32_unaligned:
     subs    r2, r2, #1          // n -= 1
-    ldrh    r3, [r1]!           // load mem @ src to r3; src += 2
-    strh    r3, [r0]!           // store r3 mem @ dst; dst += 2
+    ldrh    r3, [r1]            // load mem @ src to r3
+    strh    r3, [r0]            // store r3 mem @ dst
+    add     r1, #2              // src += 2
+    add     r0, #2              // dst += 2
 .memcpy16_arm_cpy32_check_len:
     ands    r3, r2, #1          // lsb = n & 1
     beq     .memcpy16_arm_cpy32_fallthrough // branch if lsb == 0
     // Handle single extra half-word at end
-    add     r12, r1, r2         // r12 = src + n
-    ldrh    r3, [r12, #-1]      // load mem @ r12 - 1 to r3
-    add     r12, r0, r2         // r12 = dst + n
-    strh    r3, [r12, #-1]      // store r3 to mem @ r12 - 1
+    add     r12, r1, r2, lsl #1 // r12 = src + (n << 1)
+    ldrh    r3, [r12, #-2]      // load mem @ r12 - 2 to r3
+    add     r12, r0, r2, lsl #1 // r12 = dst + (n << 1)
+    strh    r3, [r12, #-2]      // store r3 to mem @ r12 - 2
 .memcpy16_arm_cpy32_fallthrough:
     movs    r2, r2, lsr #1      // n >>= 1
     // Falls through to memcpy32_arm like a tail call
@@ -166,8 +174,10 @@ memcpy32_arm:
     pop     {r4-r10}            // restore registers from stack
 .memcpy32_arm_loop_words:
     subs    r12, r12, #1        // n_words -= 1
-    ldrcs   r3, [r1]!           // if n_words >= 0: load mem @ src to r3; src += 4
-    strcs   r3, [r0]!           // if n_words >= 0: store r3 to mem @ dst; dst += 4
+    ldrcs   r3, [r1]            // if n_words >= 0: load mem @ src to r3
+    strcs   r3, [r0]            // if n_words >= 0: store r3 to mem @ dst
+    add     r1, #4              // src += 4
+    add     r0, #4              // dst += 4
     bhi     .memcpy32_arm_loop_words // branch if n_words != 0
     bx      lr                  // return to thumb caller
 
@@ -178,11 +188,18 @@ memcpy32_arm:
 memset_arm:
     ands    r3, r0, #1          // var lsb = dst & 1
     beq     .memset_arm_dst_16_aligned // branch if lsb == 0
-    strb    r1, [r0]!           // store r1 mem @ dst; dst += 1
+    strb    r1, [r0]            // store r1 mem @ dst; dst += 1
+    add     r0, #1              // dst += 1
+    subs    r2, r2, #1          // n -= 1
 .memset_arm_dst_16_aligned:
-    movs    r3, r1, lsl #8      // r3 = r1 << 8
-    orr     r1, r1, r3          // r1 = r1 | r3
+    ands    r3, r2, #1          // lsb = n & 1
+    beq     .memset_arm_dst_16_fallthrough // branch if lsb == 0
+    // Handle single extra byte at end
+    add     r12, r0, r2         // r12 = dst + n
+    strb    r1, [r12, #-1]      // store r3 to mem @ r12 - 1
+.memset_arm_dst_16_fallthrough:
     movs    r2, r2, lsr #1      // n >>= 1
+    orr     r1, r1, lsl #8      // r1 = r1 | (r1 << 8)
     // Falls through to memset16_arm like a tail call
 
 // Set half-word-aligned memory.
@@ -190,13 +207,20 @@ memset_arm:
 // r1: src Value to write.
 // r2: n Count (half words)
 memset16_arm:
-    ands    r3, r0, #1          // var lsb = dst & 1
+    ands    r3, r0, #3          // var lsb = dst & 3
     beq     .memset16_arm_dst_32_aligned // branch if lsb == 0
-    strh    r1, [r0]!           // store r1 mem @ dst; dst += 2
+    strh    r1, [r0]            // store r1 mem @ dst; dst += 2
+    add     r0, #2              // dst += 2
+    subs    r2, r2, #1          // n -= 1
 .memset16_arm_dst_32_aligned:
-    movs    r3, r1, lsl #16     // r3 = r1 << 16
-    orr     r1, r1, r3          // r1 = r1 | r3
+    ands    r3, r2, #1          // lsb = n & 1
+    beq     .memset16_arm_dst_32_fallthrough // branch if lsb == 0
+    // Handle single extra byte at end
+    add     r12, r0, r2, lsl #1  // r12 = dst + (n << 1)
+    strh    r1, [r12, #-2]      // store r3 to mem @ r12 - 1
+.memset16_arm_dst_32_fallthrough:
     movs    r2, r2, lsr #1      // n >>= 1
+    orr     r1, r1, lsl #16     // r1 = r1 | (r1 << 16)
     // Falls through to memset32_arm like a tail call
 
 // Set word-aligned memory.
@@ -213,20 +237,21 @@ memset32_arm:
     beq     .memset32_arm_loop_words // branch if n == 0
     push    {r4-r9}             // save registers on stack
     // Initialize registers for use with stmia
-    mov     r3, r0
-    mov     r4, r0
-    mov     r5, r0
-    mov     r6, r0
-    mov     r7, r0
-    mov     r8, r0
-    mov     r9, r0
+    mov     r3, r1
+    mov     r4, r1
+    mov     r5, r1
+    mov     r6, r1
+    mov     r7, r1
+    mov     r8, r1
+    mov     r9, r1
 .memset32_arm_loop_32b_chunks:
     stmia   r0!, {r1, r3-r9}    // store r1, r3..r9 to mem @ dst; dst += 32
     subs    r2, r2, #1          // n -= 1
     bhi     .memset32_arm_loop_32b_chunks // branch if n != 0
     pop     {r4-r9}             // restore registers from stack
 .memset32_arm_loop_words:
-    subs    r12, r12, #1          // n_words -= 1
-    strcs   r1, [r0]!           // if n_words >= 0: store r1 to mem @ dst; dst += 4
+    subs    r12, r12, #1        // n_words -= 1
+    strcs   r1, [r0]            // if n_words >= 0: store r1 to mem @ dst; dst += 4
+    add     r0, #4              // dst += 4
     bhi     .memset32_arm_loop_words // branch if n_words != 0
     bx      lr                  // return to thumb caller
