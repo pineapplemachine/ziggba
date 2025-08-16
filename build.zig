@@ -31,6 +31,7 @@ pub fn build(b: *std.Build) void {
     _ = gba.addGBAExecutable(b, "helloWorld", "examples/helloWorld/helloWorld.zig", text_options);
     _ = gba.addGBAExecutable(b, "interrupts", "examples/interrupts/interrupts.zig", text_options);
     _ = gba.addGBAExecutable(b, "keydemo", "examples/keydemo/keydemo.zig", .{});
+    _ = gba.addGBAExecutable(b, "memory", "examples/memory/memory.zig", text_options);
     _ = gba.addGBAExecutable(b, "mode3draw", "examples/mode3draw/mode3draw.zig", .{});
     _ = gba.addGBAExecutable(b, "mode4draw", "examples/mode4draw/mode4draw.zig", .{});
     _ = gba.addGBAExecutable(b, "objAffine", "examples/objAffine/objAffine.zig", .{});

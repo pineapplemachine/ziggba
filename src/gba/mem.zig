@@ -1,12 +1,12 @@
 //! Module for memory related functions and accesses
 
-const isAligned = @import("std").mem.isAligned;
+const builtin = @import("builtin");
+const std = @import("std");
 const gba = @import("gba.zig");
+const assert = @import("std").debug.assert;
 
 // TODO: Maybe make these volatile pointers to u8?
 // Access to base addresses for memory regions. Intended mostly for internal use.
-//
-// If you find yourself reaching for these often, consider filing an issue with your use case.
 /// Base address for external work RAM
 pub const ewram = 0x02000000;
 /// Base address for internal work RAM
@@ -24,93 +24,239 @@ pub const rom = 0x08000000;
 /// Base address for save RAM
 pub const sram = 0x0E000000;
 
-// TODO: maybe put this in IWRAM ?
-pub fn memcpy32(noalias dest: anytype, noalias source: anytype, count: usize) void {
-    if (count < 4) {
-        genericMemcpy(@ptrCast(dest), @ptrCast(source), count);
-    } else if (isAligned(@intFromPtr(dest), 4) and isAligned(@intFromPtr(source), 4)) {
-        alignedMemcpy(u32, @ptrCast(@alignCast(dest)), @ptrCast(@alignCast(source)), count);
-    } else if (isAligned(@intFromPtr(dest), 2) and isAligned(@intFromPtr(source), 2)) {
-        alignedMemcpy(u16, @ptrCast(@alignCast(dest)), @ptrCast(@alignCast(source)), count);
-    } else {
-        genericMemcpy(@ptrCast(dest), @ptrCast(source), count);
-    }
-}
+// These functions are implemented in assembly in `mem.s`.
+extern fn memcpy_thumb(dst: [*]volatile u8, src: [*]const volatile u8, n: u32) callconv(.c) void;
+extern fn memcpy16_thumb(dst: [*]volatile u16, src: [*]const volatile u16, n: u32) callconv(.c) void;
+extern fn memcpy32_thumb(dst: [*]volatile u32, src: [*]const volatile u32, n: u32) callconv(.c) void;
+extern fn memset_thumb(dst: [*]volatile u8, src: u8, n: u32) callconv(.c) void;
+extern fn memset16_thumb(dst: [*]volatile u16, src: u16, n: u32) callconv(.c) void;
+extern fn memset32_thumb(dst: [*]volatile u32, src: u32, n: u32) callconv(.c) void;
 
-pub fn memcpy16(noalias dest: anytype, noalias source: anytype, count: usize) void {
-    if (count < 2) {
-        genericMemcpy(@ptrCast(dest), @ptrCast(source), count);
-    } else if (isAligned(@intFromPtr(dest), 2) and isAligned(@intFromPtr(source), 2)) {
-        alignedMemcpy(u16, @ptrCast(@alignCast(dest)), @ptrCast(@alignCast(source)), count);
-    } else {
-        genericMemcpy(@ptrCast(dest), @ptrCast(source), count);
-    }
-}
-
-pub fn alignedMemcpy(
-    comptime T: type,
-    noalias dest: [*]align(@alignOf(T)) volatile u8,
-    noalias source: [*]align(@alignOf(T)) const u8,
-    bytes: usize,
+/// Copy memory from a source to a destination pointer.
+/// Use this function for pointers that aren't certain to be aligned on
+/// either a word or half-word boundary.
+/// May behave unpredictably if the source and destination buffers overlap.
+///
+/// Be careful of using this function when copying into VRAM.
+/// If both pointers aren't half-word aligned, then copying will not happen
+/// the way you probably expect.
+///
+/// Normally uses a function stored in the GBA's IWRAM, but also implements
+/// a fallback to run as you would expect in tests and at comptime where this
+/// is not available.
+pub fn memcpy(
+    /// Write copied memory here.
+    destination: *volatile anyopaque,
+    /// Read memory from here.
+    source: *const volatile anyopaque,
+    /// Number of bytes to copy.
+    count_bytes: u32,
 ) void {
-    @setRuntimeSafety(false);
-    const aligned_count = bytes / @sizeOf(T);
-    const rem_bytes = bytes % @sizeOf(T);
-
-    const aligned_dest: [*]volatile T = @ptrCast(dest);
-    const aligned_source: [*]const T = @ptrCast(source);
-
-    for (0..aligned_count) |index| {
-        aligned_dest[index] = aligned_source[index];
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        @memcpy(destination[0..count_bytes], source[0..count_bytes]);
     }
-
-    for (bytes - rem_bytes..bytes) |index| {
-        dest[index] = source[index];
+    else {
+        memcpy_thumb(@ptrCast(destination), @ptrCast(source), count_bytes);
     }
 }
 
-pub fn genericMemcpy(
-    noalias dest: [*]volatile u8,
-    noalias source: [*]const u8,
-    bytes: usize,
+/// Copy memory from a source to a destination pointer, when both pointers
+/// are aligned on a 16-bit half-word boundary.
+/// May behave unpredictably if the source and destination buffers overlap.
+///
+/// Normally uses a function stored in the GBA's IWRAM, but also implements
+/// a fallback to run as you would expect in tests and at comptime where this
+/// is not available.
+pub fn memcpy16(
+    /// Write copied memory here. Must be half-word-aligned.
+    destination: *align(2) volatile anyopaque,
+    /// Read memory from here. Must be half-word-aligned.
+    source: *align(2) const volatile anyopaque,
+    /// Number of 16-bit half words to copy.
+    count_half_words: u32,
 ) void {
-    @setRuntimeSafety(false);
-    for (0..bytes) |index| {
-        dest[index] = source[index];
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        @memcpy(destination[0..count_half_words], source[0..count_half_words]);
+    }
+    else {
+        memcpy16_thumb(@ptrCast(destination), @ptrCast(source), count_half_words);
     }
 }
 
-// TODO: maybe put it in IWRAM ?
-pub fn memset32(dest: anytype, value: u32, bytes: usize) void {
-    if (isAligned(@intFromPtr(dest), 4)) {
-        alignedMemset(u32, @ptrCast(@alignCast(dest)), value, bytes);
-    } else {
-        genericMemset(u32, @ptrCast(dest), value, bytes);
+/// Copy memory from a source to a destination pointer, when both pointers
+/// are aligned on a 32-bit word boundary.
+/// May behave unpredictably if the source and destination buffers overlap.
+///
+/// Normally uses a function stored in the GBA's IWRAM, but also implements
+/// a fallback to run as you would expect in tests and at comptime where this
+/// is not available.
+pub fn memcpy32(
+    /// Write copied memory here. Must be word-aligned.
+    destination: *align(4) volatile anyopaque,
+    /// Read memory from here. Must be word-aligned.
+    source: *align(4) const volatile anyopaque,
+    /// Number of 32-bit words to copy.
+    count_words: u32,
+) void {
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        @memcpy(destination[0..count_words], source[0..count_words]);
+    }
+    else {
+        memcpy32_thumb(@ptrCast(destination), @ptrCast(source), count_words);
     }
 }
 
-pub fn memset16(dest: anytype, value: u16, count: usize) void {
-    if (isAligned(@intFromPtr(dest), 2)) {
-        alignedMemset(u16, @ptrCast(@alignCast(dest)), value, count);
-    } else {
-        genericMemset(u16, @ptrCast(dest), value, count);
+/// Fill memory at a destination pointer with a given value.
+/// Works for any alignment.
+/// However, this function is not suitable for use with a destination in VRAM.
+///
+/// Normally uses a function stored in the GBA's IWRAM, but also implements
+/// a fallback to run as you would expect in tests and at comptime where this
+/// is not available.
+pub fn memset(
+    /// Write here, filling memory with `value`.
+    destination: *volatile anyopaque,
+    /// Value to store in the destination buffer.
+    value: u8,
+    /// Number of bytes to copy.
+    count_bytes: u32,
+) void {
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        @memset(destination[0..count_bytes], value);
+    }
+    else {
+        memset_thumb(@ptrCast(destination), value, count_bytes);
     }
 }
 
-pub fn alignedMemset(comptime T: type, dest: [*]align(@alignOf(T)) volatile u8, value: T, count: usize) void {
-    @setRuntimeSafety(false);
-    const aligned_dest: [*]volatile T = @ptrCast(dest);
-    for (0..count) |index| {
-        aligned_dest[index] = value;
+/// Fill memory at a destination pointer with a given value, when the
+/// destination is aligned on a 16-bit half-word boundary.
+///
+/// Normally uses a function stored in the GBA's IWRAM, but also implements
+/// a fallback to run as you would expect in tests and at comptime where this
+/// is not available.
+pub fn memset16(
+    /// Write here, filling memory with `value`. Must be half-word-aligned.
+    destination: *align(2) volatile anyopaque,
+    /// Value to store in the destination buffer.
+    value: u16,
+    /// Number of 16-bit half words to copy.
+    count_half_words: u32,
+) void {
+    assert((@intFromPtr(destination) & 1) == 0); // Check alignment
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        @memset(destination[0..count_half_words], value);
+    }
+    else {
+        memset16_thumb(@ptrCast(destination), value, count_half_words);
     }
 }
 
-pub fn genericMemset(comptime T: type, destination: [*]volatile u8, value: T, count: usize) void {
-    @setRuntimeSafety(false);
-    const value_bytes: [*]const u8 = @ptrCast(&value);
-    for (0..count) |index| {
-        inline for (0..@sizeOf(T)) |byte| {
-            destination[(index * @sizeOf(T)) + byte] = value_bytes[byte];
-        }
+/// Fill memory at a destination pointer with a given value, when the
+/// destination is aligned on a 32-bit word boundary.
+///
+/// Normally uses a function stored in the GBA's IWRAM, but also implements
+/// a fallback to run as you would expect in tests and at comptime where this
+/// is not available.
+pub fn memset32(
+    /// Write here, filling memory with `value`. Must be word-aligned.
+    destination: *align(4) volatile anyopaque,
+    /// Value to store in the destination buffer.
+    value: u32,
+    /// Number of 32-bit words to copy.
+    count_words: u32,
+) void {
+    assert((@intFromPtr(destination) & 3) == 0); // Check alignment
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        @memset(destination[0..count_words], value);
     }
+    else {
+        memset32_thumb(@ptrCast(destination), value, count_words);
+    }
+}
+
+/// Copy memory using the DMA.
+/// Interrupts are disabled while the copy is in progress.
+pub fn memcpyDma16(
+    /// Which DMA to use.
+    dma_index: u2,
+    /// Write copied memory here. Must be half-word-aligned.
+    destination: *align(2) volatile anyopaque,
+    /// Read memory from here. Must be half-word-aligned.
+    source: *align(2) const volatile anyopaque,
+    /// Number of 16-bit half-words to copy.
+    count_half_words: u16,
+) void {
+    gba.dma[dma_index].source = source;
+    gba.dma[dma_index].dest = destination;
+    gba.dma[dma_index].count = count_half_words;
+    gba.dma[dma_index].ctrl = gba.Dma.Control{
+        .size = .bits_16,
+        .enabled = true,
+    };
+}
+
+/// Copy memory using the DMA.
+/// Interrupts are disabled while the copy is in progress.
+pub fn memcpyDma32(
+    /// Which DMA to use.
+    dma_index: u2,
+    /// Write copied memory here. Must be word-aligned.
+    destination: *align(4) volatile anyopaque,
+    /// Read memory from here. Must be word-aligned.
+    source: *align(4) const volatile anyopaque,
+    /// Number of 32-bit words to copy.
+    count_words: u16,
+) void {
+    gba.dma[dma_index].source = source;
+    gba.dma[dma_index].dest = destination;
+    gba.dma[dma_index].count = count_words;
+    gba.dma[dma_index].ctrl = gba.Dma.Control{
+        .size = .bits_32,
+        .enabled = true,
+    };
+}
+
+/// Fill memory using the DMA.
+/// Interrupts are disabled while the writing is in progress.
+pub fn memsetDma16(
+    /// Which DMA to use.
+    dma_index: u2,
+    /// Write to memory here. Must be half-word-aligned.
+    destination: *align(2) volatile anyopaque,
+    /// Read a half-word from here. Must be half-word-aligned.
+    source: *align(2) const volatile anyopaque,
+    /// Number of 32-bit words to fill.
+    count_half_words: u16,
+) void {
+    gba.dma[dma_index].source = source;
+    gba.dma[dma_index].dest = destination;
+    gba.dma[dma_index].count = count_half_words;
+    gba.dma[dma_index].ctrl = gba.Dma.Control{
+        .source = .fixed,
+        .size = .bits_16,
+        .enabled = true,
+    };
+}
+
+/// Fill memory using the DMA.
+/// Interrupts are disabled while the writing is in progress.
+pub fn memsetDma32(
+    /// Which DMA to use.
+    dma_index: u2,
+    /// Write to memory here. Must be word-aligned.
+    destination: *align(4) volatile anyopaque,
+    /// Read a word from here. Must be word-aligned.
+    source: *align(4) const volatile anyopaque,
+    /// Number of 32-bit words to fill.
+    count_words: u16,
+) void {
+    gba.dma[dma_index].source = source;
+    gba.dma[dma_index].dest = destination;
+    gba.dma[dma_index].count = count_words;
+    gba.dma[dma_index].ctrl = gba.Dma.Control{
+        .source = .fixed,
+        .size = .bits_32,
+        .enabled = true,
+    };
 }

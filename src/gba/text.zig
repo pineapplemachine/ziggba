@@ -73,7 +73,7 @@ const charset_latin_data align(2) = blk: {
         break :blk @embedFile("ziggba_font_latin.bin").*;
     }
     else {
-        break :blk &charset_data_empty;
+        break :blk charset_data_empty;
     }
 };
 pub const charset_latin = Charset{
@@ -88,7 +88,7 @@ const charset_latin_supplement_data align(2) = blk: {
         break :blk @embedFile("ziggba_font_latin_supplement.bin").*;
     }
     else {
-        break :blk &charset_data_empty;
+        break :blk charset_data_empty;
     }
 };
 pub const charset_latin_supplement = Charset{
@@ -103,7 +103,7 @@ const charset_greek_data align(2) = blk: {
         break :blk @embedFile("ziggba_font_greek.bin").*;
     }
     else {
-        break :blk &charset_data_empty;
+        break :blk charset_data_empty;
     }
 };
 pub const charset_greek = Charset{
@@ -118,7 +118,7 @@ const charset_cyrillic_data align(2) = blk: {
         break :blk @embedFile("ziggba_font_cyrillic.bin").*;
     }
     else {
-        break :blk &charset_data_empty;
+        break :blk charset_data_empty;
     }
 };
 pub const charset_cyrillic = Charset{
@@ -133,7 +133,7 @@ const charset_arrows_data align(2) = blk: {
         break :blk @embedFile("ziggba_font_arrows.bin").*;
     }
     else {
-        break :blk &charset_data_empty;
+        break :blk charset_data_empty;
     }
 };
 pub const charset_arrows = Charset{
@@ -148,7 +148,7 @@ const charset_cjk_symbols_data align(2) = blk: {
         break :blk @embedFile("ziggba_font_cjk_symbols.bin").*;
     }
     else {
-        break :blk &charset_data_empty;
+        break :blk charset_data_empty;
     }
 };
 pub const charset_cjk_symbols = Charset{
@@ -163,7 +163,7 @@ const charset_kana_data align(2) = blk: {
         break :blk @embedFile("ziggba_font_kana.bin").*;
     }
     else {
-        break :blk &charset_data_empty;
+        break :blk charset_data_empty;
     }
 };
 pub const charset_kana = Charset{
@@ -178,7 +178,7 @@ const charset_fullwidth_punctuation_data align(2) = blk: {
         break :blk @embedFile("ziggba_font_fullwidth_punctuation.bin").*;
     }
     else {
-        break :blk &charset_data_empty;
+        break :blk charset_data_empty;
     }
 };
 pub const charset_fullwidth_punctuation = Charset{
@@ -193,7 +193,7 @@ const charset_fullwidth_latin_data align(2) = blk: {
         break :blk @embedFile("ziggba_font_fullwidth_latin.bin").*;
     }
     else {
-        break :blk &charset_data_empty;
+        break :blk charset_data_empty;
     }
 };
 pub const charset_fullwidth_latin = Charset{

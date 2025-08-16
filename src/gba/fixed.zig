@@ -603,7 +603,7 @@ pub const FixedI32R8 = packed struct(i32) {
         self: FixedI32R8,
         buffer: [*]volatile u8,
         options: FormatDecimalOptions,
-    ) u8 {
+    ) u32 {
         const int_value: i32 = (self.value >> 8) + @as(i32, (
             if(self.value < 0 and (self.value & 0xff) != 0) 1 else 0
         ));
@@ -620,7 +620,7 @@ pub const FixedI32R8 = packed struct(i32) {
             if(self.value >= 0) self.value & 0xff
             else (0x100 -% self.value) & 0xff
         ));
-        var total_len: u8 = int_len;
+        var total_len: u32 = int_len;
         if(frac_value > 0 or options.min_fraction_digits > 0) {
             buffer[int_len] = options.decimal_char;
             const frac_buffer = buffer + int_len + 1;

@@ -6,22 +6,32 @@ const gba = @import("gba.zig");
 /// It must be defined in user code.
 extern fn main() void;
 
-extern var __bss_lma: u8;
-extern var __bss_start__: u8;
-extern var __bss_end__: u8;
 extern var __data_lma: u8;
 extern var __data_start__: u8;
 extern var __data_end__: u8;
+extern var __iwram_lma: u8;
+extern var __iwram_start__: u8;
+extern var __iwram_end__: u8;
 
 export fn _start_zig() noreturn {
     // Use BIOS function to clear data.
-    gba.bios.resetRamRegisters(gba.bios.RamResetFlags.initFull());
+    gba.bios.registerRamReset(gba.bios.RegisterRamResetFlags.all);
     // Clear .bss section.
-    gba.mem.memset32(&__bss_start__, 0, @intFromPtr(&__bss_end__) - @intFromPtr(&__bss_start__));
+    // gba.mem.memset32(&__bss_start__, 0, @intFromPtr(&__bss_end__) - @intFromPtr(&__bss_start__));
+    // Copy .iwram section to IWRAM.
+    gba.bios.cpuSetCopy32(
+        @alignCast(@ptrCast(&__iwram_lma)),
+        @alignCast(@ptrCast(&__iwram_start__)),
+        @truncate(@intFromPtr(&__iwram_end__) - @intFromPtr(&__iwram_start__)),
+    );
     // Copy .data section to EWRAM.
-    gba.mem.memcpy32(&__data_start__, &__data_lma, @intFromPtr(&__data_end__) - @intFromPtr(&__data_start__));
+    gba.bios.cpuSetCopy32(
+        @alignCast(@ptrCast(&__data_lma)),
+        @alignCast(@ptrCast(&__data_start__)),
+        @truncate(@intFromPtr(&__data_end__) - @intFromPtr(&__data_start__)),
+    );
     // Initialize default ISR.
-    // TODO: Consider copying isr_default to IWRAM first?
+    // TODO: Consider putting isr_default in IWRAM?
     gba.interrupt.isr_default_redirect = gba.interrupt.isr_default_redirect_null;
     gba.interrupt.isr_ptr.* = &gba.interrupt.isr_default;
     // Call user's main.
