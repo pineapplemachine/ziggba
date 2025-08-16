@@ -102,7 +102,7 @@ pub fn soundBiasChange(level: bool) void {
         "swi 0x19"
         :
         : [level] "{r0}" (level),
-        : "r0"
+        : "r0", "r1", "r3"
     );
 }
 
@@ -112,7 +112,7 @@ pub fn soundDriverInit(sound_area: *SoundArea) void {
         "swi 0x1a"
         :
         : [sound_area] "{r0}" (sound_area),
-        : "r0"
+        : "r0", "r1", "r3"
     );
 }
 
@@ -122,23 +122,38 @@ pub fn soundDriverMode(options: SoundDriverModeOptions) void {
         "swi 0x1b"
         :
         : [options] "{r0}" (options),
-        : "r0"
+        : "r0", "r1", "r3"
     );
 }
 
 /// Wraps a `SoundDriverMain` BIOS call.
 pub fn soundDriverMain() void {
-    asm volatile ("swi 0x1c");
+    asm volatile (
+        "swi 0x1c"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
 
 /// Wraps a `SoundDriverVSync` BIOS call.
 pub fn soundDriverVSync() void {
-    asm volatile ("swi 0x1d");
+    asm volatile (
+        "swi 0x1d"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
 
 /// Wraps a `SoundChannelClear` BIOS call.
 pub fn soundChannelClear() void {
-    asm volatile ("swi 0x1e");
+    asm volatile (
+        "swi 0x1e"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
 
 /// Wraps a `MidiKey2Freq` BIOS call.
@@ -153,16 +168,26 @@ pub fn midiKey2Freq(
         : [wave_data] "{r0}" (wave_data),
           [midi_key] "{r1}" (midi_key),
           [fine_adjustment] "{r2}" (fine_adjustment),
-        : "r0", "r1", "r2"
+        : "r0", "r1", "r2", "r3", "cc"
     );
 }
 
 /// Wraps a `SoundDriverVSyncOff` BIOS call.
 pub fn soundDriverVSyncOff() void {
-    asm volatile ("swi 0x28");
+    asm volatile (
+        "swi 0x28"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
 
 /// Wraps a `SoundDriverVSyncOn` BIOS call.
 pub fn soundDriverVSyncOn() void {
-    asm volatile ("swi 0x29");
+    asm volatile (
+        "swi 0x29"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }

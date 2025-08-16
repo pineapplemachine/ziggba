@@ -62,13 +62,14 @@ pub fn cpuSet(
         }
     }
     else {
+        // TODO: All bios calls should be assumed to clobber r0, r1, r3
         asm volatile (
             "swi 0x0b"
             :
             : [source] "{r0}" (source),
               [destination] "{r1}" (destination),
               [options] "{r2}" (options),
-            : "r0", "r1", "r2", "cc", "memory"
+            : "r0", "r1", "r2", "r3", "cc", "memory"
         );
     }
 }
@@ -101,7 +102,7 @@ pub fn cpuFastSet(
             : [source] "{r0}" (source),
               [destination] "{r1}" (destination),
               [options] "{r2}" (options),
-            : "r0", "r1", "r2", "cc", "memory"
+            : "r0", "r1", "r2", "r3", "cc", "memory"
         );
     }
 }

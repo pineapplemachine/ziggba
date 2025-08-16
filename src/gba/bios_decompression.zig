@@ -90,7 +90,7 @@ pub fn bitUnPack(
         : [source] "{r0}" (source),
           [destination] "{r1}" (destination),
           [options] "{r2}" (options),
-        : "r0", "r1", "r2", "cc", "memory"
+        : "r0", "r1", "r2", "r3", "cc", "memory"
     );
 }
 
@@ -105,7 +105,7 @@ inline fn unComp(
         :
         : [source] "{r0}" (source),
           [destination] "{r1}" (destination),
-        : "r0", "r1", "cc", "memory"
+        : "r0", "r1", "r3", "cc", "memory"
     );
 }
 

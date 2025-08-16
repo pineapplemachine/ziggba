@@ -60,6 +60,7 @@ pub fn div(numerator: i32, denominator: i32) DivResult {
               [absolute_quotient] "={r3}" (absolute_quotient),
             : [numerator] "{r0}" (numerator),
               [denominator] "{r1}" (denominator),
+            : "r0", "r1", "r3", "cc"
         );
         return DivResult{
             .quotient = quotient,
@@ -98,6 +99,7 @@ pub fn divArm(numerator: i32, denominator: i32) DivResult {
               [absolute_quotient] "={r3}" (absolute_quotient),
             : [denominator] "{r0}" (denominator),
               [numerator] "{r1}" (numerator),
+            : "r0", "r1", "r3", "cc"
         );
         return DivResult{
             .quotient = quotient,
@@ -136,7 +138,7 @@ pub fn sqrt(x: u32) u16 {
             "swi 0x08"
             : [ret] "={r0}" (-> u16),
             : [x] "{r0}" (x),
-            : "r0"
+            : "r0", "r1", "r3", "cc"
         );
     }
 }
@@ -167,7 +169,7 @@ pub fn arctan(x: gba.FixedU16R14) gba.FixedU16R16 {
             "swi 0x09"
             : [ret] "={r0}" (-> gba.FixedU16R16),
             : [x] "{r0}" (x),
-            : "r0"
+            : "r0", "r1", "r3", "cc"
         );
     }
 }
@@ -212,7 +214,7 @@ pub fn arctan2(x: i16, y: i16) gba.FixedU16R16 {
             : [ret] "={r0}" (-> gba.FixedU16R16),
             : [x] "{r0}" (x),
               [y] "{r1}" (y),
-            : "r0", "r1"
+            : "r0", "r1", "r3", "cc"
         );
     }
 }
@@ -300,7 +302,7 @@ pub fn bgAffineSet(
             : [source] "{r0}" (source),
               [destination] "{r1}" (destination),
               [source_len] "{r2}" (source_len),
-            : "r0", "r1", "r2", "memory"
+            : "r0", "r1", "r2", "r3", "cc", "memory"
         );
     }
 }
@@ -403,7 +405,7 @@ pub fn objAffineSet(
               [destination] "{r1}" (destination),
               [source_len] "{r2}" (source_len),
               [offset] "{r3}" (offset),
-            : "r0", "r1", "r2", "memory"
+            : "r0", "r1", "r2", "r3", "cc", "memory"
         );
     }
 }

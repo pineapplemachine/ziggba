@@ -246,7 +246,12 @@ pub const Swi = enum(u8) {
 /// (0 means 0x08000000 and anything else means 0x02000000.)
 /// Wraps a `SoftReset` BIOS call.
 pub fn softReset() void {
-    asm volatile ("swi 0x00");
+    asm volatile (
+        "swi 0x00"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
 
 /// Flags accepted by the `registerRamReset` BIOS call.
@@ -281,7 +286,7 @@ pub fn registerRamReset(flags: RegisterRamResetFlags) void {
         "swi 0x01"
         :
         : [flags] "{r0}" (flags),
-        : "r0"
+        : "r0", "r1", "r3", "cc"
     );
 }
 
@@ -290,7 +295,12 @@ pub fn registerRamReset(flags: RegisterRamResetFlags) void {
 /// You probably want to enable some interrupts before using this.
 /// Wraps a `Halt` BIOS call.
 pub fn halt() void {
-    asm volatile ("swi 0x02");
+    asm volatile (
+        "swi 0x02"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
 
 /// Switches the system to a very low power mode.
@@ -300,7 +310,12 @@ pub fn halt() void {
 /// You probably want to turn off video and sound before using this.
 /// Wraps a `Stop` BIOS call.
 pub fn stop() void {
-    asm volatile ("swi 0x03");
+    asm volatile (
+        "swi 0x03"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
 
 /// Determines `intrWait` behavior.
@@ -324,7 +339,7 @@ pub fn intrWait(
         :
         : [wait_type] "{r0}" (wait_type),
           [interrupt_flags] "{r1}" (interrupt_flags),
-        : "r0", "r1"
+        : "r0", "r1", "r3", "cc"
     );
 }
 
@@ -340,7 +355,12 @@ pub fn intrWait(
 /// and `gba.interrupt.master.enable`. All three of these flags must be set in
 /// order for VBlank interrupts to occur.
 pub fn vblankIntrWait() void {
-    asm volatile ("swi 0x05");
+    asm volatile (
+        "swi 0x05"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
 
 pub const MultiBootParam = extern struct {
@@ -380,19 +400,29 @@ pub fn multiBoot(
         : [ret] "={r0}" (-> bool),
         : [param] "{r0}" (param),
           [transfer_mode] "{r1}" (transfer_mode),
-        : "r0", "r1"
+        : "r0", "r1", "r3", "cc"
     );
 }
 
 /// Reboots the GBA, including replaying the Nintendo intro.
 /// Wraps a `HardReset` BIOS call.
 pub fn hardReset() void {
-    asm volatile ("swi 0x26");
+    asm volatile (
+        "swi 0x26"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
 
 /// Unofficial SWI supported by some emulators, including mGBA.
 /// Prints UTF-8 encoded text from a buffer to a debug log.
 /// See `gba.debug`.
 pub fn agbPrintFlush() void {
-    asm volatile ("swi 0xfa");
+    asm volatile (
+        "swi 0xfa"
+        :
+        :
+        : "r0", "r1", "r3", "cc"
+    );
 }
