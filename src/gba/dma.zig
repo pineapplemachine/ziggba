@@ -34,9 +34,9 @@ pub const Dma = packed struct {
 
     pub const Size = enum(u1) {
         /// Transfer 16-bit half-words.
-        half_word,
+        bits_16,
         /// Transfer 32-bit words.
-        word,
+        bits_32,
     };
 
     /// Enumeration of DMA timing modes.
@@ -75,7 +75,7 @@ pub const Dma = packed struct {
         /// Must be false if gamepak_drq is used (DMA3 only).
         dma_repeat: bool = false,
         /// Whether to copy by 32-bit word or 16-bit half-word.
-        size: Size = .half_word,
+        size: Size = .bits_16,
         /// DMA3 only.
         gamepak_drq: bool = false,
         /// Timing mode. Specifies when the transfer should start. 
@@ -89,10 +89,10 @@ pub const Dma = packed struct {
 
     /// Source pointer to copy memory from.
     /// For DMA 0, can only be internal memory.
-    source: *const anyopaque,
+    source: *const volatile anyopaque,
     /// Destination pointer to copy memory to.
     /// For DMA 0-2, can only be internal memory.
-    dest: *anyopaque,
+    dest: *volatile anyopaque,
     /// Indicates various parameters for the transfer, including length.
     ctrl: Control,
 };
