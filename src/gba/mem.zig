@@ -125,7 +125,7 @@ pub fn memset(
         @memset(destination[0..count_bytes], value);
     }
     else {
-        memset_thumb(@ptrCast(destination), @ptrCast(value), count_bytes);
+        memset_thumb(@ptrCast(destination), value, count_bytes);
     }
 }
 
@@ -148,7 +148,7 @@ pub fn memset16(
         @memset(destination[0..count_half_words], value);
     }
     else {
-        memset16_thumb(@ptrCast(destination), @ptrCast(value), count_half_words);
+        memset16_thumb(@ptrCast(destination), value, count_half_words);
     }
 }
 
@@ -171,6 +171,6 @@ pub fn memset32(
         @memset(destination[0..count_words], value);
     }
     else {
-        memset32_thumb(@ptrCast(destination), @ptrCast(value), count_words);
+        memset32_thumb(@ptrCast(destination), value, count_words);
     }
 }
