@@ -22,11 +22,17 @@ var test_buffer_src: [test_buffers_len]u8 align(4) = blk: {
     break :blk buffer;
 };
 
-// TODO: try with test buffers in IWRAM
+/// Will hold CPU cycle counts for each memory copy or fill operation.
 var performance_test_times: [16]i32 = @splat(0);
+
+/// Will hold correctness test results for memcpy.
 var cpy_correctness_test_results: [64]bool = @splat(false);
+
+/// Will hold correctness test results for memset.
 var set_correctness_test_results: [16]bool = @splat(false);
 
+/// List of strings corresponding to the memory copy and fill functions
+/// pertaining to each performance test in `doMemTests`.
 const performance_test_names: [16][]const u8 = .{
     "memcpy",
     "memcpy16",
@@ -116,20 +122,7 @@ fn drawMemResults() void {
 }
 
 fn doMemTests() void {
-    gba.timers[0] = gba.Timer{
-        .counter = 0,
-        .ctrl = .{
-            .freq = .cycles_1,
-            .enable = true,
-        },
-    };
-    gba.timers[1] = gba.Timer{
-        .counter = 0,
-        .ctrl = .{
-            .mode = .cascade,
-            .enable = true,
-        },
-    };
+    // Run performance tests.
     for(0..16) |i| {
         const t_start: i32 = (
             gba.timers[0].counter |
@@ -265,6 +258,9 @@ fn doMemTests() void {
         );
         performance_test_times[i] = t_end -% t_start;
     }
+    // Run correctness tests for `memcpy`.
+    // Note that the `memcpy` function also calls `memcpy16` and `memcpy32`
+    // meaning it is not necessary to have separate coverage for each.
     for(0..64) |test_i| {
         const src_start_offset: u32 = @intCast(test_i & 0x3);
         const src_end_offset: u32 = @intCast((test_i >> 2) & 0x3);
@@ -288,6 +284,9 @@ fn doMemTests() void {
             }
         }
     }
+    // Run correctness tests for `memset`.
+    // Note that the `memset` function also calls `memset16` and `memset32`
+    // meaning it is not necessary to have separate coverage for each.
     for(0..16) |test_i| {
         const fill: u8 = 0x1e;
         const dst_start_offset: u32 = @intCast(test_i & 0x3);
@@ -310,11 +309,25 @@ fn doMemTests() void {
             }
         }
     }
-    
 }
 
 pub export fn main() void {
-    doMemTests();
+    // Initialize timers.
+    // These will be used to measure elapsed cycles for performance.
+    gba.timers[0] = gba.Timer{
+        .counter = 0,
+        .ctrl = .{
+            .freq = .cycles_1,
+            .enable = true,
+        },
+    };
+    gba.timers[1] = gba.Timer{
+        .counter = 0,
+        .ctrl = .{
+            .mode = .cascade,
+            .enable = true,
+        },
+    };
     
     // Initialize a color palette.
     gba.display.bg_palette.banks[0][0] = gba.Color.black;
@@ -329,6 +342,9 @@ pub export fn main() void {
     const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
     normal_bg_map.getBaseScreenblock().fillLinear(.{});
     
+    // Run memory performance and correctness tests.
+    doMemTests();
+    // Draw performance and correctness results to the screen.
     drawMemResults();
     
     // Initialize the display.
@@ -342,15 +358,8 @@ pub export fn main() void {
     gba.interrupt.enable.vblank = true;
     gba.interrupt.master.enable = true;
     
-    var input: gba.input.BufferedKeysState = .{};
-    
     // Main loop.
     while(true) {
         gba.bios.vblankIntrWait();
-        input.poll();
-        if(input.isJustPressed(.A)) {
-            doMemTests();
-            drawMemResults();
-        }
     }
 }
