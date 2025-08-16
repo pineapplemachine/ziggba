@@ -139,7 +139,7 @@ fn Bitmap(comptime Color: type, comptime width: u8, comptime height: u8) type {
 
         pub fn fill(color: Color) void {
             // TODO: clean this up when zig allows @ptrCast on slices changing length
-            gba.bios.cpuFastSet32(
+            gba.bios.cpuFastSetFill(
                 @ptrCast(&fullWordColor(color)),
                 @ptrCast(@alignCast(gba.display.currentPage())),
                 page_size >> 2,

@@ -171,7 +171,7 @@ pub inline fn cpuSetFill32(
 /// You can expect this to have very similar performance as `gba.mem.memcpy32`,
 /// but this function is more limited in that it can only operate on word
 /// counts that are multiples of 8.
-pub inline fn cpuFastCopy32(
+pub inline fn cpuFastSetCopy(
     source: *align(4) const volatile anyopaque,
     destination: *align(4) volatile anyopaque,
     count: u21,
@@ -190,7 +190,7 @@ pub inline fn cpuFastCopy32(
 /// You can expect this to have very similar performance as `gba.mem.memset32`,
 /// but this function is more limited in that it can only operate on word
 /// counts that are multiples of 8.
-pub inline fn cpuFastSet32(
+pub inline fn cpuFastSetFill(
     source: *align(4) const volatile anyopaque,
     destination: *align(4) volatile anyopaque,
     count: u21,

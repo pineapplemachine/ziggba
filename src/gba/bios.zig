@@ -31,8 +31,8 @@ pub const cpuSetCopy16 = @import("bios_cpuset.zig").cpuSetCopy16;
 pub const cpuSetCopy32 = @import("bios_cpuset.zig").cpuSetCopy32;
 pub const cpuSetFill16 = @import("bios_cpuset.zig").cpuSetFill16;
 pub const cpuSetFill32 = @import("bios_cpuset.zig").cpuSetFill32;
-pub const cpuFastCopy32 = @import("bios_cpuset.zig").cpuFastCopy32;
-pub const cpuFastSet32 = @import("bios_cpuset.zig").cpuFastSet32;
+pub const cpuFastSetCopy = @import("bios_cpuset.zig").cpuFastSetCopy;
+pub const cpuFastSetFill = @import("bios_cpuset.zig").cpuFastSetFill;
 
 // Imports for BIOS calls which decompress or decode data.
 pub const UnCompHeader = @import("bios_decompression.zig").UnCompHeader;
