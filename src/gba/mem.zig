@@ -185,12 +185,12 @@ pub fn memcpyDma16(
     /// Read memory from here. Must be half-word-aligned.
     source: *align(2) const volatile anyopaque,
     /// Number of 16-bit half-words to copy.
-    count_words: u16,
+    count_half_words: u16,
 ) void {
     gba.dma[dma_index].source = source;
     gba.dma[dma_index].dest = destination;
+    gba.dma[dma_index].count = count_half_words;
     gba.dma[dma_index].ctrl = gba.Dma.Control{
-        .count = count_words,
         .size = .bits_16,
         .enabled = true,
     };
@@ -210,8 +210,8 @@ pub fn memcpyDma32(
 ) void {
     gba.dma[dma_index].source = source;
     gba.dma[dma_index].dest = destination;
+    gba.dma[dma_index].count = count_words;
     gba.dma[dma_index].ctrl = gba.Dma.Control{
-        .count = count_words,
         .size = .bits_32,
         .enabled = true,
     };
@@ -231,8 +231,8 @@ pub fn memsetDma16(
 ) void {
     gba.dma[dma_index].source = source;
     gba.dma[dma_index].dest = destination;
+    gba.dma[dma_index].count = count_half_words;
     gba.dma[dma_index].ctrl = gba.Dma.Control{
-        .count = count_half_words,
         .source = .fixed,
         .size = .bits_16,
         .enabled = true,
@@ -249,12 +249,12 @@ pub fn memsetDma32(
     /// Read a word from here. Must be word-aligned.
     source: *align(4) const volatile anyopaque,
     /// Number of 32-bit words to fill.
-    count_half_words: u16,
+    count_words: u16,
 ) void {
     gba.dma[dma_index].source = source;
     gba.dma[dma_index].dest = destination;
+    gba.dma[dma_index].count = count_words;
     gba.dma[dma_index].ctrl = gba.Dma.Control{
-        .count = count_half_words,
         .source = .fixed,
         .size = .bits_32,
         .enabled = true,

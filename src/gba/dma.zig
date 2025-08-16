@@ -10,7 +10,7 @@ const gba = @import("gba.zig");
 ///
 /// Note that source and destination addresses only use the least significant
 /// 27 bits (for internal memory) or 28 bits (for any memory)
-pub const Dma = packed struct {
+pub const Dma = extern struct {
     pub const DestinationAdjustment = enum(u2) {
         /// Increment after each transfer.
         increment = 0,
@@ -56,14 +56,7 @@ pub const Dma = packed struct {
     };
 
     /// Represents the contents of REG_DMAxCNT registers.
-    pub const Control = packed struct(u32) {
-        /// Number of transfers.
-        /// Counts the number of words or half-words to transfer, depending
-        /// on `size`.
-        /// For DMA0-2, only the low 14 bits are used.
-        /// A value of zero is treated as max length, i.e. 0x4000 for DMA0-2
-        /// or 0x10000 for DMA3.
-        count: u16 = 0,
+    pub const Control = packed struct(u16) {
         /// Unused bits.
         _: u5 = 0,
         /// Destination pointer adjustment.
@@ -93,9 +86,16 @@ pub const Dma = packed struct {
     /// Destination pointer to copy memory to.
     /// For DMA 0-2, can only be internal memory.
     dest: *volatile anyopaque,
+    /// Number of transfers.
+    /// Counts the number of words or half-words to transfer, depending
+    /// on `size`.
+    /// For DMA0-2, only the low 14 bits are used.
+    /// A value of zero is treated as max length, i.e. 0x4000 for DMA0-2
+    /// or 0x10000 for DMA3.
+    count: u16 = 0,
     /// Indicates various parameters for the transfer, including length.
     ctrl: Control,
 };
 
 /// Direct memory access.
-pub const dma: *[4]Dma = @ptrFromInt(gba.mem.io + 0xB0);
+pub const dma: *volatile [4]Dma = @ptrFromInt(gba.mem.io + 0xB0);
