@@ -5,6 +5,14 @@ const std = @import("std");
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
+// Imports for DMA-related API.
+pub const Dma = @import("mem_dma.zig").Dma;
+pub const dma = @import("mem_dma.zig").dma;
+pub const memcpyDma16 = @import("mem_dma.zig").memcpyDma16;
+pub const memcpyDma32 = @import("mem_dma.zig").memcpyDma32;
+pub const memsetDma16 = @import("mem_dma.zig").memsetDma16;
+pub const memsetDma32 = @import("mem_dma.zig").memsetDma32;
+
 // TODO: Maybe make these volatile pointers to u8?
 // Access to base addresses for memory regions. Intended mostly for internal use.
 /// Base address for external work RAM
@@ -173,90 +181,4 @@ pub fn memset32(
     else {
         memset32_thumb(@ptrCast(destination), value, count_words);
     }
-}
-
-/// Copy memory using the DMA.
-/// Interrupts are disabled while the copy is in progress.
-pub fn memcpyDma16(
-    /// Which DMA to use.
-    dma_index: u2,
-    /// Write copied memory here. Must be half-word-aligned.
-    destination: *align(2) volatile anyopaque,
-    /// Read memory from here. Must be half-word-aligned.
-    source: *align(2) const volatile anyopaque,
-    /// Number of 16-bit half-words to copy.
-    count_half_words: u16,
-) void {
-    gba.dma[dma_index].source = source;
-    gba.dma[dma_index].dest = destination;
-    gba.dma[dma_index].count = count_half_words;
-    gba.dma[dma_index].ctrl = gba.Dma.Control{
-        .size = .bits_16,
-        .enabled = true,
-    };
-}
-
-/// Copy memory using the DMA.
-/// Interrupts are disabled while the copy is in progress.
-pub fn memcpyDma32(
-    /// Which DMA to use.
-    dma_index: u2,
-    /// Write copied memory here. Must be word-aligned.
-    destination: *align(4) volatile anyopaque,
-    /// Read memory from here. Must be word-aligned.
-    source: *align(4) const volatile anyopaque,
-    /// Number of 32-bit words to copy.
-    count_words: u16,
-) void {
-    gba.dma[dma_index].source = source;
-    gba.dma[dma_index].dest = destination;
-    gba.dma[dma_index].count = count_words;
-    gba.dma[dma_index].ctrl = gba.Dma.Control{
-        .size = .bits_32,
-        .enabled = true,
-    };
-}
-
-/// Fill memory using the DMA.
-/// Interrupts are disabled while the writing is in progress.
-pub fn memsetDma16(
-    /// Which DMA to use.
-    dma_index: u2,
-    /// Write to memory here. Must be half-word-aligned.
-    destination: *align(2) volatile anyopaque,
-    /// Read a half-word from here. Must be half-word-aligned.
-    source: *align(2) const volatile anyopaque,
-    /// Number of 32-bit words to fill.
-    count_half_words: u16,
-) void {
-    gba.dma[dma_index].source = source;
-    gba.dma[dma_index].dest = destination;
-    gba.dma[dma_index].count = count_half_words;
-    gba.dma[dma_index].ctrl = gba.Dma.Control{
-        .source = .fixed,
-        .size = .bits_16,
-        .enabled = true,
-    };
-}
-
-/// Fill memory using the DMA.
-/// Interrupts are disabled while the writing is in progress.
-pub fn memsetDma32(
-    /// Which DMA to use.
-    dma_index: u2,
-    /// Write to memory here. Must be word-aligned.
-    destination: *align(4) volatile anyopaque,
-    /// Read a word from here. Must be word-aligned.
-    source: *align(4) const volatile anyopaque,
-    /// Number of 32-bit words to fill.
-    count_words: u16,
-) void {
-    gba.dma[dma_index].source = source;
-    gba.dma[dma_index].dest = destination;
-    gba.dma[dma_index].count = count_words;
-    gba.dma[dma_index].ctrl = gba.Dma.Control{
-        .source = .fixed,
-        .size = .bits_32,
-        .enabled = true,
-    };
 }
