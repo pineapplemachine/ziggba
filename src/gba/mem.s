@@ -185,6 +185,7 @@ memcpy32_arm:
 // r0: dst Destination pointer in, end of destination buffer out
 // r1: src Value to write.
 // r2: n Count (bytes)
+// Clobbers r3 and r12
 memset_arm:
     ands    r3, r0, #1          // var lsb = dst & 1
     beq     .memset_arm_dst_16_aligned // branch if lsb == 0
@@ -206,6 +207,7 @@ memset_arm:
 // r0: dst Destination pointer in, end of destination buffer out (half-word-aligned)
 // r1: src Value to write.
 // r2: n Count (half words)
+// Clobbers r3 and r12
 memset16_arm:
     ands    r3, r0, #3          // var lsb = dst & 3
     beq     .memset16_arm_dst_32_aligned // branch if lsb == 0
@@ -216,7 +218,7 @@ memset16_arm:
     ands    r3, r2, #1          // lsb = n & 1
     beq     .memset16_arm_dst_32_fallthrough // branch if lsb == 0
     // Handle single extra byte at end
-    add     r12, r0, r2, lsl #1  // r12 = dst + (n << 1)
+    add     r12, r0, r2, lsl #1 // r12 = dst + (n << 1)
     strh    r1, [r12, #-2]      // store r3 to mem @ r12 - 1
 .memset16_arm_dst_32_fallthrough:
     movs    r2, r2, lsr #1      // n >>= 1
