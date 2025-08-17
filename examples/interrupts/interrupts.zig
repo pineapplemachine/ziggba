@@ -115,13 +115,13 @@ pub export fn main() void {
     gba.interrupt.enable.serial = true;
     // DMA
     gba.interrupt.enable.dma_0 = true;
-    gba.dma[0].ctrl.interrupt = true;
+    gba.mem.dma[0].ctrl.interrupt = true;
     gba.interrupt.enable.dma_1 = true;
-    gba.dma[1].ctrl.interrupt = true;
+    gba.mem.dma[1].ctrl.interrupt = true;
     gba.interrupt.enable.dma_2 = true;
-    gba.dma[2].ctrl.interrupt = true;
+    gba.mem.dma[2].ctrl.interrupt = true;
     gba.interrupt.enable.dma_3 = true;
-    gba.dma[3].ctrl.interrupt = true;
+    gba.mem.dma[3].ctrl.interrupt = true;
     // Keypad
     gba.interrupt.enable.keypad = true;
     gba.input.interrupt.* = gba.input.InterruptControl{
