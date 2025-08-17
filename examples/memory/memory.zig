@@ -2,8 +2,6 @@ const gba = @import("gba");
 
 export var header linksection(".gbaheader") = gba.Header.init("MEMORY", "AMEE", "00", 0);
 
-const hex_digits = "0123456789ABCDEF";
-
 const test_buffers_len = 0x1000;
 
 /// An empty buffer to be used for memory operations.
@@ -93,8 +91,8 @@ fn drawMemResults() void {
         const ok = cpy_correctness_test_results[i];
         const status_text_buffer: [3]u8 = .{
             'C',
-            hex_digits[(i >> 4) & 0xf],
-            hex_digits[i & 0xf],
+            gba.format.hex_digits_ascii[(i >> 4) & 0xf],
+            gba.format.hex_digits_ascii[i & 0xf],
         };
         gba.text.drawToCharblock4Bpp(.{
             .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
@@ -108,8 +106,8 @@ fn drawMemResults() void {
         const ok = set_correctness_test_results[i];
         const status_text_buffer: [3]u8 = .{
             'S',
-            hex_digits[(i >> 4) & 0xf],
-            hex_digits[i & 0xf],
+            gba.format.hex_digits_ascii[(i >> 4) & 0xf],
+            gba.format.hex_digits_ascii[i & 0xf],
         };
         gba.text.drawToCharblock4Bpp(.{
             .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
