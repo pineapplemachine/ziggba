@@ -188,7 +188,7 @@ memcpy32_arm:
 memset_arm:
     ands    r3, r0, #1          // var lsb = dst & 1
     beq     .memset_arm_dst_16_aligned // branch if lsb == 0
-    strb    r1, [r0]            // store r1 mem @ dst; dst += 1
+    strb    r1, [r0]            // store r1 mem @ dst
     add     r0, #1              // dst += 1
     subs    r2, r2, #1          // n -= 1
 .memset_arm_dst_16_aligned:
@@ -209,7 +209,7 @@ memset_arm:
 memset16_arm:
     ands    r3, r0, #3          // var lsb = dst & 3
     beq     .memset16_arm_dst_32_aligned // branch if lsb == 0
-    strh    r1, [r0]            // store r1 mem @ dst; dst += 2
+    strh    r1, [r0]            // store r1 mem @ dst
     add     r0, #2              // dst += 2
     subs    r2, r2, #1          // n -= 1
 .memset16_arm_dst_32_aligned:
@@ -251,7 +251,7 @@ memset32_arm:
     pop     {r4-r9}             // restore registers from stack
 .memset32_arm_loop_words:
     subs    r12, r12, #1        // n_words -= 1
-    strcs   r1, [r0]            // if n_words >= 0: store r1 to mem @ dst; dst += 4
+    strcs   r1, [r0]            // if n_words >= 0: store r1 to mem @ dst
     add     r0, #4              // dst += 4
     bhi     .memset32_arm_loop_words // branch if n_words != 0
     bx      lr                  // return to thumb caller
