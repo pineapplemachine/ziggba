@@ -1,13 +1,72 @@
 const std = @import("std");
+const Image = @import("image.zig").Image;
 const assert = @import("std").debug.assert;
-const zigimg = @import("zigimg/zigimg.zig");
-const getImagePixelRgba32 = @import("image.zig").getImagePixelRgba32;
+
+pub const Charset = struct {
+    pub const none: Charset = .init("", "", .{}, .{});
+    
+    /// Name of the charset, e.g. `"latin"`.
+    name: []const u8,
+    /// Name of image containing charset bitmap data.
+    image_name: []const u8,
+    /// Characters are placed on a grid with the given cell size in pixels.
+    grid_size: Size,
+    /// Subrect of the image to take character bitmap data from.
+    image_rect: Rect,
+    
+    pub fn init(
+        name: []const u8,
+        image_name: []const u8,
+        grid_size: Size,
+        image_rect: Rect,
+    ) Charset {
+        return .{
+            .name = name,
+            .image_name = image_name,
+            .grid_size = grid_size,
+            .image_rect = image_rect,
+        };
+    }
+};
+
+/// List of supported font charsets which can be individually selected
+/// for embedding, depending on one's expected usage of `gba.text`.
+pub const charsets = [_]Charset{
+    .init("latin", "latin", .init(8, 12), .init(0, 24, 128, 72)),
+    .init("latin_supplement", "latin", .init(8, 12), .init(0, 120, 128, 72)),
+    .init("greek", "greek", .init(8, 12), .init(0, 0, 128, 108)),
+    .init("cyrillic", "cyrillic", .init(9, 12), .init(0, 0, 144, 192)),
+    .init("arrows", "arrows", .init(10, 12), .init(0, 0, 160, 72)),
+    .init("kana", "kana", .init(10, 12), .init(0, 0, 160, 48)),
+    .init("fullwidth", "fullwidth", .init(10, 12), .init(0, 0, 160, 84)),
+    .init("cjk_symbols", "cjk_symbols", .init(10, 12), .init(0, 0, 160, 48)),
+};
+
+pub const CharsetFlags = struct {
+    pub const none: CharsetFlags = .{};
+    pub const all: CharsetFlags = blk: {
+        var flags: CharsetFlags = .{};
+        for(charsets) |charset| {
+            @field(flags, charset.name) = true;
+        }
+        break :blk flags;
+    };
+    
+    latin: bool = false,
+    latin_supplement: bool = false,
+    greek: bool = false,
+    cyrillic: bool = false,
+    arrows: bool = false,
+    kana: bool = false,
+    fullwidth: bool = false,
+    cjk_symbols: bool = false,
+};
 
 pub const Rect = struct {
-    x: usize,
-    y: usize,
-    width: usize,
-    height: usize,
+    x: usize = 0,
+    y: usize = 0,
+    width: usize = 0,
+    height: usize = 0,
     
     pub fn init(x: usize, y: usize, width: usize, height: usize) Rect {
         return .{
@@ -20,8 +79,8 @@ pub const Rect = struct {
 };
 
 pub const Size = struct {
-    width: usize,
-    height: usize,
+    width: usize = 0,
+    height: usize = 0,
     
     pub fn init(width: usize, height: usize) Size {
         return .{
@@ -32,9 +91,8 @@ pub const Size = struct {
 };
 
 /// Helper to check if a glyph pixel is set or not set.
-fn isImagePixelSet(image: zigimg.Image, x: usize, y: usize) bool {
-    const index = y * image.width + x;
-    const color = getImagePixelRgba32(image, index);
+fn isImagePixelSet(image: Image, x: usize, y: usize) bool {
+    const color = image.getPixelColor(@intCast(x), @intCast(y));
     return color.a == 0xff and (color.r != 0 or color.g != 0 or color.b != 0);
 }
 
@@ -47,7 +105,7 @@ pub const Glyph = struct {
     rows: std.ArrayList(u16),
 
     pub fn init(
-        image: zigimg.Image,
+        image: Image,
         image_rect: Rect,
         allocator: std.mem.Allocator,
     ) !Glyph {
@@ -60,8 +118,8 @@ pub const Glyph = struct {
             .rows = std.ArrayList(u16).init(allocator),
         };
         // Find bounds of image data within the grid cell rect.
-        for(image_rect.y..image_rect.y+image_rect.height) |px_y| {
-            for(image_rect.x..image_rect.x+image_rect.width) |px_x| {
+        for(image_rect.y..image_rect.y + image_rect.height) |px_y| {
+            for(image_rect.x..image_rect.x + image_rect.width) |px_x| {
                 if(isImagePixelSet(image, px_x, px_y)) {
                     glyph.x_min = @min(glyph.x_min, px_x);
                     glyph.x_max = @max(glyph.x_max, px_x + 1);
@@ -136,7 +194,7 @@ pub fn packFontPath(
     image_rect: Rect,
     allocator: std.mem.Allocator,
 ) ![]u8 {
-    var image = try zigimg.Image.fromFilePath(allocator, image_path);
+    var image = try Image.fromFilePath(allocator, image_path);
     defer image.deinit();
     return packFont(image, grid_size, image_rect, allocator);
 }
@@ -168,19 +226,19 @@ pub fn packSaveFontPath(
 /// This function converts monochrome image data (e.g. in PNG format)
 /// to a binary representation compatible with `gba.text`.
 pub fn packFont(
-    image: zigimg.Image,
+    image: Image,
     grid_size: Size,
     image_rect: Rect,
     allocator: std.mem.Allocator,
 ) ![]u8 {
     assert(grid_size.width > 0);
     assert(grid_size.height > 0);
+    assert(image_rect.x + image_rect.width <= image.getWidth());
+    assert(image_rect.y + image_rect.height <= image.getHeight());
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
     // Read glyphs from the image.
-    var glyphs = std.ArrayList(Glyph).init(allocator);
-    defer glyphs.deinit();
-    defer for(glyphs.items) |glyph| {
-        glyph.deinit();
-    };
+    var glyphs = std.ArrayList(Glyph).init(arena.allocator());
     const grid_cols = image_rect.width / grid_size.width;
     const grid_rows = image_rect.height / grid_size.height;
     for(0..grid_rows) |row| {
@@ -191,15 +249,14 @@ pub fn packFont(
                 .width = grid_size.width,
                 .height = grid_size.height,
             };
-            const glyph = try Glyph.init(image, grid_rect, allocator);
+            const glyph = try Glyph.init(image, grid_rect, arena.allocator());
             try glyphs.append(glyph);
         }
     }
     // Encode glyph data.
     var headers = std.ArrayList(u8).init(allocator);
-    var bitmaps = std.ArrayList(u8).init(allocator);
     defer headers.deinit();
-    defer bitmaps.deinit();
+    var bitmaps = std.ArrayList(u8).init(arena.allocator());
     const headers_len = glyphs.items.len * 4; // 4 bytes per glyph
     for(glyphs.items) |glyph| {
         var offset: usize = 0;

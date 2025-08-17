@@ -1,16 +1,13 @@
-const zigimg = @import("zigimg/zigimg.zig");
 const std = @import("std");
-const getImagePixelRgba32 = @import("image.zig").getImagePixelRgba32;
+const Image = @import("image.zig").Image;
+const ColorRgba32 = @import("image.zig").ColorRgba32;
+const Palettizer = @import("palettizer.zig").Palettizer;
 
 /// Enumeration of possible bit depths for GBA tile data. (Bits per pixel.)
 pub const Bpp = @import("../gba/color.zig").Color.Bpp;
 
 /// GBA 16-bit RGB555 color.
-pub const GBAColor = @import("../gba/color.zig").Color;
-/// RGB888 truecolor.
-pub const ColorRgb24 = zigimg.color.Rgb24;
-/// RGBA8888 truecolor with alpha channel.
-pub const ColorRgba32 = zigimg.color.Rgba32;
+pub const GbaColor = @import("../gba/color.zig").Color;
 
 /// Enumeration of options for how many blocks converted tile image data
 /// is intended to fit within.
@@ -38,35 +35,31 @@ pub const ConvertFit = enum(u3) {
 };
 
 /// Options expected by the convertTiles function, to determine its behavior.
-pub fn ConvertOptions(comptime PaletteCtxT: type) type {
-    return struct {
-        /// Allocator for intermediate memory allocations.
-        allocator: std.mem.Allocator,
-        /// Given a pixel location and color, get a palette index.
-        palette_fn: *const fn (x: u16, y: u16, color: ColorRgba32, bpp: Bpp, ctx: PaletteCtxT) u8,
-        /// Context object shared between invocations of the palette callback.
-        palette_ctx: PaletteCtxT,
-        /// Value to use for padding behavior with pad_fit and
-        /// pad_tiles settings.
-        pad: u8 = 0,
-        /// Produce an error if the tile data does not fit within
-        /// the given constraint.
-        fit: ConvertFit = .within_block,
-        /// Whether to write 4 or 8 bits per pixel.
-        bpp: Bpp,
-        /// If the amount of tile data is smaller than indicated by fit,
-        /// then pad the rest. (Does not apply when fit is unlimited.)
-        pad_fit: bool = false,
-        /// Pad the edges of the image to a multiple of 8 pixels,
-        /// instead of producing an error for strangely sized images.
-        pad_tiles: bool = false,
-        /// If not set, then an empty input image will trigger an error.
-        allow_empty: bool = false,
-    };
-}
+pub const ConvertImageTilesOptions = struct {
+    /// Allocator for intermediate memory allocations.
+    allocator: std.mem.Allocator,
+    /// Used to resolve palette indices from colors in the image.
+    palettizer: Palettizer,
+    /// Value to use for padding behavior with pad_fit and
+    /// pad_tiles settings.
+    pad: u8 = 0,
+    /// Produce an error if the tile data does not fit within
+    /// the given constraint.
+    fit: ConvertFit = .within_block,
+    /// Whether to write 4 or 8 bits per pixel.
+    bpp: Bpp,
+    /// If the amount of tile data is smaller than indicated by fit,
+    /// then pad the rest. (Does not apply when fit is unlimited.)
+    pad_fit: bool = false,
+    /// Pad the edges of the image to a multiple of 8 pixels,
+    /// instead of producing an error for strangely sized images.
+    pad_tiles: bool = false,
+    /// If not set, then an empty input image will trigger an error.
+    allow_empty: bool = false,
+};
 
 /// Returned by convertTiles.
-pub const ConvertOutput = struct {
+pub const ConvertImageTilesOutput = struct {
     /// Buffer containing output data.
     /// This is image data in a raw format, ready to be inserted into GBA VRAM.
     data: []u8,
@@ -75,16 +68,15 @@ pub const ConvertOutput = struct {
 };
 
 /// Errors that may be produced by convertTiles.
-pub const ConvertError = error{
+pub const ConvertImageTilesError = error{
     /// Palette function returned a value that was out of range given the
     /// image encoding settings.
     UnexpectedPaletteIndex,
     /// The image width and height were not both multiples of 8 pixels,
     /// and the "pad_tiles" option was not used.
     UnexpectedImageSize,
-    /// The image was in an unsupported pixel format.
-    /// Try converting it using image.convert before passing it.
-    UnexpectedImagePixelFormat,
+    /// Received an invalid or non-existent image.
+    InvalidImage,
     /// The image width and/or height was 0, and the "allow_empty"
     /// option was not used.
     EmptyImage,
@@ -95,143 +87,27 @@ pub const ConvertError = error{
     TooManyTiles,
 };
 
-/// Helper to convert GBA color (5 bits per channel) to truecolor
-/// (8 bits per channel).
-pub fn gbaColorToRgb24(color: GBAColor) ColorRgb24 {
-    // For 5-bit values, `(x << 3) | (x >> 2)` is almost exactly
-    // equivalent to `round(x * (255f / 31f))`.
-    return ColorRgb24{
-        .r = ((@as(u8, color.r) << 3) | (color.r >> 2)),
-        .g = ((@as(u8, color.g) << 3) | (color.g >> 2)),
-        .b = ((@as(u8, color.b) << 3) | (color.b >> 2)),
-    };
-}
-
-/// Convenience function for finding a best fit color within a truecolor
-/// palette to match a color found in an image.
-///
-/// When using this function, []ColorRgb24 should be provided as the CtxT
-/// comptime argument to a convertTiles call. Only the first 16 items are
-/// considered for 4bpp tiles, and only the first 256 items for 8bpp tiles.
-/// The first palette color is treated as full transparency, to reflect
-/// GBA rendering behavior.
-///
-/// Pixels with less than full 100% opacity are always matched with palette
-/// index 0. Otherwise, a perceptual color distance algorithm is used to
-/// match the nearest color that isn't at index 0.
-pub fn getNearestPaletteColor(
-    _: u16, // x
-    _: u16, // y
-    color: ColorRgba32,
-    bpp: Bpp,
-    pal: []const ColorRgb24,
-) u8 {
-    if (color.a < 0xff) {
-        // Transparent pixels are always palette index 0
-        return 0;
-    }
-    const pal_i_max: usize = if (bpp == .bpp_4) 0xf else 0xff;
-    var pal_i: usize = 1;
-    var pal_nearest_i: u8 = 0;
-    var pal_nearest_dist: i32 = 0;
-    while (pal_i <= pal_i_max and pal_i < pal.len) {
-        const pal_col = pal[pal_i];
-        const dr = color.r - @as(i32, pal_col.r);
-        const dg = color.g - @as(i32, pal_col.g);
-        const db = color.b - @as(i32, pal_col.b);
-        // Compute an approximation of perceptual color distance.
-        // Human eyes are most sensitive to differences in green and
-        // least sensitive to differences in blue.
-        const dist: i32 = (
-            ((dg * dg) << 2) +
-            ((dr * dr) << 1) +
-            (db * db)
-        );
-        if (pal_nearest_i <= 0 or dist < pal_nearest_dist) {
-            pal_nearest_i = @truncate(pal_i);
-            pal_nearest_dist = dist;
-        }
-        pal_i += 1;
-    }
-    return pal_nearest_i;
-}
-
-/// Convenience function for finding a best fit color within a GBA
-/// palette to match a color found in an image.
-/// When using this function, []GBAColor should be provided as the CtxT
-/// comptime argument to a convertTiles call. Only the first 16 items are
-/// considered for 4bpp tiles, and only the first 256 items for 8bpp tiles.
-/// The first palette color is treated as full transparency, to reflect
-/// GBA rendering behavior.
-pub fn getNearestGbaPaletteColor(
-    _: u16, // x
-    _: u16, // y
-    color: ColorRgba32,
-    bpp: Bpp,
-    pal: []const GBAColor,
-) u8 {
-    if (color.a < 0xff) {
-        // Transparent pixels are always palette index 0
-        return 0;
-    }
-    const pal_i_max: usize = if (bpp == .bpp_4) 0xf else 0xff;
-    var pal_i: usize = 1;
-    var pal_nearest_i: u8 = 0;
-    var pal_nearest_dist: i32 = 0;
-    while (pal_i <= pal_i_max and pal_i < pal.len) {
-        const pal_col = gbaColorToRgb24(pal[pal_i]);
-        const dr = color.r - @as(i32, pal_col.r);
-        const dg = color.g - @as(i32, pal_col.g);
-        const db = color.b - @as(i32, pal_col.b);
-        // Compute an approximation of perceptual color distance.
-        // Human eyes are most sensitive to differences in green and
-        // least sensitive to differences in blue.
-        const dist: i32 = (((dg * dg) << 2) +
-            ((dr * dr) << 1) +
-            (db * db));
-        if (pal_nearest_i <= 0 or dist < pal_nearest_dist) {
-            pal_nearest_i = pal_i;
-            pal_nearest_dist = dist;
-        }
-        pal_i += 1;
-    }
-    return pal_nearest_i;
-}
-
-/// This is a convenience wrapper around convertTiles which accepts
+/// This is a convenience wrapper around `convertImageTiles` which accepts
 /// an image file path to read image data from.
-pub fn convertImagePath(
-    comptime CtxT: type,
+pub fn convertImageTilesPath(
     image_path: []const u8,
-    opt: ConvertOptions(CtxT),
-) (
-    ConvertError ||
-    std.mem.Allocator.Error ||
-    zigimg.Image.ReadError ||
-    std.fs.File.OpenError
-)!ConvertOutput {
-    var image = try zigimg.Image.fromFilePath(opt.allocator, image_path);
+    options: ConvertImageTilesOptions,
+) !ConvertImageTilesOutput {
+    var image = try Image.fromFilePath(options.allocator, image_path);
     defer image.deinit();
-    return convertImage(CtxT, image, opt);
+    return convertImageTiles(image, options);
 }
 
-/// This is a convenience wrapper around convertTiles which accepts
+/// This is a convenience wrapper around `convertImageTiles` which accepts
 /// both an image file path to read image data from and an output file path
 /// to write the resulting data to.
 pub fn convertSaveImagePath(
-    comptime CtxT: type,
     image_path: []const u8,
     output_path: []const u8,
-    opt: ConvertOptions(CtxT),
-) (
-    ConvertError ||
-    std.mem.Allocator.Error ||
-    zigimg.Image.ReadError ||
-    std.fs.File.OpenError ||
-    std.posix.WriteError
-)!void {
-    const tiles_data = try convertImagePath(CtxT, image_path, opt);
-    defer opt.allocator.free(tiles_data.data);
+    options: ConvertImageTilesOptions,
+) !void {
+    const tiles_data = try convertImageTilesPath(image_path, options);
+    defer options.allocator.free(tiles_data.data);
     var file = try std.fs.cwd().createFile(output_path, .{});
     defer file.close();
     try file.writeAll(tiles_data.data);
@@ -248,50 +124,51 @@ pub fn convertSaveImagePath(
 /// The limit per charblock is 128 4bpp tiles or 64 8bpp tiles.
 /// When conversion is successful, the function returns a buffer allocated
 /// using the provided allocator, containing the converted image data.
-pub fn convertImage(
-    comptime CtxT: type,
-    image: zigimg.Image,
-    opt: ConvertOptions(CtxT),
-) (ConvertError || std.mem.Allocator.Error)!ConvertOutput {
-    if (image.pixelFormat() == .invalid) {
-        return ConvertError.UnexpectedImagePixelFormat;
+pub fn convertImageTiles(
+    image: Image,
+    options: ConvertImageTilesOptions,
+) !ConvertImageTilesOutput {
+    if (!image.isValid()) {
+        return ConvertImageTilesError.InvalidImage;
     }
     // Check image size
-    if (image.width > 0xffff or image.height > 0xffff) {
-        return ConvertError.ImageTooLarge;
+    if (image.getWidth() > 0xffff or image.getHeight() > 0xffff) {
+        return ConvertImageTilesError.ImageTooLarge;
     }
-    else if ((image.width <= 0 or image.height <= 0) and !opt.allow_empty) {
-        return ConvertError.EmptyImage;
+    else if (!options.allow_empty and (
+        image.getWidth() <= 0 or image.getHeight() <= 0
+    )) {
+        return ConvertImageTilesError.EmptyImage;
     }
-    var image_tiles_x: u16 = @truncate(image.width >> 3);
-    var image_tiles_y: u16 = @truncate(image.height >> 3);
-    if (image.width & 0x7 != 0) {
-        if (!opt.pad_tiles) {
-            return ConvertError.UnexpectedImageSize;
+    var image_tiles_x: u16 = @truncate(image.getWidth() >> 3);
+    var image_tiles_y: u16 = @truncate(image.getHeight() >> 3);
+    if (image.getWidth() & 0x7 != 0) {
+        if (!options.pad_tiles) {
+            return ConvertImageTilesError.UnexpectedImageSize;
         }
         image_tiles_x += 1;
     }
-    if (image.height & 0x7 != 0) {
-        if (!opt.pad_tiles) {
-            return ConvertError.UnexpectedImageSize;
+    if (image.getHeight() & 0x7 != 0) {
+        if (!options.pad_tiles) {
+            return ConvertImageTilesError.UnexpectedImageSize;
         }
         image_tiles_y += 1;
     }
-    const bpp_shift: u4 = if (opt.bpp == .bpp_4) 0 else 1;
+    const bpp_shift: u4 = if (options.bpp == .bpp_4) 0 else 1;
     const tile_count = image_tiles_x * image_tiles_y;
-    const tile_limit = (512 * @as(u16, @intFromEnum(opt.fit))) >> bpp_shift;
-    if (opt.fit == .unlimited) {
+    const tile_limit = (512 * @as(u16, @intFromEnum(options.fit))) >> bpp_shift;
+    if (options.fit == .unlimited) {
         if (tile_count >= 0xffff) {
-            return ConvertError.TooManyTiles;
+            return ConvertImageTilesError.TooManyTiles;
         }
     }
     else {
         if (tile_count > tile_limit) {
-            return ConvertError.TooManyTiles;
+            return ConvertImageTilesError.TooManyTiles;
         }
     }
     // Encode image data
-    var data = std.ArrayList(u8).init(opt.allocator);
+    var data = std.ArrayList(u8).init(options.allocator);
     defer data.deinit();
     var tile_x: u16 = 0;
     var tile_y: u16 = 0;
@@ -299,26 +176,23 @@ pub fn convertImage(
     for (0..tile_count) |_| {
         for (0..8) |pixel_y| {
             for (0..8) |pixel_x| {
-                const image_x = tile_x + pixel_x;
-                const image_y = tile_y + pixel_y;
-                const image_i = image_x + (image.width * image_y);
+                const image_x: u16 = @intCast(tile_x + pixel_x);
+                const image_y: u16 = @intCast(tile_y + pixel_y);
                 var pal_index: u8 = 0;
-                if (image_i >= image.pixels.len()) {
-                    pal_index = opt.pad;
+                if (!image.isInBounds(image_x, image_y)) {
+                    pal_index = options.pad;
                 }
                 else {
-                    const px = getImagePixelRgba32(image, image_i);
-                    pal_index = opt.palette_fn(
-                        @truncate(image_x),
-                        @truncate(image_y),
-                        px,
-                        opt.bpp,
-                        opt.palette_ctx,
-                    );
+                    pal_index = options.palettizer.get(.{
+                        .color = image.getPixelColor(pixel_x, pixel_y),
+                        .x = image_x,
+                        .y = image_y,
+                        .bpp = options.bpp,
+                    });
                 }
-                if (opt.bpp == .bpp_4) {
+                if (options.bpp == .bpp_4) {
                     if (pal_index >= 16) {
-                        return ConvertError.UnexpectedPaletteIndex;
+                        return ConvertImageTilesError.UnexpectedPaletteIndex;
                     }
                     if ((pixel_x & 1) != 0) {
                         try data.append(pal_index_prev | (pal_index << 4));
@@ -333,18 +207,69 @@ pub fn convertImage(
             }
         }
         tile_x += 8;
-        if (tile_x >= image.width) {
+        if (tile_x >= image.getWidth()) {
             tile_x = 0;
             tile_y += 8;
         }
     }
     // Apply padding, when necessary
-    if (opt.pad_fit and opt.fit != .unlimited and data.items.len < tile_limit) {
-        try data.appendNTimes(opt.pad, tile_limit - data.items.len);
+    if (options.pad_fit and options.fit != .unlimited and data.items.len < tile_limit) {
+        try data.appendNTimes(options.pad, tile_limit - data.items.len);
     }
     // All done
-    return ConvertOutput{
+    return ConvertImageTilesOutput{
         .data = try data.toOwnedSlice(),
         .count = tile_count,
     };
 }
+
+/// Convert an image as a build step.
+pub const ConvertImageTilesStep = struct {
+    pub const InitOptions = struct {
+        name: ?[]const u8 = null,
+        image_path: []const u8,
+        output_path: []const u8,
+        options: ConvertImageTilesOptions,
+    };
+    
+    step: std.Build.Step,
+    image_path: []const u8,
+    output_path: []const u8,
+    options: ConvertImageTilesOptions,
+    output: ?ConvertImageTilesOutput = null,
+    
+    pub fn init(b: *std.Build, options: InitOptions) ConvertImageTilesStep {
+        return .{
+            .image_path = options.image_path,
+            .output_path = options.output_path,
+            .options = options.options,
+            .step = std.Build.Step.init(.{
+                .id = .custom,
+                .owner = b,
+                .makeFn = make,
+                .name = options.name orelse b.fmt(
+                    "ConvertImageTilesStep {s} -> {s}",
+                    .{ options.image_path, options.output_path },
+                ),
+            }),
+        };
+    }
+    
+    fn make(
+        step: *std.Build.Step,
+        make_options: std.Build.Step.MakeOptions,
+    ) !void {
+        const self: *ConvertImageTilesStep = @fieldParentPtr("step", step);
+        const node_name = step.owner.fmt(
+            "Converting image tiles: {s} -> {s}",
+            .{ self.image_path, self.output_path },
+        );
+        var node = make_options.progress_node.start(node_name, 1);
+        defer node.end();
+        try convertSaveImagePath(
+            self.image_path,
+            self.output_path,
+            self.options,
+        );
+    }
+};
