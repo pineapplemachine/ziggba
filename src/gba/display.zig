@@ -183,7 +183,7 @@ pub const status: *volatile display.Status = @ptrFromInt(gba.mem.io + 0x04);
 pub const vcount: *align(2) const volatile u8 = @ptrFromInt(gba.mem.io + 0x06);
 
 /// Wait until VBlank.
-/// You probably want to use `gba.bios.waitVBlank` instead of this.
+/// You probably want to use `gba.bios.vblankIntrWait` instead of this.
 pub fn naiveVSync() void {
     while (vcount.* >= 160) {} // wait till VDraw
     while (vcount.* < 160) {} // wait till VBlank

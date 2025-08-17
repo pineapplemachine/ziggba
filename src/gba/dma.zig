@@ -1,8 +1,16 @@
 const gba = @import("gba.zig");
 
-/// Source and destination addresses only use the least significant
+/// DMA (direct memory access) can be used to copy or fill data between
+/// regions in memory.
+/// You should expect DMA copies to be little faster than `gba.bios.cpuFastCopy`
+/// and fills to be a little slower than `gba.bios.cpuFastSet`.
+/// The faster copies come with the tradeoff of disabling interrupts while the
+/// operation is ongoing, because the CPU is stopped while the DMA controller
+/// does its work.
+///
+/// Note that source and destination addresses only use the least significant
 /// 27 bits (for internal memory) or 28 bits (for any memory)
-pub const Dma = packed struct {
+pub const Dma = extern struct {
     pub const DestinationAdjustment = enum(u2) {
         /// Increment after each transfer.
         increment = 0,
@@ -26,9 +34,9 @@ pub const Dma = packed struct {
 
     pub const Size = enum(u1) {
         /// Transfer 16-bit half-words.
-        half_word,
+        bits_16,
         /// Transfer 32-bit words.
-        word,
+        bits_32,
     };
 
     /// Enumeration of DMA timing modes.
@@ -48,14 +56,7 @@ pub const Dma = packed struct {
     };
 
     /// Represents the contents of REG_DMAxCNT registers.
-    pub const Control = packed struct(u32) {
-        /// Number of transfers.
-        /// Counts the number of words or half-words to transfer, depending
-        /// on `size`.
-        /// For DMA0-2, only the low 14 bits are used.
-        /// A value of zero is treated as max length, i.e. 0x4000 for DMA0-2
-        /// or 0x10000 for DMA3.
-        count: u16 = 0,
+    pub const Control = packed struct(u16) {
         /// Unused bits.
         _: u5 = 0,
         /// Destination pointer adjustment.
@@ -67,7 +68,7 @@ pub const Dma = packed struct {
         /// Must be false if gamepak_drq is used (DMA3 only).
         dma_repeat: bool = false,
         /// Whether to copy by 32-bit word or 16-bit half-word.
-        size: Size = .half_word,
+        size: Size = .bits_16,
         /// DMA3 only.
         gamepak_drq: bool = false,
         /// Timing mode. Specifies when the transfer should start. 
@@ -81,13 +82,20 @@ pub const Dma = packed struct {
 
     /// Source pointer to copy memory from.
     /// For DMA 0, can only be internal memory.
-    source: *const anyopaque,
+    source: *const volatile anyopaque,
     /// Destination pointer to copy memory to.
     /// For DMA 0-2, can only be internal memory.
-    dest: *anyopaque,
+    dest: *volatile anyopaque,
+    /// Number of transfers.
+    /// Counts the number of words or half-words to transfer, depending
+    /// on `size`.
+    /// For DMA0-2, only the low 14 bits are used.
+    /// A value of zero is treated as max length, i.e. 0x4000 for DMA0-2
+    /// or 0x10000 for DMA3.
+    count: u16 = 0,
     /// Indicates various parameters for the transfer, including length.
     ctrl: Control,
 };
 
-/// Direct Memory Access.
-pub const dma: *[4]Dma = @ptrFromInt(gba.mem.io + 0xB0);
+/// Direct memory access.
+pub const dma: *volatile [4]Dma = @ptrFromInt(gba.mem.io + 0xB0);

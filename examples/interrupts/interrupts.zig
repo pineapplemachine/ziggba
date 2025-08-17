@@ -146,7 +146,7 @@ pub export fn main() void {
     
     // Main loop.
     while(true) : (frame_counter +%= 1) {
-        gba.bios.waitVBlank();
+        gba.bios.vblankIntrWait();
         drawInterruptNames();
     }
 }
