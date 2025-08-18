@@ -19,12 +19,12 @@ pub export fn main() void {
     gba.display.memcpyBackgroundTiles8Bpp(0, @ptrCast(&tiles_data));
     
     // Initialize a color palette.
-    gba.display.bg_palette.banks[0][0] = gba.Color.black;
-    gba.display.bg_palette.banks[0][1] = gba.Color.rgb(26, 26, 26);
-    gba.display.bg_palette.banks[0][2] = gba.Color.rgb(31, 0, 0);
-    gba.display.bg_palette.banks[0][3] = gba.Color.rgb(6, 31, 6);
-    gba.display.bg_palette.banks[0][4] = gba.Color.rgb(9, 22, 31);
-    gba.display.bg_palette.banks[0][15] = gba.Color.white;
+    gba.display.bg_palette.banks[0][0] = .black;
+    gba.display.bg_palette.banks[0][1] = .rgb(26, 26, 26);
+    gba.display.bg_palette.banks[0][2] = .rgb(31, 0, 0);
+    gba.display.bg_palette.banks[0][3] = .rgb(6, 31, 6);
+    gba.display.bg_palette.banks[0][4] = .rgb(9, 22, 31);
+    gba.display.bg_palette.banks[0][15] = .white;
     
     // Initialize a regular background. This will be used to display text.
     gba.bg.ctrl[0] = .{

@@ -7,8 +7,8 @@ pub export fn main() void {
     gba.debug.write("Hello, world!") catch {};
     
     // Initialize a color palette.
-    gba.display.bg_palette.banks[0][0] = gba.Color.black;
-    gba.display.bg_palette.banks[0][1] = gba.Color.white;
+    gba.display.bg_palette.banks[0][0] = .black;
+    gba.display.bg_palette.banks[0][1] = .white;
     
     // Initialize a background, to be used for displaying text.
     gba.bg.ctrl[0] = .{

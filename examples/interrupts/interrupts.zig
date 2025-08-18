@@ -55,9 +55,9 @@ fn handleInterrupt(flags: gba.interrupt.InterruptFlags) callconv(.c) void {
 
 pub export fn main() void {
     // Initialize a color palette.
-    gba.display.bg_palette.banks[0][0] = gba.Color.black;
-    gba.display.bg_palette.banks[0][1] = gba.Color.white;
-    gba.display.bg_palette.banks[0][2] = gba.Color.rgb(20, 20, 22);
+    gba.display.bg_palette.banks[0][0] = .black;
+    gba.display.bg_palette.banks[0][1] = .white;
+    gba.display.bg_palette.banks[0][2] = .rgb(20, 20, 22);
     
     // Initialize a background, to be used for displaying text.
     gba.bg.ctrl[0] = .{

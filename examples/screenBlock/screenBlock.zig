@@ -1,6 +1,4 @@
 const gba = @import("gba");
-const display = gba.display;
-const bg = gba.bg;
 
 export var gameHeader linksection(".gbaheader") = gba.Header.init("SCREENBLOCK", "ASBE", "00", 0);
 
@@ -14,11 +12,11 @@ fn screenIndex(tx: u32, ty: u32, pitch: u32) u32 {
 
 fn initMap() void {
     // Init background
-    bg.ctrl[0] = .{
+    gba.bg.ctrl[0] = .{
         .screen_base_block = 28,
         .tile_map_size = .{ .normal = .size_64x64 },
     };
-    bg.scroll[0].set(0, 0);
+    gba.bg.scroll[0].set(0, 0);
 
     // create the tiles: basic tile and a cross
     gba.display.bg_charblocks[0].bpp_4[0] = @bitCast([_]u32{
@@ -31,12 +29,12 @@ fn initMap() void {
     });
 
     // Create the background palette
-    gba.display.bg_palette.banks[0][1] = gba.Color.rgb(31, 0, 0);
-    gba.display.bg_palette.banks[1][1] = gba.Color.rgb(0, 31, 0);
-    gba.display.bg_palette.banks[2][1] = gba.Color.rgb(0, 0, 31);
-    gba.display.bg_palette.banks[3][1] = gba.Color.rgb(16, 16, 16);
+    gba.display.bg_palette.banks[0][1] = .red;
+    gba.display.bg_palette.banks[1][1] = .green;
+    gba.display.bg_palette.banks[2][1] = .blue;
+    gba.display.bg_palette.banks[3][1] = .rgb(16, 16, 16);
 
-    const bg0_map: [*]volatile bg.TextScreenEntry = @ptrCast(&bg.screen_block_ram[28]);
+    const bg0_map: [*]volatile gba.bg.TextScreenEntry = @ptrCast(&gba.bg.screen_block_ram[28]);
 
     // Create the map: four contigent blocks of 0x0000, 0x1000, 0x2000, 0x3000
     var map_index: usize = 0;
@@ -50,7 +48,7 @@ fn initMap() void {
 
 pub export fn main() void {
     initMap();
-    display.ctrl.* = .{
+    gba.display.ctrl.* = .{
         .bg0 = true,
         .obj = true,
     };
@@ -63,11 +61,11 @@ pub export fn main() void {
     var curr_screen_block: usize = 0;
     var prev_screen_block: usize = cross_ty * 32 + cross_tx;
 
-    const bg0_map: [*]volatile bg.TextScreenEntry = @ptrCast(&bg.screen_block_ram[28]);
+    const bg0_map: [*]volatile gba.bg.TextScreenEntry = @ptrCast(&gba.bg.screen_block_ram[28]);
     bg0_map[prev_screen_block].tile_index += 1;
 
     while (true) {
-        display.naiveVSync();
+        gba.display.naiveVSync();
 
         input.poll();
 
@@ -85,6 +83,6 @@ pub export fn main() void {
             prev_screen_block = curr_screen_block;
         }
 
-        bg.scroll[0].set(x, y);
+        gba.bg.scroll[0].set(x, y);
     }
 }

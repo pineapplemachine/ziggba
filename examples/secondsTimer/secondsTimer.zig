@@ -57,7 +57,8 @@ fn initMap() void {
     });
 
     // Initialize background palette
-    gba.display.bg_palette.colors[1] = gba.Color.rgb(31, 31, 31);
+    gba.display.bg_palette.colors[0] = .black;
+    gba.display.bg_palette.colors[1] = .white;
 
     // Initialize the map to all blank tiles
     const bg0_map: [*]volatile gba.bg.TextScreenEntry = (

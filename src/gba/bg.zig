@@ -1,9 +1,4 @@
 const gba = @import("gba.zig");
-const Color = gba.Color;
-const display = gba.display;
-const Priority = display.Priority;
-
-const bg = @This();
 
 /// Background size, in 8x8 tiles.
 pub const Size = packed union {
@@ -69,7 +64,7 @@ pub const Size = packed union {
 /// Represents the contents of REG_BGxCNT background control registers.
 pub const Control = packed struct(u16) {
     /// Determines drawing order of the four backgrounds.
-    priority: Priority = .highest,
+    priority: gba.display.Priority = .highest,
     /// Sets the charblock that serves as the base for tile indexing.
     /// Only the first four of six charblocks may be used for backgrounds
     /// in this way.
@@ -82,7 +77,7 @@ pub const Control = packed struct(u16) {
     /// Which format to expect charblock tile data to be in, whether
     /// 4bpp or 8bpp paletted.
     /// Affine backgrounds always use 8bpp.
-    palette_mode: Color.Bpp = .bpp_4,
+    palette_mode: gba.ColorRgb555.Bpp = .bpp_4,
     /// The screenblock that serves as the base for screen-entry/map indexing.
     /// Beware that screenblock memory is shared with charblock memory.
     /// Screenblocks 0-7 occupy the same memory as charblock 0,
@@ -108,7 +103,7 @@ pub const Control = packed struct(u16) {
 /// Mode 1 - Normal: 0, 1; Affine: 2
 ///
 /// Mode 2 - Affine: 2, 3
-pub const ctrl: *volatile [4]bg.Control = @ptrFromInt(gba.mem.io + 0x08);
+pub const ctrl: *volatile [4]Control = @ptrFromInt(gba.mem.io + 0x08);
 
 /// Only the lowest 10 bits are used
 pub const Scroll = packed struct {
@@ -123,11 +118,11 @@ pub const Scroll = packed struct {
 /// Controls background scroll. Values are modulo map size (wrapping is automatic)
 ///
 /// These registers are write only.
-pub const scroll: *[4]bg.Scroll = @ptrFromInt(gba.mem.io + 0x10);
+pub const scroll: *[4]Scroll = @ptrFromInt(gba.mem.io + 0x10);
 
 pub const TextScreenEntry = packed struct(u16) {
     tile_index: u10 = 0,
-    flip: display.Flip = .{},
+    flip: gba.display.Flip = .{},
     palette_index: u4 = 0,
 };
 
@@ -145,9 +140,9 @@ pub const Affine = extern struct {
 pub const AffineScreenEntry = u8;
 
 pub const TextScreenBlock = [1024]TextScreenEntry;
-pub const screen_block_ram: [*]volatile TextScreenBlock = @ptrCast(display.vram);
+pub const screen_block_ram: [*]volatile TextScreenBlock = @ptrCast(gba.display.vram);
 
-pub inline fn screenBlockMap(block: u5) [*]volatile bg.TextScreenEntry {
+pub inline fn screenBlockMap(block: u5) [*]volatile TextScreenEntry {
     return @ptrCast(&screen_block_ram[block]);
 }
 

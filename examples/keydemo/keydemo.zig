@@ -16,7 +16,7 @@ pub export fn main() void {
 
     loadImageData();
 
-    const color_up = gba.Color.rgb(27, 27, 29);
+    const color_up = gba.ColorRgb555.rgb(27, 27, 29);
     const button_palette_id = 5;
     const bank0 = &gba.display.bg_palette.banks[0];
 
@@ -32,11 +32,11 @@ pub export fn main() void {
         for (0..10) |i| {
             const key: gba.input.Key = @enumFromInt(i);
             bank0[button_palette_id + i] = if (input.isJustPressed(key))
-                gba.Color.red
+                gba.ColorRgb555.red
             else if (input.isJustReleased(key))
-                gba.Color.yellow
+                gba.ColorRgb555.yellow
             else if (input.isPressed(key))
-                gba.Color.lime
+                gba.ColorRgb555.green
             else
                 color_up;
         }
