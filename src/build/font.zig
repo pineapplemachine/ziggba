@@ -280,8 +280,7 @@ pub const BuildFontsStep = struct {
     step: std.Build.Step,
     b: *GbaBuild,
     
-    pub fn create(b: *GbaBuild, name: ?[]const u8) *BuildFontsStep {
-        const step_name = name orelse "BuildFontsStep";
+    pub fn create(b: *GbaBuild) *BuildFontsStep {
         const fonts_step = (
             b.allocator().create(BuildFontsStep) catch @panic("OOM")
         );
@@ -291,7 +290,7 @@ pub const BuildFontsStep = struct {
                 .id = .custom,
                 .owner = b.b,
                 .makeFn = make,
-                .name = step_name,
+                .name = "BuildFontsStep",
             }),
         };
         return fonts_step;

@@ -282,9 +282,8 @@ pub const GbaBuild = struct {
     /// PNG images to bitmap data in a compact binary format.
     pub fn addBuildFontsStep(
         self: *GbaBuild,
-        name: ?[]const u8,
     ) *font.BuildFontsStep {
-        return font.BuildFontsStep.create(self, name);
+        return font.BuildFontsStep.create(self);
     }
     
     pub fn addConvertImageTiles4BppStep(
@@ -355,9 +354,8 @@ pub const GbaExecutable = struct {
     /// Add a step that the executable depends on.
     pub fn addBuildFontsStep(
         self: *GbaExecutable,
-        name: ?[]const u8,
     ) *font.BuildFontsStep {
-        const step = font.BuildFontsStep.create(self.b, name);
+        const step = font.BuildFontsStep.create(self.b);
         self.dependOn(&step.step);
         return step;
     }

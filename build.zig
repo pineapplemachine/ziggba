@@ -10,7 +10,8 @@ pub fn build(std_b: *std.Build) void {
     
     // Build font data
     
-    _ = b.addBuildFontsStep("font");
+    const font_step = std_b.step("font", "Build fonts for gba.text");
+    font_step.dependOn(&b.addBuildFontsStep().step);
     
     // Examples
     
