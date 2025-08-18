@@ -12,22 +12,22 @@ pub const DivResult = packed struct {
 
 /// The `bgAffineSet` function expects a pointer argument to this struct.
 pub const BgAffineSource = extern struct {
-    original_x: gba.FixedI32R8 align(4),
-    original_y: gba.FixedI32R8 align(4),
+    original_x: gba.math.FixedI32R8 align(4),
+    original_y: gba.math.FixedI32R8 align(4),
     display_x: i16,
     display_y: i16,
-    scale_x: gba.FixedI16R8,
-    scale_y: gba.FixedI16R8,
+    scale_x: gba.math.FixedI16R8,
+    scale_y: gba.math.FixedI16R8,
     /// BIOS ignores the low 8 bits.
-    angle: gba.FixedU16R16,
+    angle: gba.math.FixedU16R16,
 };
 
 /// The `objAffineSet` function expects a pointer argument to this struct.
 pub const ObjAffineSource = packed struct {
-    scale_x: gba.FixedI16R8,
-    scale_y: gba.FixedI16R8,
+    scale_x: gba.math.FixedI16R8,
+    scale_y: gba.math.FixedI16R8,
     /// BIOS ignores the low 8 bits.
-    angle: gba.FixedU16R16,
+    angle: gba.math.FixedU16R16,
 };
 
 /// Divide the numerator by the denominator,
@@ -150,7 +150,7 @@ pub fn sqrt(x: u32) u16 {
 /// Normally uses a GBA BIOS function, but also implements a fallback to run
 /// as you would expect in tests and at comptime where the GBA BIOS is not
 /// available.
-pub fn arctan(x: gba.FixedU16R14) gba.FixedU16R16 {
+pub fn arctan(x: gba.math.FixedU16R14) gba.math.FixedU16R16 {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
         // Reference: https://github.com/ez-me/gba-bios
         const x2 = @as(i32, x.value) * @as(i32, x.value);
@@ -162,12 +162,12 @@ pub fn arctan(x: gba.FixedU16R14) gba.FixedU16R16 {
         b = ((b * a) >> 14) + 0x2081;
         b = ((b * a) >> 14) + 0x3651;
         b = ((b * a) >> 14) + 0xa2f9;
-        return (@as(i32, x.value) * b) >> 16;
+        return .initRaw((@as(i32, x.value) * b) >> 16);
     }
     else {
         return asm volatile (
             "swi 0x09"
-            : [ret] "={r0}" (-> gba.FixedU16R16),
+            : [ret] "={r0}" (-> gba.math.FixedU16R16),
             : [x] "{r0}" (x),
             : "r0", "r1", "r3", "cc"
         );

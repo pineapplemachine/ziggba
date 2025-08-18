@@ -28,12 +28,12 @@ const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
 test {
-    _ = @import("test/fixed_format.zig");
-    _ = @import("test/fixed_math.zig");
-    _ = @import("test/fixed_trig.zig");
+    _ = @import("test/math_fixed_format.zig");
+    _ = @import("test/math_fixed_math.zig");
+    _ = @import("test/math_fixed_trig.zig");
 }
 
-pub const FormatDecimalOptions = struct {
+pub const FormatDecimalFixedOptions = struct {
     /// Array of decimal digits, e.g. `'0'...'9'`.
     decimal_digits: [10]u8 = gba.format.decimal_digits_ascii,
     /// This character is prepended to negative numbers.
@@ -249,7 +249,7 @@ pub const FixedI16R8 = packed struct(i16) {
     pub fn formatDecimal(
         self: FixedI16R8,
         buffer: [*]volatile u8,
-        options: FormatDecimalOptions,
+        options: FormatDecimalFixedOptions,
     ) u8 {
         return self.toI32R8().formatDecimal(buffer, options);
     }
@@ -602,7 +602,7 @@ pub const FixedI32R8 = packed struct(i32) {
     pub fn formatDecimal(
         self: FixedI32R8,
         buffer: [*]volatile u8,
-        options: FormatDecimalOptions,
+        options: FormatDecimalFixedOptions,
     ) u32 {
         const int_value: i32 = (self.value >> 8) + @as(i32, (
             if(self.value < 0 and (self.value & 0xff) != 0) 1 else 0
@@ -786,6 +786,8 @@ pub const FixedI32R16 = packed struct(i32) {
         return a.value <= b.value;
     }
 };
+
+// TODO: Generic Vec2 type function(s)
 
 /// Represents a 2-vector whose X and Y components are `FixedI32R8` values.
 pub const FixedVec2I32R8 = extern struct {

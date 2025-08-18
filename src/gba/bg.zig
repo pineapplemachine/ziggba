@@ -128,12 +128,12 @@ pub const TextScreenEntry = packed struct(u16) {
 
 // TODO: This is currently only used by the BIOS API
 pub const Affine = extern struct {
-    pa: gba.FixedI16R8 align(2) = gba.FixedI16R8.initInt(1),
-    pb: gba.FixedI16R8 align(2) = .{},
-    pc: gba.FixedI16R8 align(2) = .{},
-    pd: gba.FixedI16R8 align(2) = gba.FixedI16R8.initInt(1),
-    dx: gba.FixedI32R8 align(4) = .{},
-    dy: gba.FixedI32R8 align(4) = .{},
+    pa: gba.math.FixedI16R8 align(2) = gba.math.FixedI16R8.initInt(1),
+    pb: gba.math.FixedI16R8 align(2) = .{},
+    pc: gba.math.FixedI16R8 align(2) = .{},
+    pd: gba.math.FixedI16R8 align(2) = gba.math.FixedI16R8.initInt(1),
+    dx: gba.math.FixedI32R8 align(4) = .{},
+    dy: gba.math.FixedI32R8 align(4) = .{},
 };
 
 /// An index to a color tile
@@ -153,13 +153,13 @@ pub const BackgroundAffine = extern struct {
     /// for use with affine backgrounds.
     ///
     /// Note that the highest 4 bits of each component are not used.
-    displace: gba.FixedVec2I32R8,
+    displace: gba.math.FixedVec2I32R8,
     
     pub const RotateScaleOptions = struct {
-        bg_origin: gba.FixedVec2I32R16 = .zero,
-        screen_origin: gba.FixedVec2I32R16 = .zero,
-        scale: gba.FixedVec2I32R16 = .one,
-        angle: gba.FixedU16R16 = .zero,
+        bg_origin: gba.math.FixedVec2I32R16 = .zero,
+        screen_origin: gba.math.FixedVec2I32R16 = .zero,
+        scale: gba.math.FixedVec2I32R16 = .one,
+        angle: gba.math.FixedU16R16 = .zero,
     };
     
     pub fn initRotScaleFast(options: RotateScaleOptions) BackgroundAffine {

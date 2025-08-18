@@ -72,7 +72,7 @@ pub export fn main() void {
     };
     
     // Initialize some important variables.
-    var angle: gba.FixedU16R16 = .{};
+    var angle: gba.math.FixedU16R16 = .{};
     var input: gba.input.KeysState = .{};
     
     // Enable VBlank interrupts.

@@ -26,24 +26,26 @@ pub fn hideAllObjects() void {
 ///
 /// Values start at index 3, and only every 4th value after that is really
 /// an affine value. Other values belong to object attributes.
-pub const affine_values: [*]gba.FixedI16R8 = @ptrFromInt(gba.mem.oam);
+pub const affine_values: [*]gba.math.FixedI16R8 = @ptrFromInt(gba.mem.oam);
+
+// TODO: Generic Matrix type
 
 /// Represents an affine transformation matrix.
 pub const AffineTransform = extern struct {
     /// Identity matrix. Applies no rotation, scaling, or shearing.
     pub const Identity: AffineTransform = (
-        .init(gba.FixedI16R8.initInt(1), .{}, .{}, gba.FixedI16R8.initInt(1))
+        .init(gba.math.FixedI16R8.initInt(1), .{}, .{}, gba.math.FixedI16R8.initInt(1))
     );
     
     /// Affine transformation matrix components, in row-major order.
-    values: [4]gba.FixedI16R8 = @splat(.{}),
+    values: [4]gba.math.FixedI16R8 = @splat(.{}),
     
     /// Initialize an `AffineTransform` matrix with the given components.
     pub fn init(
-        a: gba.FixedI16R8,
-        b: gba.FixedI16R8,
-        c: gba.FixedI16R8,
-        d: gba.FixedI16R8,
+        a: gba.math.FixedI16R8,
+        b: gba.math.FixedI16R8,
+        c: gba.math.FixedI16R8,
+        d: gba.math.FixedI16R8,
     ) AffineTransform {
         return AffineTransform{ .values = .{ a, b, c, d } };
     }
@@ -62,13 +64,16 @@ pub const AffineTransform = extern struct {
     
     /// Return a transformation matrix that will scale an object by the
     /// given amount on each axis.
-    pub fn scale(x: gba.FixedI16R8, y: gba.FixedI16R8) AffineTransform {
+    pub fn scale(
+        x: gba.math.FixedI16R8,
+        y: gba.math.FixedI16R8,
+    ) AffineTransform {
         return .init(x, .{}, .{}, y);
     }
     
     /// Return a rotation matrix that will scale an object by the
     /// given amount on each axis. Uses `sin_fast` and `cos_fast`.
-    pub fn rotateFast(angle: gba.FixedU16R16) AffineTransform {
+    pub fn rotateFast(angle: gba.math.FixedU16R16) AffineTransform {
         const sin_theta = angle.sinFast().toI16R8();
         const cos_theta = angle.cosFast().toI16R8();
         return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
@@ -76,7 +81,7 @@ pub const AffineTransform = extern struct {
     
     /// Return a rotation matrix that will scale an object by the
     /// given amount on each axis. Uses `sin_lerp` and `cos_lerp`.
-    pub fn rotateLerp(angle: gba.FixedU16R16) AffineTransform {
+    pub fn rotateLerp(angle: gba.math.FixedU16R16) AffineTransform {
         const sin_theta = angle.sinLerp().toI16R8();
         const cos_theta = angle.cosLerp().toI16R8();
         return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
@@ -181,7 +186,7 @@ pub const Obj = packed struct(u48) {
     /// Whether to use a 16-color or 256-color palette for this object.
     /// When using 4-bit color, the `Obj.palette` value indicates the
     /// which 16-color palette to use.
-    palette_mode: gba.Color.Bpp = .bpp_4,
+    palette_mode: gba.ColorRgb555.Bpp = .bpp_4,
     /// Used in combination with size. See `Obj.setSize`.
     shape: Shape = .square,
     /// For normal sprites, the left side; for affine sprites, the center

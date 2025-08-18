@@ -1,8 +1,8 @@
 const gba = @import("gba.zig");
 
-pub const Mode3 = Bitmap(gba.Color, 240, 160);
+pub const Mode3 = Bitmap(gba.ColorRgb555, 240, 160);
 pub const Mode4 = Bitmap(u8, 240, 160);
-pub const Mode5 = Bitmap(gba.Color, 160, 128);
+pub const Mode5 = Bitmap(gba.ColorRgb555, 160, 128);
 
 /// x, y coordinates
 const Point = [2]u8;
