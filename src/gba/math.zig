@@ -1,3 +1,9 @@
+//! This module contains math-related helpers.
+
+test {
+    _ = @import("math_fixed.zig");
+}
+
 pub const Rect = @import("math_geometry.zig").Rect;
 pub const RectI8 = @import("math_geometry.zig").RectI8;
 pub const RectU8 = @import("math_geometry.zig").RectU8;

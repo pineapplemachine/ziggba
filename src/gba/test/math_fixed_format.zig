@@ -8,7 +8,7 @@ const FixedI32R8 = gba.math.FixedI32R8;
 fn formatTest(
     expected: []const u8,
     value: FixedI32R8,
-    options: gba.fixed.FormatDecimalOptions,
+    options: gba.math.FormatDecimalFixedOptions,
 ) !void {
     var buffer: [256]u8 = @splat(0);
     const actual_len = value.formatDecimal(
