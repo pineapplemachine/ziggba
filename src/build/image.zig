@@ -1,84 +1,36 @@
 const zigimg = @import("zigimg/zigimg.zig");
 const std = @import("std");
 const assert = @import("std").debug.assert;
+const ColorRgba32 = @import("color.zig").ColorRgba32;
+const RectU16 = @import("../gba/math.zig").RectU16;
 
-pub const ColorRgba32 = packed struct(u32) {
-    pub const transparent: ColorRgba32 = .fromIntArgb(0);
-    pub const black: ColorRgba32 = .fromIntRgb(0);
-    pub const white: ColorRgba32 = .fromIntRgb(0xffffff);
-    pub const gray: ColorRgba32 = .fromIntRgb(0x808080);
-    pub const red: ColorRgba32 = .fromIntRgb(0xff0000);
-    pub const green: ColorRgba32 = .fromIntRgb(0x00ff00);
-    pub const blue: ColorRgba32 = .fromIntRgb(0x0000ff);
-    pub const yellow: ColorRgba32 = .fromIntRgb(0xffff00);
-    pub const cyan: ColorRgba32 = .fromIntRgb(0x00ffff);
-    pub const magenta: ColorRgba32 = .fromIntRgb(0xff00ff);
-    pub const orange: ColorRgba32 = .fromIntRgb(0xff8000);
-    pub const aqua: ColorRgba32 = .fromIntRgb(0x0080ff);
-    
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
-    
-    pub fn rgb(r: u8, g: u8, b: u8) ColorRgba32 {
-        return .{ .r = r, .g = g, .b = b, .a = 0xff };
-    }
-    
-    pub fn rgba(r: u8, g: u8, b: u8, a: u8) ColorRgba32 {
-        return .{ .r = r, .g = g, .b = b, .a = a };
-    }
-    
-    pub fn fromIntensity(i: u8) ColorRgba32 {
-        return .{ .r = i, .g = i, .b = i, .a = 0xff };
-    }
-    
-    pub fn fromIntensityAlpha(i: u8, a: u8) ColorRgba32 {
-        return .{ .r = i, .g = i, .b = i, .a = a };
-    }
-    
-    pub fn fromIntRgb(int_rgb: u32) ColorRgba32 {
-        return .rgb(
-            @intCast((int_rgb >> 16) & 0xff),
-            @intCast((int_rgb >> 8) & 0xff),
-            @intCast(int_rgb & 0xff),
-        );
-    }
-    
-    pub fn fromIntArgb(int_argb: u32) ColorRgba32 {
-        return .rgba(
-            @intCast((int_argb >> 16) & 0xff),
-            @intCast((int_argb >> 8) & 0xff),
-            @intCast(int_argb & 0xff),
-            @intCast((int_argb >> 24) & 0xff),
-        );
-    }
-    
-    pub fn toIntArgb(self: ColorRgba32) u32 {
-        return (
-            (@as(u32, self.a) << 24) |
-            (@as(u32, self.r) << 16) |
-            (@as(u32, self.g) << 8) |
-            self.b
-        );
-    }
-    
-    pub fn withRed(self: ColorRgba32, r: u8) ColorRgba32 {
-        return .{ .r = r, .g = self.g, .b = self.b, .a = self.a };
-    }
-    
-    pub fn withGreen(self: ColorRgba32, g: u8) ColorRgba32 {
-        return .{ .r = self.r, .g = g, .b = self.b, .a = self.a };
-    }
-    
-    pub fn withBlue(self: ColorRgba32, b: u8) ColorRgba32 {
-        return .{ .r = self.r, .g = self.g, .b = b, .a = self.a };
-    }
-    
-    pub fn withAlpha(self: ColorRgba32, a: u8) ColorRgba32 {
-        return .{ .r = self.r, .g = self.g, .b = self.b, .a = a };
-    }
-};
+pub const ConvertImageBitmap8BppOptions = @import("image_bitmap.zig").ConvertImageBitmap8BppOptions;
+pub const ConvertImageBitmap16BppOptions = @import("image_bitmap.zig").ConvertImageBitmap16BppOptions;
+pub const ConvertImageBitmap8BppOutput = @import("image_bitmap.zig").ConvertImageBitmap8BppOutput;
+pub const ConvertImageBitmap16BppOutput = @import("image_bitmap.zig").ConvertImageBitmap16BppOutput;
+pub const ConvertImageBitmap8BppError = @import("image_bitmap.zig").ConvertImageBitmap8BppError;
+pub const ConvertImageBitmap16BppError = @import("image_bitmap.zig").ConvertImageBitmap16BppError;
+pub const convertImageBitmap8BppPath = @import("image_bitmap.zig").convertImageBitmap8BppPath;
+pub const convertSaveImageBitmap8BppPath = @import("image_bitmap.zig").convertSaveImageBitmap8BppPath;
+pub const convertImageBitmap8Bpp = @import("image_bitmap.zig").convertImageBitmap8Bpp;
+pub const convertImageBitmap16BppPath = @import("image_bitmap.zig").convertImageBitmap16BppPath;
+pub const convertSaveImageBitmap16BppPath = @import("image_bitmap.zig").convertSaveImageBitmap16BppPath;
+pub const convertImageBitmap16Bpp = @import("image_bitmap.zig").convertImageBitmap16Bpp;
+pub const ConvertImageBitmap8BppStep = @import("image_bitmap.zig").ConvertImageBitmap8BppStep;
+pub const ConvertImageBitmap16BppStep = @import("image_bitmap.zig").ConvertImageBitmap16BppStep;
+
+pub const ConvertImageTiles4BppOptions = @import("image_tiles.zig").ConvertImageTiles4BppOptions;
+pub const ConvertImageTiles8BppOptions = @import("image_tiles.zig").ConvertImageTiles8BppOptions;
+pub const ConvertImageTiles4BppError = @import("image_tiles.zig").ConvertImageTiles4BppError;
+pub const ConvertImageTiles8BppError = @import("image_tiles.zig").ConvertImageTiles8BppError;
+pub const convertImageTiles4BppPath = @import("image_tiles.zig").convertImageTiles4BppPath;
+pub const convertSaveImageTiles4BppPath = @import("image_tiles.zig").convertSaveImageTiles4BppPath;
+pub const convertImageTiles4Bpp = @import("image_tiles.zig").convertImageTiles4Bpp;
+pub const convertImageTiles8BppPath = @import("image_tiles.zig").convertImageTiles8BppPath;
+pub const convertSaveImageTiles8BppPath = @import("image_tiles.zig").convertSaveImageTiles8BppPath;
+pub const convertImageTiles8Bpp = @import("image_tiles.zig").convertImageTiles8Bpp;
+pub const ConvertImageTiles4BppStep = @import("image_tiles.zig").ConvertImageTiles4BppStep;
+pub const ConvertImageTiles8BppStep = @import("image_tiles.zig").ConvertImageTiles8BppStep;
 
 /// Provides an interface for loading and reading image data.
 /// Wraps a `zigimg.Image`, but could wrap something else in the future
@@ -117,6 +69,20 @@ pub const Image = struct {
     /// Get the height of the image, in pixels.
     pub fn getHeight(self: Image) u16 {
         return @intCast(self.data.height);
+    }
+    
+    pub fn getRect(self: Image) RectU16 {
+        return .init(0, 0, self.getWidth(), self.getHeight());
+    }
+    
+    /// Returns the number of pixels, i.e. `width * height`.
+    pub fn getSizePixels(self: Image) u32 {
+        return @as(u32, self.getWidth()) * @as(u32, self.getHeight());
+    }
+    
+    /// Returns true when width or height is zero.
+    pub fn isEmpty(self: Image) bool {
+        return self.getWidth() <= 0 or self.getHeight() <= 0;
     }
     
     /// Get whether a pixel coordinate is within the image bounds.

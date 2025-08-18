@@ -173,34 +173,19 @@ pub const charset_kana = Charset{
     .data = &charset_kana_data,
 };
 
-const charset_fullwidth_punctuation_data align(2) = blk: {
-    if (build_options.text_charset_fullwidth_punctuation) {
-        break :blk @embedFile("ziggba_font_fullwidth_punctuation.bin").*;
+const charset_fullwidth_data align(2) = blk: {
+    if (build_options.text_charset_fullwidth) {
+        break :blk @embedFile("ziggba_font_fullwidth.bin").*;
     }
     else {
         break :blk charset_data_empty;
     }
 };
-pub const charset_fullwidth_punctuation = Charset{
-    .enabled = build_options.text_charset_fullwidth_punctuation,
+pub const charset_fullwidth = Charset{
+    .enabled = build_options.text_charset_fullwidth,
     .code_point_min = 0xff00,
-    .code_point_max = 0xff1f,
-    .data = &charset_fullwidth_punctuation_data,
-};
-
-const charset_fullwidth_latin_data align(2) = blk: {
-    if (build_options.text_charset_fullwidth_latin) {
-        break :blk @embedFile("ziggba_font_fullwidth_latin.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_fullwidth_latin = Charset{
-    .enabled = build_options.text_charset_fullwidth_latin,
-    .code_point_min = 0xff20,
     .code_point_max = 0xff60,
-    .data = &charset_fullwidth_latin_data,
+    .data = &charset_fullwidth_data,
 };
 
 pub const all_charsets = [_]Charset{
@@ -211,8 +196,7 @@ pub const all_charsets = [_]Charset{
     charset_arrows,
     charset_cjk_symbols,
     charset_kana,
-    charset_fullwidth_punctuation,
-    charset_fullwidth_latin,
+    charset_fullwidth,
 };
 
 const num_enabled_charsets: u8 = blk: {

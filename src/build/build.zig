@@ -2,12 +2,9 @@
 
 const std = @import("std");
 
-pub const GbaColor = @import("../gba/color.zig").Color;
+pub const color = @import("color.zig");
 pub const font = @import("font.zig");
 pub const image = @import("image.zig");
-pub const mode4 = @import("mode4.zig");
-pub const palettizer = @import("palettizer.zig");
-pub const tiles = @import("tiles.zig");
 
 fn libRootPath() []const u8 {
     const build_path = std.fs.path.dirname(@src().file) orelse ".";
@@ -69,6 +66,11 @@ pub const GbaBuild = struct {
             .optimize_mode = if(cli_options.debug) .Debug else .ReleaseFast,
             .gdb = cli_options.gdb,
         };
+    }
+    
+    /// Get the allocator belonging to the underling `std.Build` instance.
+    pub fn allocator(self: GbaBuild) std.mem.Allocator {
+        return self.b.allocator;
     }
     
     /// Get options passed via compiler arguments.
@@ -207,7 +209,7 @@ pub const GbaBuild = struct {
         rom_name: []const u8,
         source_file_path: []const u8,
         build_options: BuildOptions,
-    ) *std.Build.Step.Compile {
+    ) GbaExecutable {
         const exe = self.b.addExecutable(.{
             .name = rom_name,
             .target = self.thumb_target,
@@ -273,7 +275,7 @@ pub const GbaBuild = struct {
         install_bin_step.step.dependOn(&objcopy_step.step);
         self.b.default_step.dependOn(&install_bin_step.step);
         // Fin
-        return exe;
+        return .init(exe);
     }
     
     pub const BuildFontsDiagnostic = struct {
@@ -332,15 +334,144 @@ pub const GbaBuild = struct {
     /// Add a build step for building font data for `gba.text`, converting
     /// PNG images to bitmap data in a compact binary format.
     pub fn addBuildFontsStep(self: GbaBuild, name: []const u8) *std.Build.Step {
-        const step = self.b.step(name, "Build font data for gba.text");
+        const step = self.b.step(name, "Build font data for gba.text.");
         step.makeFn = GbaBuild.buildFontsStep;
         return step;
     }
     
-    pub fn addConvertImageTilesStep(
+    pub fn addConvertImageTiles4BppStep(
         self: GbaBuild,
-        options: tiles.ConvertImageTilesStep.InitOptions,
-    ) tiles.ConvertImageTilesStep {
-        return tiles.ConvertImageTilesStep.init(self.b, options);
+        options: image.ConvertImageTiles4BppStep.Options,
+    ) *image.ConvertImageTiles4BppStep {
+        return image.ConvertImageTiles4BppStep.create(self.b, options);
+    }
+    
+    pub fn addConvertImageTiles8BppStep(
+        self: GbaBuild,
+        options: image.ConvertImageTiles8BppStep.Options,
+    ) *image.ConvertImageTiles8BppStep {
+        return image.ConvertImageTiles8BppStep.create(self.b, options);
+    }
+    
+    pub fn addConvertImageBitmap8BppStep(
+        self: GbaBuild,
+        options: image.ConvertImageBitmap8BppStep.Options,
+    ) *image.ConvertImageBitmap8BppStep {
+        return image.ConvertImageBitmap8BppStep.create(self.b, options);
+    }
+    
+    pub fn addConvertImageBitmap16BppStep(
+        self: GbaBuild,
+        options: image.ConvertImageBitmap16BppStep.Options,
+    ) *image.ConvertImageBitmap16BppStep {
+        return image.ConvertImageBitmap16BppStep.create(self.b, options);
+    }
+    
+    pub fn addSavePaletteStep(
+        self: GbaBuild,
+        options: color.SavePaletteStep.Options,
+    ) *color.SavePaletteStep {
+        return color.SavePaletteStep.create(self.b, options);
+    }
+    
+    pub fn addSaveQuantizedPalettizerPaletteStep(
+        self: GbaBuild,
+        options: color.SaveQuantizedPalettizerPaletteStep.Options,
+    ) *color.SaveQuantizedPalettizerPaletteStep {
+        return color.SaveQuantizedPalettizerPaletteStep.create(self.b, options);
+    }
+};
+
+pub const GbaExecutable = struct {
+    step: *std.Build.Step.Compile,
+    
+    pub fn init(step: *std.Build.Step.Compile) GbaExecutable {
+        return .{ .step = step };
+    }
+    
+    pub fn getOwner(self: GbaExecutable) *std.Build {
+        return self.step.step.owner;
+    }
+    
+    pub fn dependOn(self: *GbaExecutable, step: *std.Build.Step) void {
+        self.step.step.dependOn(step);
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addConvertImageTiles4BppStep(
+        self: *GbaExecutable,
+        options: image.ConvertImageTiles4BppStep.Options,
+    ) *image.ConvertImageTiles4BppStep {
+        const step = image.ConvertImageTiles4BppStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addConvertImageTiles8BppStep(
+        self: *GbaExecutable,
+        options: image.ConvertImageTiles8BppStep.Options,
+    ) *image.ConvertImageTiles8BppStep {
+        const step = image.ConvertImageTiles8BppStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addConvertImageBitmap8BppStep(
+        self: *GbaExecutable,
+        options: image.ConvertImageBitmap8BppStep.Options,
+    ) *image.ConvertImageBitmap8BppStep {
+        const step = image.ConvertImageBitmap8BppStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addConvertImageBitmap16BppStep(
+        self: *GbaExecutable,
+        options: image.ConvertImageBitmap16BppStep.Options,
+    ) *image.ConvertImageBitmap16BppStep {
+        const step = image.ConvertImageBitmap16BppStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addSavePaletteStep(
+        self: *GbaExecutable,
+        options: color.SavePaletteStep.Options,
+    ) *color.SavePaletteStep {
+        const step = color.SavePaletteStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addSaveQuantizedPalettizerPaletteStep(
+        self: *GbaExecutable,
+        options: color.SaveQuantizedPalettizerPaletteStep.Options,
+    ) *color.SaveQuantizedPalettizerPaletteStep {
+        const step = color.SaveQuantizedPalettizerPaletteStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
     }
 };

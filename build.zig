@@ -27,53 +27,57 @@ pub fn build(std_b: *std.Build) void {
     _ = b.addExecutable("screenBlock", "examples/screenBlock/screenBlock.zig", .{});
     _ = b.addExecutable("tileDemo", "examples/tileDemo/tileDemo.zig", .{});
     
-    const bgAffine = b.addExecutable("bgAffine", "examples/bgAffine/bgAffine.zig", .{ .text_charsets = .all });
-    const bgAffine_tiles = b.addConvertImageTilesStep(.{
+    var bgAffine = b.addExecutable("bgAffine", "examples/bgAffine/bgAffine.zig", .{ .text_charsets = .all });
+    const bgAffine_pal = gba.color.PalettizerNearest.create(
+        b.allocator(),
+        &[_]gba.color.ColorRgba32 {
+            .transparent,
+            .white,
+            .red,
+            .green,
+            .aqua,
+        },
+    ) catch @panic("OOM");
+    _ = bgAffine.addConvertImageTiles8BppStep(.{
         .image_path = "examples/bgAffine/tiles.png",
         .output_path = "examples/bgAffine/tiles.bin",
-        .options = .{
-            .allocator = std.heap.page_allocator,
-            .bpp = .bpp_8, // Affine backgrounds require 8bpp tile data
-            .palettizer = gba.palettizer.PalettizerNearest.init(&[_]gba.image.ColorRgba32 {
-                .transparent,
-                .white,
-                .red,
-                .green,
-                .aqua,
-            }).pal(),
-        },
+        .options = .{ .palettizer = bgAffine_pal.pal() },
     });
-    bgAffine.dependOn(&bgAffine_tiles.step);
     
-    var jesuMusic_palette = [_]gba.tiles.ColorRgb24 {
-        .{ .r = 0, .g = 0, .b = 0 }, // Transparency
-        .{ .r = 255, .g = 255, .b = 255 },
-        .{ .r = 0, .g = 0, .b = 0 },
-    };
-    _ = b.addExecutable("jesuMusic", "examples/jesuMusic/jesuMusic.zig", .{});
-    gba.tiles.convertSaveImagePath(
-        []gba.tiles.ColorRgb24,
-        "examples/jesuMusic/charset.png",
-        "examples/jesuMusic/charset.bin",
-        .{
-            .allocator = std.heap.page_allocator,
-            .bpp = .bpp_4,
-            .palette_fn = gba.tiles.getNearestPaletteColor,
-            .palette_ctx = jesuMusic_palette[0..],
+    var jesuMusic = b.addExecutable("jesuMusic", "examples/jesuMusic/jesuMusic.zig", .{});
+    const jesuMusic_pal = gba.color.PalettizerNearest.create(
+        b.allocator(),
+        &[_]gba.color.ColorRgba32 {
+            .transparent,
+            .white,
+            .black,
         },
-    ) catch {};
+    ) catch @panic("OOM");
+    _ = jesuMusic.addConvertImageTiles4BppStep(.{
+        .image_path = "examples/jesuMusic/charset.png",
+        .output_path = "examples/jesuMusic/charset.bin",
+        .options = .{ .palettizer = jesuMusic_pal.pal() },
+    });
 
-    const mode4flip = b.addExecutable("mode4flip", "examples/mode4flip/mode4flip.zig", .{});
-    gba.mode4.convertMode4Images(mode4flip, &[_]gba.mode4.ImageSourceTarget{
-        .{
-            .source = "examples/mode4flip/front.bmp",
-            .target = "examples/mode4flip/front.agi",
-        },
-        .{
-            .source = "examples/mode4flip/back.bmp",
-            .target = "examples/mode4flip/back.agi",
-        },
-    }, "examples/mode4flip/mode4flip.agp");
+    var mode4flip = b.addExecutable("mode4flip", "examples/mode4flip/mode4flip.zig", .{});
+    const mode4flip_pal = gba.color.PalettizerNaive.create(
+        b.allocator(),
+        256,
+    ) catch @panic("OOM");
+    _ = mode4flip.addConvertImageBitmap8BppStep(.{
+        .image_path = "examples/mode4flip/front.bmp",
+        .output_path = "examples/mode4flip/front.agi",
+        .options = .{ .palettizer = mode4flip_pal.pal() },
+    });
+    _ = mode4flip.addConvertImageBitmap8BppStep(.{
+        .image_path = "examples/mode4flip/back.bmp",
+        .output_path = "examples/mode4flip/back.agi",
+        .options = .{ .palettizer = mode4flip_pal.pal() },
+    });
+    _ = mode4flip.addSaveQuantizedPalettizerPaletteStep(.{
+        .palettizer = mode4flip_pal.pal(),
+        .output_path = "examples/mode4flip/mode4flip.agp",
+    });
     
     // Tests
     
