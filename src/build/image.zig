@@ -1,4 +1,4 @@
-const zigimg = @import("zigimg/zigimg.zig");
+const zigimg = @import("zigimg").zigimg;
 const std = @import("std");
 const assert = @import("std").debug.assert;
 const ColorRgba32 = @import("color.zig").ColorRgba32;
