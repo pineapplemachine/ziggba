@@ -79,6 +79,6 @@ pub export fn main() void {
     gba.bg.ctrl[1] = .{
         .tile_base_block = charblock_8bpp_index,
         .screen_base_block = screenblock_8bpp_index,
-        .palette_mode = .bpp_8,
+        .bpp = .bpp_8,
     };
 }

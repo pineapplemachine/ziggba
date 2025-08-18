@@ -1,3 +1,4 @@
+/// Represents 16-bit color in a GBA-friendly format.
 pub const ColorRgb555 = packed struct(u16) {
     pub const black = ColorRgb555.rgb(0, 0, 0);
     pub const white = ColorRgb555.rgb(31, 31, 31);
@@ -27,17 +28,4 @@ pub const ColorRgb555 = packed struct(u16) {
             .b = b,
         };
     }
-
-    // TODO: Belongs in display.zig or display_vram.zig, named e.g. TileBpp
-    /// Enumeration of tile bits per pixel values.
-    /// Determines whether palettes are accessed via banks of 16 colors (4bpp)
-    /// or a single palette of 256 colors (8bpp).
-    /// Naturally, 8bpp image data consumes twice as much memory as 4bpp
-    /// image data.
-    pub const Bpp = enum(u1) {
-        /// Palettes are stored in 16 banks of 16 colors, 4 bits per pixel.
-        bpp_4 = 0,
-        /// Single palette of 256 colors, 8 bits per pixel.
-        bpp_8 = 1,
-    };
 };

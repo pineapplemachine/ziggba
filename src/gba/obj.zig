@@ -186,7 +186,7 @@ pub const Obj = packed struct(u48) {
     /// Whether to use a 16-color or 256-color palette for this object.
     /// When using 4-bit color, the `Obj.palette` value indicates the
     /// which 16-color palette to use.
-    palette_mode: gba.ColorRgb555.Bpp = .bpp_4,
+    bpp: gba.display.TileBpp = .bpp_4,
     /// Used in combination with size. See `Obj.setSize`.
     shape: Shape = .square,
     /// For normal sprites, the left side; for affine sprites, the center

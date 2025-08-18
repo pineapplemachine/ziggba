@@ -20,6 +20,7 @@ pub const bg_charblocks = @import("display_vram.zig").bg_charblocks;
 pub const bg_charblock_tiles = @import("display_vram.zig").bg_charblock_tiles;
 pub const obj_charblocks = @import("display_vram.zig").obj_charblocks;
 pub const obj_charblock_tiles = @import("display_vram.zig").obj_charblock_tiles;
+pub const TileBpp = @import("display_vram.zig").TileBpp;
 pub const Tile4Bpp = @import("display_vram.zig").Tile4Bpp;
 pub const Tile8Bpp = @import("display_vram.zig").Tile8Bpp;
 pub const memcpyTiles4Bpp = @import("display_vram.zig").memcpyTiles4Bpp;

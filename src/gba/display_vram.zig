@@ -601,6 +601,20 @@ pub const obj_charblocks: *volatile [2]Charblock = @ptrFromInt(gba.mem.vram + 0x
 /// Represents the tiles of the charblocks usable with objects.
 pub const obj_charblock_tiles: *volatile ObjectCharblockTiles = @ptrFromInt(gba.mem.vram + 0x10000);
 
+/// Enumeration of bits per pixel values for tiles.
+///
+/// Determines whether palettes are accessed via banks of 16 colors (4bpp)
+/// or a single palette of 256 colors (8bpp).
+///
+/// Naturally, 8bpp image data consumes twice as much memory as 4bpp
+/// image data.
+pub const TileBpp = enum(u1) {
+    /// Palettes are stored in 16 banks of 16 colors, 4 bits per pixel.
+    bpp_4 = 0,
+    /// Single palette of 256 colors, 8 bits per pixel.
+    bpp_8 = 1,
+};
+
 /// Represents a 16-color 8x8 pixel tile, 4 bits per pixel.
 /// Also called an "s-tile", or single-size tile.
 pub const Tile4Bpp = extern union {
