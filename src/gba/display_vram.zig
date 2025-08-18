@@ -604,12 +604,12 @@ pub const obj_charblock_tiles: *volatile ObjectCharblockTiles = @ptrFromInt(gba.
 /// Represents a 16-color 8x8 pixel tile, 4 bits per pixel.
 /// Also called an "s-tile", or single-size tile.
 pub const Tile4Bpp = extern union {
-    pixels: [32]u8,
+    data_8: [32]u8,
     data_16: [16]u16,
     data_32: [8]u32,
     
-    pub fn init(pixels: [32]u8) Tile4Bpp {
-        return Tile4Bpp{ .pixels = pixels };
+    pub fn init(data_8: [32]u8) Tile4Bpp {
+        return Tile4Bpp{ .data_8 = data_8 };
     }
     
     /// Fill all pixels in the tile with a given color.
@@ -644,8 +644,8 @@ pub const Tile4Bpp = extern union {
         const i: u8 = x + (@as(u8, y) << 3);
         const i_half = i >> 1;
         return switch(x & 1) {
-            0 => @truncate(self.pixels[i_half]),
-            1 => @truncate(self.pixels[i_half] >> 4),
+            0 => @truncate(self.data_8[i_half]),
+            1 => @truncate(self.data_8[i_half] >> 4),
             else => unreachable,
         };
     }
@@ -674,17 +674,17 @@ pub const Tile4Bpp = extern union {
     pub fn setPixel8(self: *volatile Tile4Bpp, x: u3, y: u3, color: u4) void {
         const i: u8 = x + (@as(u8, y) << 3);
         const i_half = i >> 1;
-        self.pixels[i_half] = switch(x & 1) {
-            0 => (self.pixels[i_half] & 0xf0) | color,
-            1 => (self.pixels[i_half] & 0x0f) | (@as(u8, color) << 4),
+        self.data_8[i_half] = switch(x & 1) {
+            0 => (self.data_8[i_half] & 0xf0) | color,
+            1 => (self.data_8[i_half] & 0x0f) | (@as(u8, color) << 4),
             else => unreachable,
         };
         
         if((x & 1) != 0) {
-            self.pixels[i_half] = (self.pixels[i_half] & 0x0f) | (@as(u8, color) << 4);
+            self.data_8[i_half] = (self.data_8[i_half] & 0x0f) | (@as(u8, color) << 4);
         }
         else {
-            self.pixels[i_half] = (self.pixels[i_half] & 0xf0) | color;
+            self.data_8[i_half] = (self.data_8[i_half] & 0xf0) | color;
         }
     }
 };
@@ -696,13 +696,13 @@ pub const Tile8Bpp = extern union {
     data_16: [32]u16,
     data_32: [16]u32,
     
-    pub fn init(pixels: [64]u8) Tile4Bpp {
-        return Tile4Bpp{ .pixels = pixels };
+    pub fn init(pixels: [64]u8) Tile8Bpp {
+        return Tile8Bpp{ .pixels = pixels };
     }
     
     /// Get the color of a pixel at a given coordinate.
     /// Colors are indices into a palette.
-    pub fn getPixel(self: Tile4Bpp, x: u3, y: u3) u8 {
+    pub fn getPixel(self: Tile8Bpp, x: u3, y: u3) u8 {
         const i: u8 = x + (@as(u8, y) << 3);
         return self.pixels[i];
     }
@@ -712,7 +712,7 @@ pub const Tile8Bpp = extern union {
     ///
     /// This function can be safely used if the tile is in VRAM,
     /// but it comes with a performance cost.
-    pub fn setPixel16(self: *volatile Tile4Bpp, x: u3, y: u3, value: u8) void {
+    pub fn setPixel16(self: *volatile Tile8Bpp, x: u3, y: u3, value: u8) void {
         const i: u8 = x + (@as(u8, y) << 3);
         const i_half = i >> 1;
         self.data_16[i_half] = switch(x & 1) {
@@ -726,7 +726,7 @@ pub const Tile8Bpp = extern union {
     /// Colors are indices into a palette.
     ///
     /// This function is not safe to use if the tile is located in VRAM.
-    pub fn setPixel8(self: *volatile Tile4Bpp, x: u3, y: u3, value: u8) void {
+    pub fn setPixel8(self: *volatile Tile8Bpp, x: u3, y: u3, value: u8) void {
         const i: u8 = x + (@as(u8, y) << 3);
         self.pixels[i] = value;
     }
