@@ -174,10 +174,8 @@ memcpy32_arm:
     pop     {r4-r10}            // restore registers from stack
 .memcpy32_arm_loop_words:
     subs    r12, r12, #1        // n_words -= 1
-    ldrcs   r3, [r1]            // if n_words >= 0: load mem @ src to r3
-    strcs   r3, [r0]            // if n_words >= 0: store r3 to mem @ dst
-    add     r1, #4              // src += 4
-    add     r0, #4              // dst += 4
+    ldmiacs r1!, {r3}           // if n_words >= 0: load mem @ src to r3; src += 4
+    stmiacs r0!, {r3}           // if n_words >= 0: store r3 to mem @ dst; dst += 4
     bhi     .memcpy32_arm_loop_words // branch if n_words != 0
     bx      lr                  // return to thumb caller
 
