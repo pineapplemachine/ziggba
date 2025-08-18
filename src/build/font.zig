@@ -1,6 +1,7 @@
 const std = @import("std");
-const Image = @import("image.zig").Image;
 const assert = @import("std").debug.assert;
+const GbaBuild = @import("build.zig").GbaBuild;
+const Image = @import("image.zig").Image;
 
 pub const Charset = struct {
     pub const none: Charset = .init("", "", .{}, .{});
@@ -273,3 +274,64 @@ pub fn packFont(
     try headers.appendSlice(bitmaps.items);
     return headers.toOwnedSlice();
 }
+
+/// Convert font images as a build step.
+pub const BuildFontsStep = struct {
+    step: std.Build.Step,
+    b: *GbaBuild,
+    
+    pub fn create(b: *GbaBuild, name: ?[]const u8) *BuildFontsStep {
+        const step_name = name orelse "BuildFontsStep";
+        const fonts_step = (
+            b.allocator().create(BuildFontsStep) catch @panic("OOM")
+        );
+        fonts_step.* = .{
+            .b = b,
+            .step = std.Build.Step.init(.{
+                .id = .custom,
+                .owner = b.b,
+                .makeFn = make,
+                .name = step_name,
+            }),
+        };
+        return fonts_step;
+    }
+    
+    fn make(
+        step: *std.Build.Step,
+        make_options: std.Build.Step.MakeOptions,
+    ) !void {
+        const self: *BuildFontsStep = @fieldParentPtr("step", step);
+        const root_node = make_options.progress_node.start(
+            "Building ZigGBA fonts",
+            charsets.len,
+        );
+        defer root_node.end();
+        inline for(charsets) |charset| {
+            const charset_node = make_options.progress_node.start(
+                "Building ZigGBA font charset: " ++ charset.name,
+                1,
+            );
+            defer charset_node.end();
+            // ;_;
+            const image_path = "assets/font_" ++ charset.image_name ++ ".png";
+            const image_path_dep = self.b.ziggbaPath(image_path);
+            const image_path_cache = image_path_dep.getPath3(self.b.b, step);
+            const image_path_str = try image_path_cache.toString(self.b.allocator());
+            defer self.b.allocator().free(image_path_str);
+            const output_path = "assets/font_" ++ charset.name ++ ".bin";
+            const output_path_dep = self.b.ziggbaPath(output_path);
+            const output_path_cache = output_path_dep.getPath3(self.b.b, step);
+            const output_path_str = try output_path_cache.toString(self.b.allocator());
+            defer self.b.allocator().free(output_path_str);
+            try packSaveFontPath(
+                image_path_str,
+                output_path_str,
+                charset.grid_size,
+                charset.image_rect,
+                self.b.allocator(),
+            );
+            root_node.completeOne();
+        }
+    }
+};

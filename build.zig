@@ -2,8 +2,9 @@ const std = @import("std");
 
 pub const gba = @import("src/build/build.zig");
 
+/// Build example ROMs.
 pub fn build(std_b: *std.Build) void {
-    const b = gba.GbaBuild.init(std_b);
+    const b = gba.GbaBuild.create(std_b);
     
     // TODO: Use tile and palette data created by the build system for demos
     
@@ -13,22 +14,72 @@ pub fn build(std_b: *std.Build) void {
     
     // Examples
     
-    _ = b.addExecutable("charBlock", "examples/charBlock/charBlock.zig", .{});
-    _ = b.addExecutable("debugPrint", "examples/debugPrint/debugPrint.zig", .{});
-    _ = b.addExecutable("first", "examples/first/first.zig", .{});
-    _ = b.addExecutable("helloWorld", "examples/helloWorld/helloWorld.zig", .{ .text_charsets = .all });
-    _ = b.addExecutable("interrupts", "examples/interrupts/interrupts.zig", .{ .text_charsets = .all });
-    _ = b.addExecutable("keydemo", "examples/keydemo/keydemo.zig", .{});
-    _ = b.addExecutable("memory", "examples/memory/memory.zig", .{ .text_charsets = .all });
-    _ = b.addExecutable("mode3draw", "examples/mode3draw/mode3draw.zig", .{});
-    _ = b.addExecutable("mode4draw", "examples/mode4draw/mode4draw.zig", .{});
-    _ = b.addExecutable("objAffine", "examples/objAffine/objAffine.zig", .{});
-    _ = b.addExecutable("objDemo", "examples/objDemo/objDemo.zig", .{});
-    _ = b.addExecutable("secondsTimer", "examples/secondsTimer/secondsTimer.zig", .{});
-    _ = b.addExecutable("screenBlock", "examples/screenBlock/screenBlock.zig", .{});
-    _ = b.addExecutable("tileDemo", "examples/tileDemo/tileDemo.zig", .{});
+    _ = b.addExecutable(.{
+        .name = "charBlock",
+        .root_source_file = b.path("examples/charBlock/charBlock.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "debugPrint",
+        .root_source_file = b.path("examples/debugPrint/debugPrint.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "first",
+        .root_source_file = b.path("examples/first/first.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "helloWorld",
+        .root_source_file = b.path("examples/helloWorld/helloWorld.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
+    _ = b.addExecutable(.{
+        .name = "interrupts",
+        .root_source_file = b.path("examples/interrupts/interrupts.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
+    _ = b.addExecutable(.{
+        .name = "keydemo",
+        .root_source_file = b.path("examples/keydemo/keydemo.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "memory",
+        .root_source_file = b.path("examples/memory/memory.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
+    _ = b.addExecutable(.{
+        .name = "mode3draw",
+        .root_source_file = b.path("examples/mode3draw/mode3draw.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "mode4draw",
+        .root_source_file = b.path("examples/mode4draw/mode4draw.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "objAffine",
+        .root_source_file = b.path("examples/objAffine/objAffine.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "objDemo",
+        .root_source_file = b.path("examples/objDemo/objDemo.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "secondsTimer",
+        .root_source_file = b.path("examples/secondsTimer/secondsTimer.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "screenBlock",
+        .root_source_file = b.path("examples/screenBlock/screenBlock.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "tileDemo",
+        .root_source_file = b.path("examples/tileDemo/tileDemo.zig"),
+    });
     
-    var bgAffine = b.addExecutable("bgAffine", "examples/bgAffine/bgAffine.zig", .{ .text_charsets = .all });
+    
+    var bgAffine = b.addExecutable(.{
+        .name = "bgAffine",
+        .root_source_file = b.path("examples/bgAffine/bgAffine.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
     const bgAffine_pal = gba.color.PalettizerNearest.create(
         b.allocator(),
         &[_]gba.color.ColorRgba32 {
@@ -45,7 +96,10 @@ pub fn build(std_b: *std.Build) void {
         .options = .{ .palettizer = bgAffine_pal.pal() },
     });
     
-    var jesuMusic = b.addExecutable("jesuMusic", "examples/jesuMusic/jesuMusic.zig", .{});
+    var jesuMusic = b.addExecutable(.{
+        .name = "jesuMusic",
+        .root_source_file = b.path("examples/jesuMusic/jesuMusic.zig"),
+    });
     const jesuMusic_pal = gba.color.PalettizerNearest.create(
         b.allocator(),
         &[_]gba.color.ColorRgba32 {
@@ -60,7 +114,10 @@ pub fn build(std_b: *std.Build) void {
         .options = .{ .palettizer = jesuMusic_pal.pal() },
     });
 
-    var mode4flip = b.addExecutable("mode4flip", "examples/mode4flip/mode4flip.zig", .{});
+    var mode4flip = b.addExecutable(.{
+        .name = "mode4flip",
+        .root_source_file = b.path("examples/mode4flip/mode4flip.zig"),
+    });
     const mode4flip_pal = gba.color.PalettizerNaive.create(
         b.allocator(),
         256,

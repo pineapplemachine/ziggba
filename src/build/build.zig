@@ -6,23 +6,14 @@ pub const color = @import("color.zig");
 pub const font = @import("font.zig");
 pub const image = @import("image.zig");
 
-fn libRootPath() []const u8 {
-    const build_path = std.fs.path.dirname(@src().file) orelse ".";
-    const src_path = std.fs.path.dirname(build_path) orelse ".";
-    const root_path = std.fs.path.dirname(src_path) orelse ".";
-    return root_path;
-}
-
-const lib_root_path = libRootPath();
-
-const gba_linker_script_path = libRootPath() ++ "/src/gba/gba.ld";
-const gba_start_zig_file_path = libRootPath() ++ "/src/gba/start.zig";
-const gba_lib_file_path = libRootPath() ++ "/src/gba/gba.zig";
+const gba_linker_script_path = "src/gba/gba.ld";
+const gba_start_zig_file_path = "src/gba/start.zig";
+const gba_lib_file_path = "src/gba/gba.zig";
 
 const asm_file_paths = [_][]const u8{
-    libRootPath() ++ "/src/gba/crt0.s",
-    libRootPath() ++ "/src/gba/isr.s",
-    libRootPath() ++ "/src/gba/mem.s",
+    "src/gba/crt0.s",
+    "src/gba/isr.s",
+    "src/gba/mem.s",
 };
 
 pub const GbaBuild = struct {
@@ -54,14 +45,29 @@ pub const GbaBuild = struct {
     };
     
     b: *std.Build,
+    ziggba_dep: ?*std.Build.Dependency,
     thumb_target: std.Build.ResolvedTarget,
     optimize_mode: std.builtin.OptimizeMode,
     gdb: bool,
     
+    pub fn create(b: *std.Build) *GbaBuild {
+        const gba_b = b.allocator.create(GbaBuild) catch @panic("OOM");
+        gba_b.* = GbaBuild.init(b);
+        return gba_b;
+    }
+    
     pub fn init(b: *std.Build) GbaBuild {
         const cli_options = GbaBuild.getCliOptions(b);
+        var ziggba_dep: ?*std.Build.Dependency = null;
+        for(b.available_deps) |dep| {
+            if(std.mem.eql(u8, dep[0], "ziggba")) {
+                ziggba_dep = b.dependency("ziggba", .{});
+                break;
+            }
+        }
         return .{
             .b = b,
+            .ziggba_dep = ziggba_dep,
             .thumb_target = b.resolveTargetQuery(GbaBuild.thumb_target_query),
             .optimize_mode = if(cli_options.debug) .Debug else .ReleaseFast,
             .gdb = cli_options.gdb,
@@ -71,6 +77,26 @@ pub const GbaBuild = struct {
     /// Get the allocator belonging to the underling `std.Build` instance.
     pub fn allocator(self: GbaBuild) std.mem.Allocator {
         return self.b.allocator;
+    }
+    
+    /// Get a path relative to the build directory.
+    pub fn path(self: GbaBuild, sub_path: []const u8) std.Build.LazyPath {
+        return self.b.path(sub_path);
+    }
+    
+    /// Get a path relative to the ZigGBA build directory.
+    pub fn ziggbaPath(self: GbaBuild, sub_path: []const u8) std.Build.LazyPath {
+        if(self.ziggba_dep) |dep| {
+            return .{
+                .dependency = .{
+                    .dependency = dep,
+                    .sub_path = sub_path,
+                },
+            };
+        }
+        else {
+            return self.b.path(sub_path);
+        }
     }
     
     /// Get options passed via compiler arguments.
@@ -117,11 +143,11 @@ pub const GbaBuild = struct {
     pub fn addFontImports(self: GbaBuild, module: *std.Build.Module) void {
         inline for(font.charsets) |charset| {
             const png_path = comptime(
-                libRootPath() ++ "/assets/font_" ++ charset.name ++ ".bin"
+                "assets/font_" ++ charset.name ++ ".bin"
             );
             module.addAnonymousImport(
                 "ziggba_font_" ++ charset.name ++ ".bin",
-                .{ .root_source_file = self.b.path(png_path) },
+                .{ .root_source_file = self.ziggbaPath(png_path) },
             );
         }
     }
@@ -140,18 +166,13 @@ pub const GbaBuild = struct {
     pub fn addModule(
         self: GbaBuild,
         name: []const u8,
-        source_file_path: []const u8,
+        root_source_file: std.Build.LazyPath,
         build_options: BuildOptions,
     ) *std.Build.Module {
         const module = self.b.addModule(name, .{
             .target = self.thumb_target,
             .optimize = self.optimize_mode,
-            .root_source_file = .{
-                .src_path = .{
-                    .owner = self.b,
-                    .sub_path = source_file_path,
-                },
-            },
+            .root_source_file = root_source_file,
         });
         self.addFontImports(module);
         self.addBuildOptions(module, build_options);
@@ -170,12 +191,7 @@ pub const GbaBuild = struct {
             .name = library_name,
             .root_module = root_module,
         });
-        lib.setLinkerScript(.{
-            .src_path = .{
-                .owner = self.b,
-                .sub_path = gba_linker_script_path,
-            },
-        });
+        lib.setLinkerScript(self.ziggbaPath(gba_linker_script_path));
         self.addFontImports(lib.root_module);
         self.addBuildOptions(lib.root_module, build_options);
         return lib;
@@ -184,84 +200,68 @@ pub const GbaBuild = struct {
     pub fn addObject(
         self: GbaBuild,
         object_name: []const u8,
-        source_file_path: []const u8,
+        root_source_file: std.Build.LazyPath,
         build_options: BuildOptions,
     ) *std.Build.Step.Compile {
         const object = self.b.addObject(.{
             .name = object_name,
             .target = self.thumb_target,
             .optimize = self.optimize_mode,
-            .root_source_file = .{
-                .src_path = .{
-                    .owner = self.b,
-                    .sub_path = source_file_path,
-                },
-            },
+            .root_source_file = root_source_file,
         });
         self.addFontImports(object.root_module);
         self.addBuildOptions(object.root_module, build_options);
         return object;
     }
     
+    pub const ExecutableOptions = struct {
+        name: []const u8,
+        root_source_file: std.Build.LazyPath,
+        build_options: BuildOptions = .{},
+    };
+    
     /// Add a build step to compile an executable, i.e. a GBA ROM.
     pub fn addExecutable(
-        self: GbaBuild,
-        rom_name: []const u8,
-        source_file_path: []const u8,
-        build_options: BuildOptions,
-    ) GbaExecutable {
+        self: *GbaBuild,
+        options: ExecutableOptions,
+    ) *GbaExecutable {
         const exe = self.b.addExecutable(.{
-            .name = rom_name,
+            .name = options.name,
             .target = self.thumb_target,
             .optimize = self.optimize_mode,
-            .root_source_file = .{
-                .src_path = .{
-                    .owner = self.b,
-                    .sub_path = source_file_path,
-                },
-            },
+            .root_source_file = options.root_source_file,
         });
         self.addFontImports(exe.root_module);
-        self.addBuildOptions(exe.root_module, build_options);
+        self.addBuildOptions(exe.root_module, options.build_options);
         self.b.default_step.dependOn(&exe.step);
         // Zig entry point and startup routine
         exe.addObject(self.addObject(
             "gba_start",
-            gba_start_zig_file_path,
-            build_options,
+            self.ziggbaPath(gba_start_zig_file_path),
+            options.build_options,
         ));
         // ZigGBA as a static library
         const gba_module = self.addModule(
             "gba",
-            gba_lib_file_path,
-            build_options,
+            self.ziggbaPath(gba_lib_file_path),
+            options.build_options,
         );
         exe.linkLibrary(self.addStaticLibrary(
             "ziggba",
             gba_module,
-            build_options,
+            options.build_options,
         ));
         exe.root_module.addImport("gba", gba_module);
         // Linker script
-        exe.setLinkerScript(.{
-            .src_path = .{
-                .owner = self.b,
-                .sub_path = gba_linker_script_path,
-            },
-        });
+        exe.setLinkerScript(self.ziggbaPath(gba_linker_script_path));
         // Assembly modules
         for(asm_file_paths) |asm_path| {
-            exe.addAssemblyFile(.{
-                .src_path = .{
-                    .owner = self.b,
-                    .sub_path = asm_path,
-                },
-            });
+            exe.addAssemblyFile(self.ziggbaPath(asm_path));
         }
         // Optionally generate ELF file with debug symbols
         if (self.gdb) {
             _ = self.b.addInstallArtifact(exe, .{
-                .dest_sub_path = self.b.fmt("{s}.elf", .{rom_name}),
+                .dest_sub_path = self.b.fmt("{s}.elf", .{ options.name }),
             });
         }
         // Generate GBA ROM
@@ -270,73 +270,21 @@ pub const GbaBuild = struct {
         });
         const install_bin_step = self.b.addInstallBinFile(
             objcopy_step.getOutput(),
-            self.b.fmt("{s}.gba", .{rom_name}),
+            self.b.fmt("{s}.gba", .{ options.name }),
         );
         install_bin_step.step.dependOn(&objcopy_step.step);
         self.b.default_step.dependOn(&install_bin_step.step);
         // Fin
-        return .init(exe);
-    }
-    
-    pub const BuildFontsDiagnostic = struct {
-        charset: font.Charset = .none,
-    };
-    
-    /// Convert font image data from PNGs to an embeddable bitmap format
-    /// recognized by `gba.text`.
-    pub fn buildFonts(
-        make_options: std.Build.Step.MakeOptions,
-        diagnostic: ?*BuildFontsDiagnostic,
-    ) !void {
-        const root_node = make_options.progress_node.start(
-            "Building font",
-            font.charsets.len,
-        );
-        defer root_node.end();
-        const alloc = std.heap.page_allocator;
-        inline for(font.charsets) |charset| {
-            const charset_node = make_options.progress_node.start(
-                "Building font charset: " ++ charset.name,
-                1,
-            );
-            defer charset_node.end();
-            font.packSaveFontPath(
-                lib_root_path ++ "/assets/font_" ++ charset.image_name ++ ".png",
-                lib_root_path ++ "/assets/font_" ++ charset.name ++ ".bin",
-                charset.grid_size,
-                charset.image_rect,
-                alloc
-            ) catch |err| {
-                if(diagnostic) |d| {
-                    d.charset = charset;
-                }
-                return err;
-            };
-            root_node.completeOne();
-        }
-    }
-
-    /// Wraps `buildFonts` in an interface compatible with
-    /// `std.Build.Step.MakeFn`.
-    pub fn buildFontsStep(
-        b: *std.Build.Step,
-        make_options: std.Build.Step.MakeOptions,
-    ) !void {
-        var diagnostic: BuildFontsDiagnostic = .{};
-        buildFonts(make_options, &diagnostic) catch |err| {
-            try b.addError(
-                "Failed to build font {s}: {any}.",
-                .{ diagnostic.charset.name, err }
-            );
-        };
+        return .create(self, exe);
     }
     
     /// Add a build step for building font data for `gba.text`, converting
     /// PNG images to bitmap data in a compact binary format.
-    pub fn addBuildFontsStep(self: GbaBuild, name: []const u8) *std.Build.Step {
-        const step = self.b.step(name, "Build font data for gba.text.");
-        step.makeFn = GbaBuild.buildFontsStep;
-        return step;
+    pub fn addBuildFontsStep(
+        self: *GbaBuild,
+        name: ?[]const u8,
+    ) *font.BuildFontsStep {
+        return font.BuildFontsStep.create(self, name);
     }
     
     pub fn addConvertImageTiles4BppStep(
@@ -383,10 +331,17 @@ pub const GbaBuild = struct {
 };
 
 pub const GbaExecutable = struct {
+    b: *GbaBuild,
     step: *std.Build.Step.Compile,
     
-    pub fn init(step: *std.Build.Step.Compile) GbaExecutable {
-        return .{ .step = step };
+    pub fn init(b: *GbaBuild, step: *std.Build.Step.Compile) GbaExecutable {
+        return .{ .b = b, .step = step };
+    }
+    
+    pub fn create(b: *GbaBuild, step: *std.Build.Step.Compile) *GbaExecutable {
+        const exe = b.allocator().create(GbaExecutable) catch @panic("OOM");
+        exe.* = .init(b, step);
+        return exe;
     }
     
     pub fn getOwner(self: GbaExecutable) *std.Build {
@@ -395,6 +350,16 @@ pub const GbaExecutable = struct {
     
     pub fn dependOn(self: *GbaExecutable, step: *std.Build.Step) void {
         self.step.step.dependOn(step);
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addBuildFontsStep(
+        self: *GbaExecutable,
+        name: ?[]const u8,
+    ) *font.BuildFontsStep {
+        const step = font.BuildFontsStep.create(self.b, name);
+        self.dependOn(&step.step);
+        return step;
     }
     
     /// Add a step that the executable depends on.
