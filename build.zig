@@ -1,5 +1,6 @@
 const std = @import("std");
-const gba = @import("src/build/build.zig");
+
+pub const gba = @import("src/build/build.zig");
 
 pub fn build(std_b: *std.Build) void {
     const b = gba.GbaBuild.init(std_b);
