@@ -141,15 +141,21 @@ pub const GbaBuild = struct {
     
     /// Add font-related imports to a module.
     /// These files contain glyph data bitmaps used by `gba.text`.
-    pub fn addFontImports(self: GbaBuild, module: *std.Build.Module) void {
+    pub fn addFontImports(
+        self: GbaBuild,
+        module: *std.Build.Module,
+        build_options: BuildOptions,
+    ) void {
         inline for(font.charsets) |charset| {
-            const png_path = comptime(
-                "assets/font_" ++ charset.name ++ ".bin"
-            );
-            module.addAnonymousImport(
-                "ziggba_font_" ++ charset.name ++ ".bin",
-                .{ .root_source_file = self.ziggbaPath(png_path) },
-            );
+            if(@field(build_options.text_charsets, charset.name)) {
+                const png_path = comptime(
+                    "assets/font_" ++ charset.name ++ ".bin"
+                );
+                module.addAnonymousImport(
+                    "ziggba_font_" ++ charset.name ++ ".bin",
+                    .{ .root_source_file = self.ziggbaPath(png_path) },
+                );
+            }
         }
     }
     
@@ -175,7 +181,7 @@ pub const GbaBuild = struct {
             .optimize = self.optimize_mode,
             .root_source_file = root_source_file,
         });
-        self.addFontImports(module);
+        self.addFontImports(module, build_options);
         self.addBuildOptions(module, build_options);
         return module;
     }
@@ -193,7 +199,7 @@ pub const GbaBuild = struct {
             .root_module = root_module,
         });
         lib.setLinkerScript(self.ziggbaPath(gba_linker_script_path));
-        self.addFontImports(lib.root_module);
+        self.addFontImports(lib.root_module, build_options);
         self.addBuildOptions(lib.root_module, build_options);
         return lib;
     }
@@ -210,7 +216,7 @@ pub const GbaBuild = struct {
             .optimize = self.optimize_mode,
             .root_source_file = root_source_file,
         });
-        self.addFontImports(object.root_module);
+        self.addFontImports(object.root_module, build_options);
         self.addBuildOptions(object.root_module, build_options);
         return object;
     }
@@ -232,7 +238,7 @@ pub const GbaBuild = struct {
             .optimize = self.optimize_mode,
             .root_source_file = options.root_source_file,
         });
-        self.addFontImports(exe.root_module);
+        self.addFontImports(exe.root_module, options.build_options);
         self.addBuildOptions(exe.root_module, options.build_options);
         self.b.default_step.dependOn(&exe.step);
         // Zig entry point and startup routine
