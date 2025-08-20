@@ -28,70 +28,6 @@ pub fn hideAllObjects() void {
 /// an affine value. Other values belong to object attributes.
 pub const affine_values: [*]gba.math.FixedI16R8 = @ptrFromInt(gba.mem.oam);
 
-/// Represents an affine transformation matrix.
-pub const AffineTransform = extern struct {
-    // TODO: Replace with gba.math.Mat2x2FixedI16R8
-    
-    /// Identity matrix. Applies no rotation, scaling, or shearing.
-    pub const Identity: AffineTransform = (
-        .init(gba.math.FixedI16R8.fromInt(1), .{}, .{}, gba.math.FixedI16R8.fromInt(1))
-    );
-    
-    /// Affine transformation matrix components, in row-major order.
-    values: [4]gba.math.FixedI16R8 = @splat(.{}),
-    
-    /// Initialize an `AffineTransform` matrix with the given components.
-    pub fn init(
-        a: gba.math.FixedI16R8,
-        b: gba.math.FixedI16R8,
-        c: gba.math.FixedI16R8,
-        d: gba.math.FixedI16R8,
-    ) AffineTransform {
-        return AffineTransform{ .values = .{ a, b, c, d } };
-    }
-    
-    /// Multiply one transformation matrix by another, and return the product.
-    /// The new matrix produces the same transform as applying one transform
-    /// and then the other.
-    pub fn mul(a: AffineTransform, b: AffineTransform) AffineTransform {
-        return .init(
-            a.values[0].mul(b.values[0]).add(a.values[1].mul(b.values[2])),
-            a.values[0].mul(b.values[1]).add(a.values[1].mul(b.values[3])),
-            a.values[2].mul(b.values[0]).add(a.values[3].mul(b.values[1])),
-            a.values[2].mul(b.values[1]).add(a.values[3].mul(b.values[3])),
-        );
-    }
-    
-    /// Return a transformation matrix that will scale an object by the
-    /// given amount on each axis.
-    pub fn scale(
-        x: gba.math.FixedI16R8,
-        y: gba.math.FixedI16R8,
-    ) AffineTransform {
-        return .init(x, .{}, .{}, y);
-    }
-    
-    /// Return a rotation matrix that will scale an object by the
-    /// given amount on each axis.
-    /// Uses `gba.math.FixedU16R16.sin` and `gba.math.FixedU16R16.cos`.
-    /// See also `gba.bios.objAffineSet`.
-    pub fn rotate(angle: gba.math.FixedU16R16) AffineTransform {
-        const sin_theta = angle.sin().toI16R8();
-        const cos_theta = angle.cos().toI16R8();
-        return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
-    }
-    
-    /// Return a rotation matrix that will scale an object by the
-    /// given amount on each axis.
-    /// Uses `gba.math.FixedU16R16.sinLerp` and `gba.math.FixedU16R16.cosLerp`.
-    /// See also `gba.bios.objAffineSet`.
-    pub fn rotateLerp(angle: gba.math.FixedU16R16) AffineTransform {
-        const sin_theta = angle.sinLerp().toI16R8();
-        const cos_theta = angle.cosLerp().toI16R8();
-        return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
-    }
-};
-
 pub const Obj = packed struct(u48) {
     pub const Effect = enum(u2) {
         normal,
@@ -235,13 +171,13 @@ pub const Obj = packed struct(u48) {
 
 /// Write an affine transformation matrix to OAM, for use with objects.
 /// Should only be updated during VBlank, to avoid graphical glitches.
-pub fn setOamTransform(index: u5, transform: AffineTransform) void {
+pub fn setOamTransform(index: u5, transform: gba.math.Affine2x2) void {
     var value_index = 3 + (@as(u8, index) << 4);
-    affine_values[value_index] = transform.values[0];
+    affine_values[value_index] = transform.a;
     value_index += 4;
-    affine_values[value_index] = transform.values[1];
+    affine_values[value_index] = transform.b;
     value_index += 4;
-    affine_values[value_index] = transform.values[2];
+    affine_values[value_index] = transform.c;
     value_index += 4;
-    affine_values[value_index] = transform.values[3];
+    affine_values[value_index] = transform.d;
 }

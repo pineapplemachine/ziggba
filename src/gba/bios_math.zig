@@ -9,26 +9,6 @@ pub const DivResult = packed struct {
     absolute_quotient: u32,
 };
 
-/// The `bgAffineSet` function expects a pointer argument to this struct.
-pub const BgAffineSource = extern struct {
-    original_x: gba.math.FixedI32R8 align(4),
-    original_y: gba.math.FixedI32R8 align(4),
-    display_x: i16,
-    display_y: i16,
-    scale_x: gba.math.FixedI16R8,
-    scale_y: gba.math.FixedI16R8,
-    /// BIOS ignores the low 8 bits.
-    angle: gba.math.FixedU16R16,
-};
-
-/// The `objAffineSet` function expects a pointer argument to this struct.
-pub const ObjAffineSource = packed struct {
-    scale_x: gba.math.FixedI16R8,
-    scale_y: gba.math.FixedI16R8,
-    /// BIOS ignores the low 8 bits.
-    angle: gba.math.FixedU16R16,
-};
-
 /// Divide the numerator by the denominator,
 /// using the system's `Div` BIOS call.
 ///
@@ -218,6 +198,19 @@ pub fn arctan2(x: i16, y: i16) gba.math.FixedU16R16 {
     }
 }
 
+/// The `bgAffineSet` function expects a pointer argument to this struct.
+pub const BgAffineSetOptions = extern struct {
+    /// Origin in texture space.
+    original: gba.math.Vec2FixedI32R8,
+    /// Origin in screen space.
+    display: gba.math.Vec2I16,
+    /// Scaling on each axis.
+    scale: gba.math.Vec2FixedI16R8,
+    /// Angle of rotation.
+    /// BIOS ignores the low 8 bits.
+    angle: gba.math.FixedU16R16,
+};
+
 /// Can be used to calculate rotation and scaling parameters
 /// for affine backgrounds, using the system's `BgAffineSet` BIOS call.
 ///
@@ -227,7 +220,7 @@ pub fn arctan2(x: i16, y: i16) gba.math.FixedU16R16 {
 pub fn bgAffineSet(
     /// Parameters for the affine transformation matrices and displacements
     /// to be computed.
-    source: []const volatile BgAffineSource,
+    options: []const volatile BgAffineSetOptions,
     /// Write the computed affine transformations and displacements here.
     destination: [*]volatile gba.bg.Affine,
 ) void {
@@ -267,23 +260,23 @@ pub fn bgAffineSet(
             0xe783, 0xe8f8, 0xea71, 0xebed, 0xed6c, 0xeeef, 0xf074, 0xf1fb,
             0xf384, 0xf50f, 0xf69c, 0xf82b, 0xf9bb, 0xfb4b, 0xfcdd, 0xfe6e,
         };
-        for(0..source.len) |i| {
-            const theta: u16 = source[i].angle >> 8;
-            const sin_theta: i32 = sin_lut[theta];
-            const cos_theta: i32 = sin_lut[(theta + 0x40) & 0xff];
-            const pa = (source[i].scale_x * cos_theta) >> 14;
-            const pb = -((source[i].scale_x * sin_theta) >> 14);
-            const pc = (source[i].scale_y * sin_theta) >> 14;
-            const pd = (source[i].scale_y * cos_theta) >> 14;
+        for(0..options.len) |i| {
+            const theta: u16 = options[i].angle >> 8;
+            const sin: i32 = sin_lut[theta];
+            const cos: i32 = sin_lut[(theta + 0x40) & 0xff];
+            const pa = (options[i].scale.x * cos) >> 14;
+            const pb = -((options[i].scale.x * sin) >> 14);
+            const pc = (options[i].scale.y * sin) >> 14;
+            const pd = (options[i].scale.y * cos) >> 14;
             const dx = (
-                source[i].original_x -
-                (pa * source[i].display_x) +
-                (pb * source[i].display_y)
+                options[i].original.x -
+                (pa * options[i].display.x) +
+                (pb * options[i].display.y)
             );
             const dy = (
-                source[i].original_x -
-                (pc * source[i].display_x) -
-                (pd * source[i].display_y)
+                options[i].original.y -
+                (pc * options[i].display.x) -
+                (pd * options[i].display.y)
             );
             destination[i].pa = pa;
             destination[i].pb = pb;
@@ -294,47 +287,56 @@ pub fn bgAffineSet(
         }
     }
     else {
-        const source_len = source.len;
+        const options_len = options.len;
         asm volatile (
             "swi 0x0e"
             :
-            : [source] "{r0}" (source),
+            : [options] "{r0}" (options),
               [destination] "{r1}" (destination),
-              [source_len] "{r2}" (source_len),
+              [options_len] "{r2}" (options_len),
             : "r0", "r1", "r2", "r3", "cc", "memory"
         );
     }
 }
 
+/// The `objAffineSet` function expects a pointer argument to this struct.
+pub const ObjAffineSetOptions = packed struct {
+    /// Scaling on each axis.
+    scale: gba.math.Vec2FixedI16R8,
+    /// Angle of rotation.
+    /// BIOS ignores the low 8 bits.
+    angle: gba.math.FixedU16R16,
+};
+
 /// Wraps `objAffineSet` to write output values to OAM.
 /// See also `gba.obj.setOamTransform`.
 pub fn objAffineSetOam(
     /// Parameters for the affine transformation matrices to be computed.
-    source: []const volatile ObjAffineSource,
+    options: []const volatile ObjAffineSetOptions,
     /// Write the computed transformation matrices to OAM starting here.
     oam_affine_index: u5,
 ) void {
-    assert(source.len + @as(usize, oam_affine_index) <= 32);
+    assert(options.len + @as(usize, oam_affine_index) <= 32);
     const value_index = 3 + (@as(u8, oam_affine_index) << 4);
-    objAffineSet(source, &gba.obj.affine_values[value_index], 8);
+    objAffineSet(options, &gba.obj.affine_values[value_index], 8);
 }
 
-/// Wraps `objAffineSet` to write output values to `gba.obj.AffineTransform`
+/// Wraps `objAffineSet` to write output values to `gba.math.Affine2x2`
 /// destinations.
 pub fn objAffineSetStruct(
     /// Parameters for the affine transformation matrices to be computed.
-    source: []const volatile ObjAffineSource,
+    options: []const volatile ObjAffineSetOptions,
     /// Write the computed transformation matrices here.
-    destination: [*]volatile gba.obj.AffineTransform,
+    destination: [*]volatile gba.math.Affine2x2,
 ) void {
-    objAffineSet(source, destination, 2);
+    objAffineSet(options, destination, 2);
 }
 
 /// Can be used to calculate rotation and scaling parameters
 /// for affine objects, using the system's `ObjAffineSet` BIOS call.
 ///
 /// If writing to an affine matrix represented in contiguous memory,
-/// e.g. with the `gba.obj.AffineTransform` struct, `offset` should be 2.
+/// e.g. with the `gba.math.Affine2x2` struct, `offset` should be 2.
 /// If writing directly to OAM, then `offset` should be 8.
 ///
 /// Normally uses a GBA BIOS function, but also implements a fallback to run
@@ -342,13 +344,15 @@ pub fn objAffineSetStruct(
 /// available.
 pub fn objAffineSet(
     /// Parameters for the affine transformation matrices to be computed.
-    source: []const volatile ObjAffineSource,
+    options: []const volatile ObjAffineSetOptions,
     /// Write the computed transformation matrices here.
-    destination: [*]volatile gba.obj.AffineTransform,
+    destination: [*]align(2) volatile u8,
     /// Byte offset in memory from each affine transformation matrix component
     /// to the next, at the destination pointer.
+    /// The offset must be a multiple of 2.
     offset: u32,
 ) void {
+    assert((offset & 1) == 0);
     if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios
         const sin_lut: [256]i16 = .{
@@ -385,24 +389,30 @@ pub fn objAffineSet(
             0xe783, 0xe8f8, 0xea71, 0xebed, 0xed6c, 0xeeef, 0xf074, 0xf1fb,
             0xf384, 0xf50f, 0xf69c, 0xf82b, 0xf9bb, 0xfb4b, 0xfcdd, 0xfe6e,
         };
-        for(0..source.len) |i| {
-            const theta: u16 = source[i].angle >> 8;
-            const sin_theta: i32 = sin_lut[theta];
-            const cos_theta: i32 = sin_lut[(theta + 0x40) & 0xff];
-            destination[i].pa = (source[i].scale_x * cos_theta) >> 14;
-            destination[i].pb = -((source[i].scale_x * sin_theta) >> 14);
-            destination[i].pc = (source[i].scale_y * sin_theta) >> 14;
-            destination[i].pd = (source[i].scale_y * cos_theta) >> 14;
+        const dest: *volatile gba.math.FixedI16R8 = @ptrCast(destination);
+        const dest_offset = offset >> 1;
+        for(0..options.len) |i| {
+            const theta: u16 = options[i].angle >> 8;
+            const sin: i32 = sin_lut[theta];
+            const cos: i32 = sin_lut[(theta + 0x40) & 0xff];
+            dest.* = (options[i].scale.x * cos) >> 14;
+            dest += dest_offset;
+            dest.* = -((options[i].scale.x * sin) >> 14);
+            dest += dest_offset;
+            dest.* = (options[i].scale.y * sin) >> 14;
+            dest += dest_offset;
+            dest.* = (options[i].scale.y * cos) >> 14;
+            dest += dest_offset;
         }
     }
     else {
-        const source_len = source.len;
+        const options_len = options.len;
         asm volatile (
             "swi 0x0e"
             :
-            : [source] "{r0}" (source),
+            : [options] "{r0}" (options),
               [destination] "{r1}" (destination),
-              [source_len] "{r2}" (source_len),
+              [options_len] "{r2}" (options_len),
               [offset] "{r3}" (offset),
             : "r0", "r1", "r2", "r3", "cc", "memory"
         );

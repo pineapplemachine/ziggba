@@ -83,7 +83,7 @@ pub fn Vec3I(comptime T: type) type {
         pub fn isZero(self: Self) bool {
             return (
                 gba.math.eql(self.x, T_zero) and
-                gba.math.eql(self.y, T_zero)and
+                gba.math.eql(self.y, T_zero) and
                 gba.math.eql(self.z, T_zero)
             );
         }
@@ -184,10 +184,10 @@ pub const Vec3I16 = Vec3I(i16);
 pub const Vec3I32 = Vec3I(i32);
 
 /// Three-dimensional vector with fixed point components.
-pub const Vec3FixedI16R8 = Vec3FixedI(gba.math.FixedI16R8);
+pub const Vec3FixedI16R8 = Vec3I(gba.math.FixedI16R8);
 
 /// Three-dimensional vector with fixed point components.
-pub const Vec3FixedI32R8 = Vec3FixedI(gba.math.FixedI32R8);
+pub const Vec3FixedI32R8 = Vec3I(gba.math.FixedI32R8);
 
 /// Three-dimensional vector with fixed point components.
-pub const Vec3FixedI32R16 = Vec3FixedI(gba.math.FixedI32R16);
+pub const Vec3FixedI32R16 = Vec3I(gba.math.FixedI32R16);

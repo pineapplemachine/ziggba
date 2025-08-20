@@ -136,9 +136,6 @@ pub const Affine = extern struct {
     dy: gba.math.FixedI32R8 align(4) = .{},
 };
 
-/// An index to a color tile
-pub const AffineScreenEntry = u8;
-
 pub const TextScreenBlock = [1024]TextScreenEntry;
 pub const screen_block_ram: [*]volatile TextScreenBlock = @ptrCast(gba.display.vram);
 
@@ -146,58 +143,22 @@ pub inline fn screenBlockMap(block: u5) [*]volatile TextScreenEntry {
     return @ptrCast(&screen_block_ram[block]);
 }
 
-// TODO: Generic Mat3x2 type
-
-pub const BackgroundAffine = extern struct {
-    /// Represents an affine transformation matrix for a background.
-    transform: gba.obj.AffineTransform,
-    /// Represents a displacement vector (also called a translation vector)
-    /// for use with affine backgrounds.
-    ///
-    /// Note that the highest 4 bits of each component are not used.
-    displace: gba.math.Vec2FixedI32R8,
-    
-    pub const RotateScaleOptions = struct {
-        bg_origin: gba.math.Vec2FixedI32R16 = .zero,
-        screen_origin: gba.math.Vec2FixedI32R16 = .zero,
-        scale: gba.math.Vec2FixedI32R16 = .one,
-        angle: gba.math.FixedU16R16 = .zero,
-    };
-    
-    /// See also `gba.bios.bgAffineSet`.
-    pub fn initRotScaleFast(options: RotateScaleOptions) BackgroundAffine {
-        // See https://gbadev.net/tonc/affbg.html#sec-aff-ofs
-        const sin = options.angle.sin();
-        const cos = options.angle.cos();
-        const pa = options.scale.x.mul(cos);
-        const pb = options.scale.x.mul(sin.negate());
-        const pc = options.scale.y.mul(sin);
-        const pd = options.scale.y.mul(cos);
-        const dx = options.bg_origin.x.sub(
-            pa.mul(options.screen_origin.x).add(pb.mul(options.screen_origin.y))
-        );
-        const dy = options.bg_origin.y.sub(
-            pc.mul(options.screen_origin.x).add(pd.mul(options.screen_origin.y))
-        );
-        return .{
-            .transform = .init(pa.toI16R8(), pb.toI16R8(), pc.toI16R8(), pd.toI16R8()),
-            .displace = .{ .x = dx.toI32R8(), .y = dy.toI32R8() },
-        };
-    }
-};
-
-/// Holds an affine transformation matrix plus a displacement/translation
+/// Holds an affine transformation matrix with a displacement/translation
 /// vector for background 2, when in affine mode. (Mode 1 or Mode 2.)
 ///
 /// The `transform` property corresponds to REG_BG2PA, REG_BG2PB, REG_BG2PC,
 /// and REG_BG2PD.
 /// The `displace` property corresponds to REG_BG2X and REG_BG2Y.
-pub const bg_2_affine: *volatile BackgroundAffine = @ptrFromInt(gba.mem.io + 0x20);
+pub const bg_2_affine: *volatile gba.math.Affine3x2 = (
+    @ptrFromInt(gba.mem.io + 0x20)
+);
 
-/// Holds an affine transformation matrix plus a displacement/translation
+/// Holds an affine transformation matrix with a displacement/translation
 /// vector for background 3, when in affine mode. (Mode 2.)
 ///
 /// The `transform` property corresponds to REG_BG3PA, REG_BG3PB, REG_BG3PC,
 /// and REG_BG3PD.
 /// The `displace` property corresponds to REG_BG3X and REG_BG3Y.
-pub const bg_3_affine: *volatile BackgroundAffine = @ptrFromInt(gba.mem.io + 0x20);
+pub const bg_3_affine: *volatile gba.math.Affine3x2 = (
+    @ptrFromInt(gba.mem.io + 0x20)
+);

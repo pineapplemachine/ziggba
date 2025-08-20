@@ -9,6 +9,10 @@ test {
 extern fn umull_thumb(x: u32, y: u32) UnsignedMulLongResult;
 extern fn smull_thumb(x: i32, y: i32) SignedMulLongResult;
 
+// Affine transformation matrix types.
+pub const Affine2x2 = @import("math_affine.zig").Affine2x2;
+pub const Affine3x2 = @import("math_affine.zig").Affine3x2;
+
 // Fixed-point math types.
 pub const isFixedPointType = @import("math_fixed.zig").isFixedPointType;
 pub const isSignedFixedPointType = @import("math_fixed.zig").isSignedFixedPointType;
@@ -84,18 +88,18 @@ pub fn isIntPrimitiveType(comptime T: type) bool {
 
 /// Returns true when the given type is a signed integer primitive type.
 pub fn isSignedIntPrimitiveType(comptime T: type) bool {
-    return switch(@typeInfo(T)) {
+    return comptime(switch(@typeInfo(T)) {
         .int => |int_info| int_info.signedness == .signed,
         else => false,
-    };
+    });
 }
 
 /// Returns true when the given type is an usigned integer primitive type.
 pub fn isUnsignedIntPrimitiveType(comptime T: type) bool {
-    return switch(@typeInfo(T)) {
+    return comptime(switch(@typeInfo(T)) {
         .int => |int_info| int_info.signedness == .unsigned,
         else => false,
-    };
+    });
 }
 
 /// Get the signed int primitive type with a given number of bits.
@@ -170,7 +174,9 @@ pub inline fn zero(comptime T: type) T {
         return .zero;
     }
     else {
-        @compileError("Operation is not supported for this type.");
+        @compileError(
+            "Operation is not supported for this type: " ++ @typeName(T)
+        );
     }
 }
 
@@ -180,11 +186,13 @@ pub inline fn one(comptime T: type) T {
     if(comptime(isIntPrimitiveType(T))) {
         return 1;
     }
-    else if(comptime(isFixedPointType(T) and @hasField(T, "toInt"))) {
+    else if(comptime(isFixedPointType(T) and @hasDecl(T, "toInt"))) {
         return .one;
     }
     else {
-        @compileError("Operation is not supported for this type.");
+        @compileError(
+            "Operation is not supported for this type: " ++ @typeName(T)
+        );
     }
 }
 
@@ -198,7 +206,9 @@ pub inline fn negativeOne(comptime T: type) T {
         return .negative_one;
     }
     else {
-        @compileError("Operation is not supported for this type.");
+        @compileError(
+            "Operation is not supported for this type: " ++ @typeName(T)
+        );
     }
 }
 

@@ -75,7 +75,7 @@ pub fn Vec2I(comptime T: type) type {
             comptime ToComponentT: type,
             /// The Z component of the new `Vec3`.
             z: ToComponentT,
-        ) Vec3(ToComponentT) {
+        ) gba.math.Vec3(ToComponentT) {
             const v = self.toVec2(ToComponentT);
             return .init(v.x, v.y, z);
         }
@@ -271,10 +271,10 @@ pub const Vec2U16 = Vec2U(u16);
 pub const Vec2U32 = Vec2U(u32);
 
 /// Two-dimensional vector with fixed point components.
-pub const Vec2FixedI16R8 = Vec2FixedI(gba.math.FixedI16R8);
+pub const Vec2FixedI16R8 = Vec2I(gba.math.FixedI16R8);
 
 /// Two-dimensional vector with fixed point components.
-pub const Vec2FixedI32R8 = Vec2FixedI(gba.math.FixedI32R8);
+pub const Vec2FixedI32R8 = Vec2I(gba.math.FixedI32R8);
 
 /// Two-dimensional vector with fixed point components.
-pub const Vec2FixedI32R16 = Vec2FixedI(gba.math.FixedI32R16);
+pub const Vec2FixedI32R16 = Vec2I(gba.math.FixedI32R16);

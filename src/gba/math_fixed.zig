@@ -39,22 +39,22 @@ test {
 
 /// Returns true when the given type is a fixed point type.
 pub fn isFixedPointType(comptime T: type) bool {
-    return @hasField(T, "is_fixed_point_type");
+    return comptime(@hasDecl(T, "is_fixed_point_type"));
 }
 
 /// Returns true when the given type is a signed fixed point type.
 pub fn isSignedFixedPointType(comptime T: type) bool {
-    return (
-        @hasField(T, "is_fixed_point_type") and
-        @hasField(T, "is_signed_fixed_point_type")
+    return comptime(
+        @hasDecl(T, "is_fixed_point_type") and
+        @hasDecl(T, "is_signed_fixed_point_type")
     );
 }
 
 /// Returns true when the given type is an unsigned fixed point type.
 pub fn isUnsignedFixedPointType(comptime T: type) bool {
-    return (
-        @hasField(T, "is_fixed_point_type") and
-        !@hasField(T, "is_signed_fixed_point_type")
+    return comptime(
+        @hasDecl(T, "is_fixed_point_type") and
+        !@hasDecl(T, "is_signed_fixed_point_type")
     );
 }
 
@@ -296,10 +296,10 @@ pub const FixedU16R16 = packed struct(u16) {
         comptime ToValueT: type,
         comptime to_radix_bits: comptime_int,
     ) FixedI(ToValueT, to_radix_bits) {
-        if(to_radix_bits == radix_bits) {
+        if(comptime(to_radix_bits == radix_bits)) {
             return .initRaw(@intCast(self.value));
         }
-        else if(to_radix_bits > radix_bits) {
+        else if(comptime(to_radix_bits > radix_bits)) {
             const shift = to_radix_bits - radix_bits;
             return .initRaw(@intCast(@as(i32, self.value) << shift));
         }
@@ -312,12 +312,16 @@ pub const FixedU16R16 = packed struct(u16) {
     /// Convert to another numeric type.
     /// Only supports other fixed-point types.
     pub fn to(self: Self, comptime ToT: type) ToT {
-        if(isSignedFixedPointType(ToT)) {
-            return self.toFixedI(@FieldType(ToT, "value"), @bitSizeOf(
-                @TypeOf(ToT.toInt).@"fn".return_type orelse unreachable
-            ));
+        if(comptime(isSignedFixedPointType(ToT))) {
+            const ToValueT = @FieldType(ToT, "value");
+            const bits_all = @bitSizeOf(ToValueT);
+            const bits_int = @bitSizeOf(
+                @typeInfo(@TypeOf(ToT.toInt)).@"fn".return_type orelse
+                unreachable
+            );
+            return self.toFixedI(ToValueT, bits_all - bits_int);
         }
-        else if(ToT == Self) {
+        else if(comptime(ToT == Self)) {
             return self;
         }
         else {
@@ -523,7 +527,7 @@ pub fn FixedI(
         
         /// Convert to an integer, truncating the value's fractional portion.
         pub fn toInt(self: Self) IntT {
-            return @intCast(self.value >> self.radix_bits);
+            return @intCast(self.value >> radix_bits);
         }
         
         /// Convert to another signed fixed-point type.
@@ -532,10 +536,10 @@ pub fn FixedI(
             comptime ToValueT: type,
             comptime to_radix_bits: comptime_int,
         ) FixedI(ToValueT, to_radix_bits) {
-            if(to_radix_bits == radix_bits) {
+            if(comptime(to_radix_bits == radix_bits)) {
                 return .initRaw(@intCast(self.value));
             }
-            else if(to_radix_bits > radix_bits) {
+            else if(comptime(to_radix_bits > radix_bits)) {
                 const shift = to_radix_bits - radix_bits;
                 return .initRaw(@intCast(@as(i32, self.value) << shift));
             }
@@ -548,15 +552,19 @@ pub fn FixedI(
         /// Convert to another numeric type.
         /// Supports integer primitives and other fixed-point types.
         pub fn to(self: Self, comptime ToT: type) ToT {
-            if(gba.math.isIntPrimitiveType(ToT)) {
+            if(comptime(gba.math.isIntPrimitiveType(ToT))) {
                 return @intCast(self.toInt());
             }
-            else if(isSignedFixedPointType(ToT)) {
-                return self.toFixedI(@FieldType(ToT, "value"), @bitSizeOf(
-                    @TypeOf(ToT.toInt).@"fn".return_type orelse unreachable
-                ));
+            else if(comptime(isSignedFixedPointType(ToT))) {
+                const ToValueT = @FieldType(ToT, "value");
+                const bits_all = @bitSizeOf(ToValueT);
+                const bits_int = @bitSizeOf(
+                    @typeInfo(@TypeOf(ToT.toInt)).@"fn".return_type orelse
+                    unreachable
+                );
+                return self.toFixedI(ToValueT, bits_all - bits_int);
             }
-            else if(ToT == FixedU16R16) {
+            else if(comptime(ToT == FixedU16R16)) {
                 if(radix_bits == 16) {
                     return .initRaw(@intCast(self.value));
                 }

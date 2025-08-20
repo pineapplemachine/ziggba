@@ -16,8 +16,6 @@ pub fn Mat2x2(comptime T: type) type {
 
 /// Represents a 2x2 matrix with signed components.
 pub fn Mat2x2I(comptime T: type) type {
-    const T_zero = gba.math.zero(T);
-    const T_one = gba.math.one(T);
     return extern struct {
         const Self = @This();
         const Vec2T = gba.math.Vec2(T);
@@ -135,7 +133,7 @@ pub fn Mat2x2I(comptime T: type) type {
         pub fn toMat3x3(
             self: Self,
             comptime ToComponentT: type,
-        ) Mat3x3(ToComponentT) {
+        ) gba.math.Mat3x3(ToComponentT) {
             return .initColumns(
                 self.cols[0].toVec3(ToComponentT),
                 self.cols[1].toVec3(ToComponentT),
@@ -146,8 +144,8 @@ pub fn Mat2x2I(comptime T: type) type {
         /// Multiply two matrices.
         pub fn mul(a: Self, b: Self) Self {
             return .initColumns(
-                self.mulVector(b.cols[0]),
-                self.mulVector(b.cols[1]),
+                a.mulVec2(b.cols[0]),
+                a.mulVec2(b.cols[1]),
             );
         }
         

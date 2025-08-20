@@ -1,3 +1,4 @@
+
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
@@ -66,7 +67,7 @@ pub fn Mat3x3I(comptime T: type) type {
         }
         
         /// Initialize with column vectors.
-        pub fn initColumns(a: [3]Vec3T, b: [3]Vec3T) Self {
+        pub fn initColumns(a: [3]Vec3T, b: [3]Vec3T, c: [3]Vec3T) Self {
             return .{ .cols = .{ a, b, c } };
         }
         
@@ -96,19 +97,22 @@ pub fn Mat3x3I(comptime T: type) type {
         
         /// Convert to an affine transform.
         pub fn toAffine2x2(self: Self) gba.math.Affine3x2 {
-            const col_0 = self.cols[0].toVec2(gba.math.FixedI32R8);
-            const col_1 = self.cols[1].toVec2(gba.math.FixedI32R8);
-            return .init(cols_0.x, cols_1.x, cols_0.y, cols_1.y);
+            return .init(
+                self.cols[0].x.to(gba.math.FixedI32R8),
+                self.cols[1].x.to(gba.math.FixedI32R8),
+                self.cols[0].y.to(gba.math.FixedI32R8),
+                self.cols[1].y.to(gba.math.FixedI32R8),
+            );
         }
         
         /// Convert to an affine transform.
         pub fn toAffine3x2(self: Self) gba.math.Affine3x2 {
-            const col_0 = self.cols[0].toVec2(gba.math.FixedI32R8);
-            const col_1 = self.cols[1].toVec2(gba.math.FixedI32R8);
-            const col_2 = self.cols[2].toVec2(gba.math.FixedI32R8);
             return .init(
-                .init(cols_0.x, cols_1.x, cols_0.y, cols_1.y),
-                .init(col_2.x, col_2.x),
+                self.toAffine2x2(),
+                .init(
+                    self.cols[2].x.to(gba.math.FixedI32R8),
+                    self.cols[2].x.to(gba.math.FixedI32R8),
+                ),
             );
         }
         
@@ -130,9 +134,9 @@ pub fn Mat3x3I(comptime T: type) type {
         /// Multiply two matrices.
         pub fn mul(a: Self, b: Self) Self {
             return .initColumns(
-                self.mulVector(b.cols[0]),
-                self.mulVector(b.cols[1]),
-                self.mulVector(b.cols[2]),
+                a.mulVec3(b.cols[0]),
+                a.mulVec3(b.cols[1]),
+                a.mulVec3(b.cols[2]),
             );
         }
         
