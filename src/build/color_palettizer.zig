@@ -6,8 +6,12 @@ const ColorQuantizerLinear = @import("color.zig").ColorQuantizerLinear;
 const savePalette = @import("color.zig").savePalette;
 const ColorRgb555 = @import("../gba/color.zig").ColorRgb555;
 
+/// Result type returned by `colorRgbNearestLinear`.
 const NearestColorResult = struct {
+    /// Index of the nearest color to the input.
     index: u8,
+    /// A measurement of distance between the input and the chosen color.
+    /// A distance of zero should be taken as indicating an exact match.
     distance: i32,
 };
 

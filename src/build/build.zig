@@ -13,6 +13,7 @@ const gba_lib_file_path = "src/gba/gba.zig";
 const asm_file_paths = [_][]const u8{
     "src/gba/crt0.s",
     "src/gba/isr.s",
+    "src/gba/math.s",
     "src/gba/mem.s",
 };
 

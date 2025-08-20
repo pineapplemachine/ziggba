@@ -28,13 +28,13 @@ pub fn hideAllObjects() void {
 /// an affine value. Other values belong to object attributes.
 pub const affine_values: [*]gba.math.FixedI16R8 = @ptrFromInt(gba.mem.oam);
 
-// TODO: Generic Matrix type
-
 /// Represents an affine transformation matrix.
 pub const AffineTransform = extern struct {
+    // TODO: Replace with gba.math.Mat2x2FixedI16R8
+    
     /// Identity matrix. Applies no rotation, scaling, or shearing.
     pub const Identity: AffineTransform = (
-        .init(gba.math.FixedI16R8.initInt(1), .{}, .{}, gba.math.FixedI16R8.initInt(1))
+        .init(gba.math.FixedI16R8.fromInt(1), .{}, .{}, gba.math.FixedI16R8.fromInt(1))
     );
     
     /// Affine transformation matrix components, in row-major order.
@@ -72,15 +72,19 @@ pub const AffineTransform = extern struct {
     }
     
     /// Return a rotation matrix that will scale an object by the
-    /// given amount on each axis. Uses `sin_fast` and `cos_fast`.
-    pub fn rotateFast(angle: gba.math.FixedU16R16) AffineTransform {
-        const sin_theta = angle.sinFast().toI16R8();
-        const cos_theta = angle.cosFast().toI16R8();
+    /// given amount on each axis.
+    /// Uses `gba.math.FixedU16R16.sin` and `gba.math.FixedU16R16.cos`.
+    /// See also `gba.bios.objAffineSet`.
+    pub fn rotate(angle: gba.math.FixedU16R16) AffineTransform {
+        const sin_theta = angle.sin().toI16R8();
+        const cos_theta = angle.cos().toI16R8();
         return .init(cos_theta, sin_theta, sin_theta.negate(), cos_theta);
     }
     
     /// Return a rotation matrix that will scale an object by the
-    /// given amount on each axis. Uses `sin_lerp` and `cos_lerp`.
+    /// given amount on each axis.
+    /// Uses `gba.math.FixedU16R16.sinLerp` and `gba.math.FixedU16R16.cosLerp`.
+    /// See also `gba.bios.objAffineSet`.
     pub fn rotateLerp(angle: gba.math.FixedU16R16) AffineTransform {
         const sin_theta = angle.sinLerp().toI16R8();
         const cos_theta = angle.cosLerp().toI16R8();
@@ -171,6 +175,7 @@ pub const Obj = packed struct(u48) {
         /// In bitmap modes, this must be 1, since the lower block is occupied by the bitmap.
         block: u1 = 0,
     };
+    // TODO: just make it a u10
 
     /// Represents the Y position of the object on the screen.
     /// For normal sprites, marks the top.

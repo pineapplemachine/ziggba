@@ -128,10 +128,10 @@ pub const TextScreenEntry = packed struct(u16) {
 
 // TODO: This is currently only used by the BIOS API
 pub const Affine = extern struct {
-    pa: gba.math.FixedI16R8 align(2) = gba.math.FixedI16R8.initInt(1),
+    pa: gba.math.FixedI16R8 align(2) = gba.math.FixedI16R8.fromInt(1),
     pb: gba.math.FixedI16R8 align(2) = .{},
     pc: gba.math.FixedI16R8 align(2) = .{},
-    pd: gba.math.FixedI16R8 align(2) = gba.math.FixedI16R8.initInt(1),
+    pd: gba.math.FixedI16R8 align(2) = gba.math.FixedI16R8.fromInt(1),
     dx: gba.math.FixedI32R8 align(4) = .{},
     dy: gba.math.FixedI32R8 align(4) = .{},
 };
@@ -146,6 +146,8 @@ pub inline fn screenBlockMap(block: u5) [*]volatile TextScreenEntry {
     return @ptrCast(&screen_block_ram[block]);
 }
 
+// TODO: Generic Mat3x2 type
+
 pub const BackgroundAffine = extern struct {
     /// Represents an affine transformation matrix for a background.
     transform: gba.obj.AffineTransform,
@@ -153,19 +155,20 @@ pub const BackgroundAffine = extern struct {
     /// for use with affine backgrounds.
     ///
     /// Note that the highest 4 bits of each component are not used.
-    displace: gba.math.FixedVec2I32R8,
+    displace: gba.math.Vec2FixedI32R8,
     
     pub const RotateScaleOptions = struct {
-        bg_origin: gba.math.FixedVec2I32R16 = .zero,
-        screen_origin: gba.math.FixedVec2I32R16 = .zero,
-        scale: gba.math.FixedVec2I32R16 = .one,
+        bg_origin: gba.math.Vec2FixedI32R16 = .zero,
+        screen_origin: gba.math.Vec2FixedI32R16 = .zero,
+        scale: gba.math.Vec2FixedI32R16 = .one,
         angle: gba.math.FixedU16R16 = .zero,
     };
     
+    /// See also `gba.bios.bgAffineSet`.
     pub fn initRotScaleFast(options: RotateScaleOptions) BackgroundAffine {
         // See https://gbadev.net/tonc/affbg.html#sec-aff-ofs
-        const sin = options.angle.sinFast();
-        const cos = options.angle.cosFast();
+        const sin = options.angle.sin();
+        const cos = options.angle.cos();
         const pa = options.scale.x.mul(cos);
         const pb = options.scale.x.mul(sin.negate());
         const pc = options.scale.y.mul(sin);

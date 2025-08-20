@@ -3,6 +3,7 @@ const std = @import("std");
 const assert = @import("std").debug.assert;
 const ColorRgba32 = @import("color.zig").ColorRgba32;
 const RectU16 = @import("../gba/math.zig").RectU16;
+const Vec2U16 = @import("../gba/math.zig").Vec2U16;
 
 pub const ConvertImageBitmap8BppOptions = @import("image_bitmap.zig").ConvertImageBitmap8BppOptions;
 pub const ConvertImageBitmap16BppOptions = @import("image_bitmap.zig").ConvertImageBitmap16BppOptions;
@@ -33,7 +34,7 @@ pub const ConvertImageTiles4BppStep = @import("image_tiles.zig").ConvertImageTil
 pub const ConvertImageTiles8BppStep = @import("image_tiles.zig").ConvertImageTiles8BppStep;
 
 /// Provides an interface for loading and reading image data.
-/// Wraps a `zigimg.Image`, but could wrap something else in the future
+/// Wraps a `zigimg.Image`, but it could wrap something else in the future
 /// while providing the same interface.
 pub const Image = struct {
     data: zigimg.Image,
@@ -71,8 +72,14 @@ pub const Image = struct {
         return @intCast(self.data.height);
     }
     
+    /// Get a rectangle representing the bounds of the image.
     pub fn getRect(self: Image) RectU16 {
         return .init(0, 0, self.getWidth(), self.getHeight());
+    }
+    
+    /// Get a vector representing the size of the image.
+    pub fn getSize(self: Image) Vec2U16 {
+        return .init(self.getWidth(), self.getHeight());
     }
     
     /// Returns the number of pixels, i.e. `width * height`.

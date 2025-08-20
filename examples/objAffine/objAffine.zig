@@ -45,7 +45,7 @@ pub export fn main() void {
     while (true) : (frame +%= 1) {
         gba.display.naiveVSync();
 
-        const transform = gba.obj.AffineTransform.rotateFast(
+        const transform = gba.obj.AffineTransform.rotate(
             .initRaw(@truncate(frame << 8)),
         );
         gba.obj.setOamTransform(metroid.transform.affine_index, transform);

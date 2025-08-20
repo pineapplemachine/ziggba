@@ -1,7 +1,6 @@
-const builtin = @import("builtin");
-const std = @import("std");
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
+const isGbaTarget = @import("util.zig").isGbaTarget;
 
 /// Type returned by `div` and `divArm`.
 pub const DivResult = packed struct {
@@ -42,7 +41,7 @@ pub const ObjAffineSource = packed struct {
 /// available.
 pub fn div(numerator: i32, denominator: i32) DivResult {
     assert(denominator != 0);
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+    if(comptime(!isGbaTarget())) {
         return .{
             .quotient = @divTrunc(numerator, denominator),
             .remainder = @rem(numerator, denominator),
@@ -81,7 +80,7 @@ pub fn div(numerator: i32, denominator: i32) DivResult {
 /// available.
 pub fn divArm(numerator: i32, denominator: i32) DivResult {
     assert(denominator != 0);
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+    if(comptime(!isGbaTarget())) {
         return .{
             .quotient = @divTrunc(numerator, denominator),
             .remainder = @rem(numerator, denominator),
@@ -116,7 +115,7 @@ pub fn divArm(numerator: i32, denominator: i32) DivResult {
 /// as you would expect in tests and at comptime where the GBA BIOS is not
 /// available.
 pub fn sqrt(x: u32) u16 {
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+    if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios
         const N_items: [16]u4 = .{
             15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0
@@ -151,7 +150,7 @@ pub fn sqrt(x: u32) u16 {
 /// as you would expect in tests and at comptime where the GBA BIOS is not
 /// available.
 pub fn arctan(x: gba.math.FixedU16R14) gba.math.FixedU16R16 {
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+    if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios
         const x2 = @as(i32, x.value) * @as(i32, x.value);
         const a: i32 = -(x2 >> 14);
@@ -183,8 +182,8 @@ pub fn arctan(x: gba.math.FixedU16R14) gba.math.FixedU16R16 {
 /// Normally uses a GBA BIOS function, but also implements a fallback to run
 /// as you would expect in tests and at comptime where the GBA BIOS is not
 /// available.
-pub fn arctan2(x: i16, y: i16) gba.FixedU16R16 {
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+pub fn arctan2(x: i16, y: i16) gba.math.FixedU16R16 {
+    if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios
         if(y == 0) {
             return ((x >> 16) & 0x8000);
@@ -211,7 +210,7 @@ pub fn arctan2(x: i16, y: i16) gba.FixedU16R16 {
     else {
         return asm volatile (
             "swi 0x0a"
-            : [ret] "={r0}" (-> gba.FixedU16R16),
+            : [ret] "={r0}" (-> gba.math.FixedU16R16),
             : [x] "{r0}" (x),
               [y] "{r1}" (y),
             : "r0", "r1", "r3", "cc"
@@ -232,7 +231,7 @@ pub fn bgAffineSet(
     /// Write the computed affine transformations and displacements here.
     destination: [*]volatile gba.bg.Affine,
 ) void {
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+    if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios
         const sin_lut: [256]i16 = .{
             0x0000, 0x0192, 0x0323, 0x04b5, 0x0645, 0x07d5, 0x0964, 0x0af1,
@@ -350,7 +349,7 @@ pub fn objAffineSet(
     /// to the next, at the destination pointer.
     offset: u32,
 ) void {
-    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+    if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios
         const sin_lut: [256]i16 = .{
             0x0000, 0x0192, 0x0323, 0x04b5, 0x0645, 0x07d5, 0x0964, 0x0af1,

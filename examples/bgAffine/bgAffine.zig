@@ -101,8 +101,8 @@ pub export fn main() void {
         // Rotate the background by the current angle around its center,
         // showing it near the center of the screen.
         gba.bg.bg_2_affine.* = .initRotScaleFast(.{
-            .bg_origin = .{ .x = .initInt(64), .y = .initInt(64) },
-            .screen_origin = .{ .x = .initInt(120), .y = .initInt(68) },
+            .bg_origin = .{ .x = .fromInt(64), .y = .fromInt(64) },
+            .screen_origin = .{ .x = .fromInt(120), .y = .fromInt(68) },
             .angle = angle,
         });
         
@@ -114,7 +114,7 @@ pub export fn main() void {
         );
         
         // Draw an up-to-date value for the angle, converted to degrees.
-        const angle_display = angle.toI32R16().mul(.initInt(360)).toI32R8();
+        const angle_display = angle.toI32R16().mul(.fromInt(360)).toI32R8();
         const fmt_len = angle_display.formatDecimal(&text_buffer, .{
             .min_fraction_digits = 2,
             .max_fraction_digits = 2,

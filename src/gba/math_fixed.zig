@@ -26,11 +26,36 @@
 
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
+const isGbaTarget = @import("util.zig").isGbaTarget;
+
+extern var FixedI32R8_mul_arm: u8;
+extern var FixedI32R16_mul_arm: u8;
 
 test {
     _ = @import("test/math_fixed_format.zig");
     _ = @import("test/math_fixed_math.zig");
     _ = @import("test/math_fixed_trig.zig");
+}
+
+/// Returns true when the given type is a fixed point type.
+pub fn isFixedPointType(comptime T: type) bool {
+    return @hasField(T, "is_fixed_point_type");
+}
+
+/// Returns true when the given type is a signed fixed point type.
+pub fn isSignedFixedPointType(comptime T: type) bool {
+    return (
+        @hasField(T, "is_fixed_point_type") and
+        @hasField(T, "is_signed_fixed_point_type")
+    );
+}
+
+/// Returns true when the given type is an unsigned fixed point type.
+pub fn isUnsignedFixedPointType(comptime T: type) bool {
+    return (
+        @hasField(T, "is_fixed_point_type") and
+        !@hasField(T, "is_signed_fixed_point_type")
+    );
 }
 
 pub const FormatDecimalFixedOptions = struct {
@@ -62,6 +87,79 @@ pub const FormatDecimalFixedOptions = struct {
     /// This character is used for the decimal point.
     decimal_char: u8 = '.',
 };
+
+/// Format a FixedI32R8 value as a decimal string.
+fn formatDecimalFixedI32R8(
+    self: FixedI32R8,
+    buffer: [*]volatile u8,
+    options: FormatDecimalFixedOptions,
+) u32 {
+    const int_value: i32 = (self.value >> 8) + @as(i32, (
+        if(self.value < 0 and (self.value & 0xff) != 0) 1 else 0
+    ));
+    const int_len = gba.format.formatDecimalI32(buffer, int_value, .{
+        .decimal_digits = options.decimal_digits,
+        .sign_negative_char = options.sign_negative_char,
+        .sign_positive_char = options.sign_positive_char,
+        .always_sign = options.always_sign,
+        .pad_left_len = if(options.pad_left_int) options.pad_left_len else 0,
+        .pad_left_char = options.pad_left_char,
+    });
+    // 1/256 == 0.00390625
+    const frac_value: i32 = 390625 * @as(i32, (
+        if(self.value >= 0) self.value & 0xff
+        else (0x100 -% self.value) & 0xff
+    ));
+    var total_len: u32 = int_len;
+    if(frac_value > 0 or options.min_fraction_digits > 0) {
+        buffer[int_len] = options.decimal_char;
+        const frac_buffer = buffer + int_len + 1;
+        var frac_len = gba.format.formatDecimalI32(frac_buffer, frac_value, .{
+            .decimal_digits = options.decimal_digits,
+            .pad_left_len = 8,
+            .pad_left_char = options.decimal_digits[0],
+        });
+        assert(frac_len == 8);
+        total_len += 9; // decimal point plus 8 digits == 9 bytes
+        // Truncate to max_fraction_digits
+        if(frac_len > options.max_fraction_digits) {
+            total_len -= frac_len - options.max_fraction_digits;
+            frac_len = options.max_fraction_digits;
+        }
+        // Trim trailing zeros
+        while(buffer[total_len - 1] == options.decimal_digits[0] and (
+            frac_len > options.min_fraction_digits
+        )) {
+            frac_len -= 1;
+            total_len -= 1;
+        }
+        // Pad to min_fraction_digits
+        while(frac_len < options.min_fraction_digits) {
+            buffer[total_len] = options.decimal_digits[0];
+            frac_len += 1;
+            total_len += 1;
+        }
+        // No fraction digits, after all that? Remove the decimal point.
+        if(frac_len == 0) {
+            total_len -= 1;
+        }
+    }
+    if(total_len < options.pad_left_len and !options.pad_left_int) {
+        const pad_len = options.pad_left_len - total_len;
+        for(0..total_len) |pad_i| {
+            const j = options.pad_left_len - pad_i - 1;
+            assert(j >= pad_len);
+            buffer[j] = buffer[j - pad_len];
+        }
+        for(0..pad_len) |pad_i| {
+            buffer[pad_i] = options.pad_left_char;
+        }
+        return options.pad_left_len;
+    }
+    else {
+        return total_len;
+    }
+}
 
 /// Stores `sine(x) * 0x10000` in 256 steps over the range `[0, pi/2)` radians.
 /// This can be used to trivially compute sine and cosine for arbitary inputs.
@@ -136,221 +234,6 @@ fn sinRevolutionsLerp(value: u16) i32 {
     return sin_lo + ((sin_delta * t) >> 6);
 }
 
-/// Fixed point number type. Signed, width 16 bits, radix 8 bits.
-/// The GBA hardware uses values of this type to represent the components
-/// of affine transformation matrices.
-pub const FixedI16R8 = packed struct(i16) {
-    pub const zero: FixedI16R8 = .initRaw(0);
-    pub const one: FixedI16R8 = .initInt(1);
-    
-    /// Raw internal value.
-    value: i16 = 0,
-    
-    pub inline fn initRaw(raw_value: i16) FixedI16R8 {
-        return FixedI16R8{ .value = raw_value };
-    }
-    
-    pub inline fn initInt(int_value: i8) FixedI16R8 {
-        return FixedI16R8.initRaw(@as(i16, int_value) << 8);
-    }
-    
-    pub fn initFloat32(comptime value: f32) FixedI16R8 {
-        return FixedI16R8.initRaw(@intFromFloat(value * 0x100));
-    }
-    
-    /// Convert to an integer, truncating the value's fractional portion.
-    pub inline fn toInt(self: FixedI16R8) i8 {
-        return @intCast(self.value >> 8);
-    }
-    
-    /// Convert to a `FixedI32R16` value.
-    pub inline fn toI32R16(self: FixedI32R16) FixedI32R16 {
-        return FixedI32R16.initRaw(@as(i32, self.value) << 8);
-    }
-    
-    /// Convert to a `FixedU16R16` value.
-    pub inline fn toU16R16(self: FixedI16R8) FixedU16R16 {
-        return FixedU16R16.initRaw(self.value << 8);
-    }
-    
-    /// Convert to a `FixedI32R8` value.
-    pub inline fn toI32R8(self: FixedI32R8) FixedI32R8 {
-        return FixedI32R8.initRaw(@intCast(self.value));
-    }
-    
-    /// Get a negated value.
-    pub inline fn negate(self: FixedI16R8) FixedI16R8 {
-        return FixedI16R8.initRaw(-self.value);
-    }
-    
-    /// Get an absolute value.
-    pub inline fn abs(self: FixedI16R8) FixedI16R8 {
-        return if(self.value >= 0) self else FixedI16R8.initRaw(-self.value);
-    }
-    
-    /// Add two values.
-    pub inline fn add(a: FixedI16R8, b: FixedI16R8) FixedI16R8 {
-        return FixedI16R8.initRaw(a.value + b.value);
-    }
-    
-    /// Subtract `b` from `a`.
-    pub inline fn sub(a: FixedI16R8, b: FixedI16R8) FixedI16R8 {
-        return FixedI16R8.initRaw(a.value - b.value);
-    }
-    
-    /// Multiply two values.
-    pub fn mul(a: FixedI16R8, b: FixedI16R8) FixedI16R8 {
-        return FixedI16R8.initRaw(@truncate(
-            (@as(i32, a.value) * @as(i32, b.value)) >> 16
-        ));
-    }
-    
-    /// Divide two values.
-    pub fn div(a: FixedI16R8, b: FixedI16R8) FixedI16R8 {
-        const qr = gba.bios.div(@as(i32, a.value) << 8, b.value);
-        return FixedI16R8.initRaw(qr.quotient);
-    }
-    
-    /// Returns true when two values are exactly equal.
-    pub inline fn eql(a: FixedI16R8, b: FixedI16R8) bool {
-        return a.value == b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is less than `b`.
-    pub inline fn lessThan(a: FixedI16R8, b: FixedI16R8) bool {
-        return a.value < b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is greater than `b`.
-    pub inline fn greaterThan(a: FixedI16R8, b: FixedI16R8) bool {
-        return a.value > b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is less than or equal to `b`.
-    pub inline fn lessOrEqual(a: FixedI16R8, b: FixedI16R8) bool {
-        return a.value <= b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is greater than or equal to `b`.
-    pub inline fn greaterOrEqual(a: FixedI16R8, b: FixedI16R8) bool {
-        return a.value <= b.value;
-    }
-    
-    /// Write the fixed point value with ASCII characters in decimal
-    /// format to an output buffer. The longest possible output string
-    /// under normal circumstances is 13 characters: 1 for sign, 3 for
-    /// integer portion, 1 for decimal point, and 8 after the decimal.
-    ///
-    /// May write junk in the output buffer past the end of the returned
-    /// length, using it as a scratch area. Always provide a buffer with
-    /// at least 13 free bytes.
-    /// More is required when using a `options.pad_left_len` longer
-    /// than 13 or `options.max_fraction_digits` longer than 8.
-    pub fn formatDecimal(
-        self: FixedI16R8,
-        buffer: [*]volatile u8,
-        options: FormatDecimalFixedOptions,
-    ) u8 {
-        return self.toI32R8().formatDecimal(buffer, options);
-    }
-};
-
-/// Fixed point number type. Signed, width 16 bits, radix 14 bits.
-/// The GBA BIOS uses this type in arctangent calculations.
-pub const FixedI16R14 = packed struct(i16) {
-    pub const zero: FixedI16R14 = .initRaw(0);
-    pub const one: FixedI16R14 = .initInt(1);
-    
-    /// Raw internal value.
-    value: i16 = 0,
-    
-    pub inline fn initRaw(raw_value: i16) FixedI16R14 {
-        return FixedI16R14{ .value = raw_value };
-    }
-    
-    pub inline fn initInt(int_value: i2) FixedI16R14 {
-        return FixedI16R14.initRaw(@as(i16, int_value) << 14);
-    }
-    
-    pub fn initFloat32(comptime value: f32) FixedI16R14 {
-        return FixedI16R14.initRaw(@intFromFloat(value * 0x4000));
-    }
-    
-    pub fn initFloat64(comptime value: f64) FixedI16R14 {
-        return FixedI16R14.initRaw(@intFromFloat(value * 0x4000));
-    }
-    
-    /// Convert to an integer, truncating the value's fractional portion.
-    pub inline fn toInt(self: FixedI16R14) i2 {
-        return @intCast(self.value >> 14);
-    }
-    
-    /// Convert to a `FixedI16R8` value.
-    pub inline fn toI16R8(self: FixedI16R14) FixedI16R8 {
-        return FixedI16R8.initRaw(self.value >> 6);
-    }
-    
-    /// Convert to a `FixedI32R16` value.
-    pub inline fn toI32R16(self: FixedI16R14) FixedI32R16 {
-        return FixedI32R16.initRaw(@as(i32, self.value) << 2);
-    }
-    
-    /// Convert to a `FixedU16R16` value.
-    pub inline fn toU16R16(self: FixedI16R14) FixedU16R16 {
-        return FixedU16R16.initRaw(self.value << 2);
-    }
-    
-    /// Convert to a `FixedI32R8` value.
-    pub inline fn toI32R8(self: FixedI16R14) FixedI32R8 {
-        return FixedI32R8.initRaw(@as(i32, self.value) >> 6);
-    }
-    
-    /// Get a negated value.
-    pub inline fn negate(self: FixedI16R14) FixedI16R14 {
-        return FixedI16R14.initRaw(-self.value);
-    }
-    
-    /// Get an absolute value.
-    pub inline fn abs(self: FixedI16R14) FixedI16R14 {
-        return if(self.value >= 0) self else FixedI16R14.initRaw(-self.value);
-    }
-    
-    /// Add two values.
-    pub inline fn add(a: FixedI16R14, b: FixedI16R14) FixedI16R14 {
-        return FixedI16R14.initRaw(a.value + b.value);
-    }
-    
-    /// Subtract `b` from `a`.
-    pub inline fn sub(a: FixedI16R14, b: FixedI16R14) FixedI16R14 {
-        return FixedI16R14.initRaw(a.value - b.value);
-    }
-    
-    /// Returns true when two values are exactly equal.
-    pub inline fn eql(a: FixedI16R14, b: FixedI16R14) bool {
-        return a.value == b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is less than `b`.
-    pub inline fn lessThan(a: FixedI16R14, b: FixedI16R14) bool {
-        return a.value < b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is greater than `b`.
-    pub inline fn greaterThan(a: FixedI16R14, b: FixedI16R14) bool {
-        return a.value > b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is less than or equal to `b`.
-    pub inline fn lessOrEqual(a: FixedI16R14, b: FixedI16R14) bool {
-        return a.value <= b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is greater than or equal to `b`.
-    pub inline fn greaterOrEqual(a: FixedI16R14, b: FixedI16R14) bool {
-        return a.value <= b.value;
-    }
-};
-
 /// Fixed point number type. Unsigned, width 16 bits, radix 16 bits.
 /// Note that this is a particularly suitable type for representing angles
 /// of rotation, measured in revolutions.
@@ -359,88 +242,132 @@ pub const FixedI16R14 = packed struct(i16) {
 /// the `BgAffineSet` and `ObjAffineSet` functions, as well as angle outputs
 /// from the `ArcTan` and `ArcTan2` functions.
 pub const FixedU16R16 = packed struct(u16) {
+    const Self = @This();
+    const ValueT = u16;
+    const radix_bits: comptime_int = 16;
+    const radix_int: comptime_int = 1 << radix_bits;
+    
+    pub const is_fixed_point_type: bool = true;
+    
     pub const zero: FixedU16R16 = .initRaw(0);
+    pub const deg_90: FixedU16R16 = .initRaw(0x4000);
+    pub const deg_180: FixedU16R16 = .initRaw(0x8000);
+    pub const deg_270: FixedU16R16 = .initRaw(0xc000);
     
     /// Raw internal value.
     value: u16 = 0,
     
-    pub inline fn initRaw(raw_value: u16) FixedU16R16 {
-        return FixedU16R16{ .value = raw_value };
-    }
-    
-    pub fn initFloat32(comptime value: f32) FixedU16R16 {
-        return FixedU16R16.initRaw(@intFromFloat(value * 0x10000));
-    }
-    
-    pub fn initFloat64(comptime value: f64) FixedU16R16 {
-        return FixedU16R16.initRaw(@intFromFloat(value * 0x10000));
+    /// Initialize from a raw value.
+    /// You probably want to use `initDegrees`, `initRadians`, or
+    /// `fromFloat` instead!
+    pub fn initRaw(raw_value: ValueT) Self {
+        return .{ .value = raw_value };
     }
     
     /// Initialize an angle, converting from degrees.
     /// FixedU16R16 internally represents angles as revolutions.
     pub fn initDegrees(comptime deg: f64) FixedU16R16 {
-        return FixedU16R16.initFloat64(@mod(deg / 360.0, 1.0));
+        return FixedU16R16.fromFloat64(@mod(deg / 360.0, 1.0));
     }
     
     /// Initialize an angle, converting from radians.
     /// FixedU16R16 internally represents angles as revolutions.
     pub fn initRadians(comptime rad: f64) FixedU16R16 {
-        return FixedU16R16.initFloat64(@mod(rad / 6.283185307179586, 1.0));
+        return FixedU16R16.fromFloat64(@mod(rad / 6.283185307179586, 1.0));
     }
     
-    /// Convert to a `FixedI16R8` value.
-    pub inline fn toI16R8(self: FixedU16R16) FixedU16R16 {
-        return FixedI16R8.initRaw(self.value >> 8);
+    /// Initialize with a floating point value.
+    pub fn fromFloat(comptime value: f64) Self {
+        return Self.initRaw(@intFromFloat(value * radix_int));
     }
     
-    /// Convert to a `FixedI32R8` value.
-    pub inline fn toI32R8(self: FixedU16R16) FixedI32R8 {
-        return FixedI32R8.initRaw(self.value >> 8);
+    /// Convert to a signed fixed-point type.
+    pub fn toFixedI(
+        self: Self,
+        comptime ToValueT: type,
+        comptime to_radix_bits: comptime_int,
+    ) FixedI(ToValueT, to_radix_bits) {
+        if(to_radix_bits == radix_bits) {
+            return .initRaw(@intCast(self.value));
+        }
+        else if(to_radix_bits > radix_bits) {
+            const shift = to_radix_bits - radix_bits;
+            return .initRaw(@intCast(@as(i32, self.value) << shift));
+        }
+        else {
+            const shift = radix_bits - to_radix_bits;
+            return .initRaw(@intCast(@as(i32, self.value) >> shift));
+        }
     }
     
-    /// Convert to a `FixedI32R16` value.
-    pub inline fn toI32R16(self: FixedU16R16) FixedI32R16 {
-        return FixedI32R16.initRaw(self.value);
+    /// Convert to another numeric type.
+    /// Only supports other fixed-point types.
+    pub fn to(self: Self, comptime ToT: type) ToT {
+        if(isSignedFixedPointType(ToT)) {
+            return self.toFixedI(@FieldType(ToT, "value"), @bitSizeOf(
+                @TypeOf(ToT.toInt).@"fn".return_type orelse unreachable
+            ));
+        }
+        else if(ToT == Self) {
+            return self;
+        }
+        else {
+            @compileError("Cannot convert fixed point value to this type.");
+        }
     }
     
     /// Invert this value.
     /// For angles, this is equivalent to adding 180 degrees.
-    pub inline fn invert(self: FixedU16R16) FixedU16R16 {
-        return FixedU16R16.initRaw(self.value +% 0x8000);
+    pub inline fn invert(self: Self) Self {
+        return Self.initRaw(self.value +% 0x8000);
     }
     
     /// Add two values.
-    pub inline fn add(a: FixedU16R16, b: FixedU16R16) FixedU16R16 {
-        return FixedU16R16.initRaw(a.value + b.value);
+    pub inline fn add(a: Self, b: Self) Self {
+        return Self.initRaw(a.value + b.value);
     }
     
     /// Subtract `b` from `a`.
-    pub inline fn sub(a: FixedU16R16, b: FixedU16R16) FixedU16R16 {
-        return FixedU16R16.initRaw(a.value - b.value);
+    pub inline fn sub(a: Self, b: Self) Self {
+        return Self.initRaw(a.value - b.value);
+    }
+    
+    /// Multiply two values.
+    pub fn mul(a: Self, b: Self) Self {
+        return Self.initRaw(@intCast(
+            (@as(u32, a.value) * @as(u32, b.value)) >> 16
+        ));
+    }
+    
+    // TODO: Compute reciprocal, return a FixedI32R16
+    
+    /// Returns true when the fixed point value is equal to zero.
+    pub inline fn isZero(self: Self) bool {
+        return self.value == 0;
     }
     
     /// Returns true when two values are exactly equal.
-    pub inline fn eql(a: FixedU16R16, b: FixedU16R16) bool {
+    pub inline fn eql(a: Self, b: Self) bool {
         return a.value == b.value;
     }
     
     /// Compare two values. Returns true when `a` is less than `b`.
-    pub inline fn lessThan(a: FixedU16R16, b: FixedU16R16) bool {
+    pub inline fn lessThan(a: Self, b: Self) bool {
         return a.value < b.value;
     }
     
     /// Compare two values. Returns true when `a` is greater than `b`.
-    pub inline fn greaterThan(a: FixedU16R16, b: FixedU16R16) bool {
+    pub inline fn greaterThan(a: Self, b: Self) bool {
         return a.value > b.value;
     }
     
     /// Compare two values. Returns true when `a` is less than or equal to `b`.
-    pub inline fn lessOrEqual(a: FixedU16R16, b: FixedU16R16) bool {
+    pub inline fn lessOrEqual(a: Self, b: Self) bool {
         return a.value <= b.value;
     }
     
     /// Compare two values. Returns true when `a` is greater than or equal to `b`.
-    pub inline fn greaterOrEqual(a: FixedU16R16, b: FixedU16R16) bool {
+    pub inline fn greaterOrEqual(a: Self, b: Self) bool {
         return a.value <= b.value;
     }
     
@@ -448,7 +375,9 @@ pub const FixedU16R16 = packed struct(u16) {
     ///
     /// This implementation uses a lookup table allowing for 1024 discrete
     /// results from 0 to a full turn. It does not perform interpolation.
-    pub inline fn sinFast(self: FixedU16R16) FixedI32R16 {
+    /// This makes it faster than `sinLerp`, but less accurate.
+    /// Even so, this should be accurate enough for almost all purposes.
+    pub inline fn sin(self: Self) FixedI32R16 {
         return FixedI32R16.initRaw(sinRevolutionsStepped(self.value));
     }
     
@@ -456,440 +385,328 @@ pub const FixedU16R16 = packed struct(u16) {
     ///
     /// This implementation uses a lookup table allowing for 1024 discrete
     /// results from 0 to a full turn. It does not perform interpolation.
-    pub inline fn cosFast(self: FixedU16R16) FixedI32R16 {
+    /// This makes it faster than `cosLerp`, but less accurate.
+    /// Even so, this should be accurate enough for almost all purposes.
+    pub inline fn cos(self: Self) FixedI32R16 {
         return FixedI32R16.initRaw(sinRevolutionsStepped(self.value +% 0x4000));
     }
     
     /// Compute the sine of an angle, measured in revolutions.
+    /// Produces a very accurate result, but not perfectly so.
     ///
     /// This implementation interpolates between values in a LUT, meaning
     /// it produces a smoother curve with less error compared to `sin_fast`.
     /// However, this extra computation costs a little extra performance.
-    pub inline fn sinLerp(self: FixedU16R16) FixedI32R16 {
+    pub inline fn sinLerp(self: Self) FixedI32R16 {
         return FixedI32R16.initRaw(sinRevolutionsLerp(self.value));
     }
     
     /// Compute the cosine of an angle, measured in revolutions.
+    /// Produces a very accurate result, but not perfectly so.
     ///
     /// This implementation interpolates between values in a LUT, meaning
     /// it produces a smoother curve with less error compared to `cos_fast`.
     /// However, this extra computation costs a little extra performance.
-    pub inline fn cosLerp(self: FixedU16R16) FixedI32R16 {
+    pub inline fn cosLerp(self: Self) FixedI32R16 {
         return FixedI32R16.initRaw(sinRevolutionsLerp(self.value +% 0x4000));
     }
     
     /// Convert an angle to degrees.
-    pub fn degrees(self: FixedU16R16) FixedI32R16 {
-        return FixedI32R16.initRaw(360 * @as(i32, self.value));
+    pub fn toDegrees(self: Self) FixedI32R16 {
+        return self.toFixedI(i32, 16).mul(.fromInt(360));
+    }
+    
+    /// Convert an angle to radians.
+    pub fn toRadians(self: Self) FixedI32R16 {
+        const tau: f64 = 6.283185307179586;
+        return self.toFixedI(i32, 16).mul(.fromFloat(tau));
+    }
+
+    /// Write the fixed point value with ASCII characters in decimal
+    /// format to an output buffer.
+    /// See `FixedI32R8.formatDecimal`.
+    pub fn formatDecimal(
+        self: Self,
+        buffer: [*]volatile u8,
+        options: FormatDecimalFixedOptions,
+    ) u32 {
+        // TODO: Once there is an implementation for `FixedI32R16`,
+        // use that one instead.
+        return formatDecimalFixedI32R8(
+            self.toFixedI(i32, 8),
+            buffer,
+            options,
+        );
     }
 };
+
+/// Parameterized signed fixed point number type.
+pub fn FixedI(
+    /// Raw storage value type. This should be a signed integer primitive.
+    comptime ValueT: type,
+    /// Number of bits to use for the fractional part of numbers.
+    /// The fixed point scaling factor is equal to `1 << radix_bits`.
+    comptime radix_bits: comptime_int,
+) type {
+    const int_bits = @bitSizeOf(ValueT) - radix_bits;
+    const IntT = gba.math.getSignedIntPrimitiveType(int_bits);
+    const radix_int: comptime_int = 1 << radix_bits;
+    return packed struct(ValueT) {
+        const Self = @This();
+        
+        pub const is_fixed_point_type: bool = true;
+        pub const is_signed_fixed_point_type: bool = true;
+        
+        pub const zero: Self = .initRaw(0);
+        pub const one: Self = .fromInt(1);
+        pub const negative_one: Self = .fromInt(-1);
+        
+        /// Raw internal value.
+        value: ValueT = 0,
+        
+        /// Initialize from a raw value.
+        /// You probably want to use `fromInt` or `fromFloat` instead!
+        pub inline fn initRaw(raw_value: ValueT) Self {
+            return .{ .value = raw_value };
+        }
+        
+        /// Initialize with an integer value.
+        pub inline fn fromInt(int_value: IntT) Self {
+            return Self.initRaw(@as(ValueT, int_value) << radix_bits);
+        }
+        
+        /// Initialize with a floating point value.
+        pub fn fromFloat(comptime value: f64) Self {
+            return Self.initRaw(@intFromFloat(value * radix_int));
+        }
+        
+        /// Convert to an integer, truncating the value's fractional portion.
+        pub fn toInt(self: Self) IntT {
+            return @intCast(self.value >> self.radix_bits);
+        }
+        
+        /// Convert to another signed fixed-point type.
+        pub fn toFixedI(
+            self: Self,
+            comptime ToValueT: type,
+            comptime to_radix_bits: comptime_int,
+        ) FixedI(ToValueT, to_radix_bits) {
+            if(to_radix_bits == radix_bits) {
+                return .initRaw(@intCast(self.value));
+            }
+            else if(to_radix_bits > radix_bits) {
+                const shift = to_radix_bits - radix_bits;
+                return .initRaw(@intCast(@as(i32, self.value) << shift));
+            }
+            else {
+                const shift = radix_bits - to_radix_bits;
+                return .initRaw(@intCast(@as(i32, self.value) >> shift));
+            }
+        }
+        
+        /// Convert to another numeric type.
+        /// Supports integer primitives and other fixed-point types.
+        pub fn to(self: Self, comptime ToT: type) ToT {
+            if(gba.math.isIntPrimitiveType(ToT)) {
+                return @intCast(self.toInt());
+            }
+            else if(isSignedFixedPointType(ToT)) {
+                return self.toFixedI(@FieldType(ToT, "value"), @bitSizeOf(
+                    @TypeOf(ToT.toInt).@"fn".return_type orelse unreachable
+                ));
+            }
+            else if(ToT == FixedU16R16) {
+                if(radix_bits == 16) {
+                    return .initRaw(@intCast(self.value));
+                }
+                else if(radix_bits < 16) {
+                    const shift = 16 - radix_bits;
+                    return .initRaw(@intCast(@as(i32, self.value) << shift));
+                }
+                else {
+                    const shift = radix_bits - 16;
+                    return .initRaw(@intCast(@as(i32, self.value) >> shift));
+                }
+            }
+            else {
+                @compileError("Cannot convert fixed point value to this type.");
+            }
+        }
+        
+        /// Get a negated value.
+        pub inline fn negate(self: Self) Self {
+            return Self.initRaw(-self.value);
+        }
+        
+        /// Get an absolute value.
+        pub inline fn abs(self: Self) Self {
+            return if(self.value >= 0) self else Self.negate();
+        }
+        
+        /// Add two values.
+        pub inline fn add(a: Self, b: Self) Self {
+            return Self.initRaw(a.value + b.value);
+        }
+        
+        /// Subtract `b` from `a`.
+        pub inline fn sub(a: Self, b: Self) Self {
+            return Self.initRaw(a.value - b.value);
+        }
+        
+        /// Multiply two values.
+        pub fn mul(a: Self, b: Self) Self {
+            if(comptime(@bitSizeOf(ValueT) > 32)) {
+                @compileError(
+                    "Fixed point multiplication is not supported for " ++
+                    "this type."
+                );
+            }
+            // Comptime or tests: Use 64-bit multiplication
+            if(comptime(!isGbaTarget())) {
+                const product = @as(i64, a.value) * @as(i64, b.value);
+                return .initRaw(@intCast(product >> radix_bits));
+            }
+            // Radix is 16 bits or fewer: Use 32-bit multiplication
+            else if(comptime(@bitSizeOf(ValueT) <= 16)) {
+                const product = (@as(i32, a.value) * @as(i32, b.value));
+                return .initRaw(@intCast(product >> radix_bits));
+            }
+            // Use optimized IWRAM ARM call for FixedI32R16
+            else if(comptime(ValueT == i32 and radix_bits == 16 and isGbaTarget())) {
+                const arm_address = &FixedI32R16_mul_arm;
+                return asm volatile (
+                    "bx r3"
+                    : [ret] "={r0}" (-> Self),
+                    : [a] "{r0}" (a),
+                      [b] "{r1}" (b),
+                      [arm_address] "{r3}" (arm_address),
+                    : "r0", "r1", "r3"
+                );
+            }
+            // Use optimized IWRAM ARM call for FixedI32R8
+            else if(comptime(ValueT == i32 and radix_bits == 8 and isGbaTarget())) {
+                const arm_address = &FixedI32R8_mul_arm;
+                return asm volatile (
+                    "bx r3"
+                    : [ret] "={r0}" (-> Self),
+                    : [a] "{r0}" (a),
+                      [b] "{r1}" (b),
+                      [arm_address] "{r3}" (arm_address),
+                    : "r0", "r1", "r3"
+                );
+            }
+            // Fallback for other types with a backing int larger than 16 bits
+            else if(comptime(gba.math.isSignedIntPrimitiveType(ValueT))) {
+                const product = gba.math.signedMulLong(a.value, b.value);
+                return .initRaw(@intCast(
+                    (product.lo >> radix_bits) |
+                    (product.hi << (32 - radix_bits))
+                ));
+            }
+            else {
+                @compileError(
+                    "Fixed point multiplication is not supported for " ++
+                    "this type."
+                );
+            }
+        }
+        
+        /// Compute the reciprocal, i.e. the result of dividing 1 by this
+        /// value.
+        pub fn reciprocal(self: Self) Self {
+            // TODO: Support for 32-bit types
+            // https://blog.segger.com/algorithms-for-division-part-4-using-newtons-method/
+            if(@bitSizeOf(ValueT) <= 16) {
+                const qr = gba.bios.div(0x10000, @intCast(self.raw_value));
+                return .initRaw(@intCast(qr.quotient));
+            }
+            else {
+                @compileError(
+                    "Fixed point division is not supported for " ++
+                    "this type."
+                );
+            }
+        }
+        
+        /// Divide two values.
+        pub fn div(a: Self, b: Self) Self {
+            // Note: `reciprocal` currently has limited support.
+            return a.mul(b.reciprocal());
+        }
+        
+        /// Returns true when the fixed point value is equal to zero.
+        pub inline fn isZero(self: FixedI32R16) bool {
+            return self.value == 0;
+        }
+        
+        /// Returns true when two values are exactly equal.
+        pub inline fn eql(a: Self, b: Self) bool {
+            return a.value == b.value;
+        }
+        
+        /// Compare two values. Returns true when `a` is less than `b`.
+        pub inline fn lessThan(a: Self, b: Self) bool {
+            return a.value < b.value;
+        }
+        
+        /// Compare two values. Returns true when `a` is greater than `b`.
+        pub inline fn greaterThan(a: Self, b: Self) bool {
+            return a.value > b.value;
+        }
+        
+        /// Compare two values. Returns true when `a` is less than or equal to `b`.
+        pub inline fn lessOrEqual(a: Self, b: Self) bool {
+            return a.value <= b.value;
+        }
+        
+        /// Compare two values. Returns true when `a` is greater than or equal to `b`.
+        pub inline fn greaterOrEqual(a: Self, b: Self) bool {
+            return a.value <= b.value;
+        }
+        
+        /// Write the fixed point value with ASCII characters in decimal
+        /// format to an output buffer.
+        ///
+        /// Currently, this function converts everything to a `FixedI32R8`
+        /// for formatting.
+        /// Given this, the longest possible output string under normal
+        /// circumstances is 13 characters: 1 for sign, 3 for integer portion,
+        /// 1 for decimal point, and 8 after the decimal.
+        ///
+        /// May write junk in the output buffer past the end of the returned
+        /// length, using it as a scratch area. Always provide a buffer with
+        /// at least 13 free bytes.
+        ///
+        /// A longer buffer is required when using a `options.pad_left_len`
+        /// longer than 13 or `options.min_fraction_digits` longer than 8.
+        pub fn formatDecimal(
+            self: Self,
+            buffer: [*]volatile u8,
+            options: FormatDecimalFixedOptions,
+        ) u32 {
+            // TODO: Better support for other types
+            return formatDecimalFixedI32R8(
+                self.toFixedI(i32, 8),
+                buffer,
+                options,
+            );
+        }
+    };
+}
+
+/// Fixed point number type. Signed, width 16 bits, radix 8 bits.
+/// The GBA hardware uses values of this type to represent the components
+/// of affine transformation matrices.
+pub const FixedI16R8 = FixedI(i16, 8);
+
+/// Fixed point number type. Signed, width 16 bits, radix 14 bits.
+/// Used by the GBA BIOS for `gba.bios.arctan2`.
+pub const FixedI16R14 = FixedI(i16, 14);
 
 /// Fixed point number type. Signed, width 32 bits, radix 8 bits.
 /// The GBA hardware uses values of this type to represent the
 /// displacement vector components of a background's affine transformation.
-pub const FixedI32R8 = packed struct(i32) {
-    pub const zero: FixedI32R8 = .initRaw(0);
-    pub const one: FixedI32R8 = .initInt(1);
-    
-    /// Raw internal value.
-    value: i32 = 0,
-    
-    pub inline fn initRaw(raw_value: i32) FixedI32R8 {
-        return FixedI32R8{ .value = raw_value };
-    }
-    
-    pub inline fn initInt(int_value: i24) FixedI32R8 {
-        return FixedI32R8.initRaw(@as(i32, int_value) << 8);
-    }
-    
-    pub fn initFloat32(comptime value: f32) FixedI32R8 {
-        return FixedI32R8.initRaw(@intFromFloat(value * 0x100));
-    }
-    
-    pub fn initFloat64(comptime value: f64) FixedI32R8 {
-        return FixedI32R8.initRaw(@intFromFloat(value * 0x100));
-    }
-    
-    /// Convert to an integer, truncating the value's fractional portion.
-    pub inline fn toInt(self: FixedI32R8) i16 {
-        return @intCast(self.value >> 16);
-    }
-    
-    /// Convert to a `FixedI16R8` value.
-    pub inline fn toI16R8(self: FixedI32R8) FixedI16R8 {
-        return FixedI16R8.initRaw(@intCast(self.value));
-    }
-    
-    /// Convert to a `FixedU16R16` value.
-    pub inline fn toU16R16(self: FixedI32R8) FixedU16R16 {
-        return FixedU16R16.initRaw(@intCast((self.value & 0xff) << 8));
-    }
-    
-    /// Convert to a `FixedI32R16` value.
-    pub inline fn toI32R16(self: FixedI32R8) FixedI32R16 {
-        return FixedI16R8.initRaw(@intCast(self.value << 8));
-    }
-    
-    /// Get a negated value.
-    pub inline fn negate(self: FixedI32R8) FixedI32R8 {
-        return FixedI32R8.initRaw(-self.value);
-    }
-    
-    /// Get an absolute value.
-    pub inline fn abs(self: FixedI32R8) FixedI32R8 {
-        return if(self.value >= 0) self else FixedI32R8.initRaw(-self.value);
-    }
-    
-    /// Add two values.
-    pub inline fn add(a: FixedI32R8, b: FixedI32R8) FixedI32R8 {
-        return FixedI32R8.initRaw(a.value + b.value);
-    }
-    
-    /// Subtract `b` from `a`.
-    pub inline fn sub(a: FixedI32R8, b: FixedI32R8) FixedI32R8 {
-        return FixedI32R8.initRaw(a.value - b.value);
-    }
-    
-    /// Multiply two values.
-    pub fn mul(a: FixedI32R8, b: FixedI32R8) FixedI32R8 {
-        // https://stackoverflow.com/a/1815371
-        var x: i32 = (a.value & 0xffff) * (b.value & 0xffff);
-        x = (a.value >> 16) * (b.value & 0xffff) + (x >> 16);
-        const s1 = x & 0xffff;
-        const s2 = x >> 16;
-        x = s1 + (a.value & 0xffff) * (b.value >> 16);
-        x = s2 + (a.value >> 16) * (b.value >> 16) + (x >> 16);
-        return FixedI32R8.initRaw((x << 16) | s1);
-        // TODO: Sometime figure out how to make this work using the
-        // very likely more performant `smull` ARM instruction.
-    }
-    
-    /// Returns true when two values are exactly equal.
-    pub inline fn eql(a: FixedI32R8, b: FixedI32R8) bool {
-        return a.value == b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is less than `b`.
-    pub inline fn lessThan(a: FixedI32R8, b: FixedI32R8) bool {
-        return a.value < b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is greater than `b`.
-    pub inline fn greaterThan(a: FixedI32R8, b: FixedI32R8) bool {
-        return a.value > b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is less than or equal to `b`.
-    pub inline fn lessOrEqual(a: FixedI32R8, b: FixedI32R8) bool {
-        return a.value <= b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is greater than or equal to `b`.
-    pub inline fn greaterOrEqual(a: FixedI32R8, b: FixedI32R8) bool {
-        return a.value <= b.value;
-    }
-    
-    /// Write the fixed point value with ASCII characters in decimal
-    /// format to an output buffer. The longest possible output string
-    /// under normal circumstances is 17 characters: 1 for sign, 7 for
-    /// integer portion, 1 for decimal point, and 8 after the decimal.
-    ///
-    /// May write junk in the output buffer past the end of the returned
-    /// length, using it as a scratch area. Always provide a buffer with
-    /// at least 17 free bytes.
-    /// More is required when using a `options.pad_left_len` longer
-    /// than 17 or `options.max_fraction_digits` longer than 8.
-    pub fn formatDecimal(
-        self: FixedI32R8,
-        buffer: [*]volatile u8,
-        options: FormatDecimalFixedOptions,
-    ) u32 {
-        const int_value: i32 = (self.value >> 8) + @as(i32, (
-            if(self.value < 0 and (self.value & 0xff) != 0) 1 else 0
-        ));
-        const int_len = gba.format.formatDecimalI32(buffer, int_value, .{
-            .decimal_digits = options.decimal_digits,
-            .sign_negative_char = options.sign_negative_char,
-            .sign_positive_char = options.sign_positive_char,
-            .always_sign = options.always_sign,
-            .pad_left_len = if(options.pad_left_int) options.pad_left_len else 0,
-            .pad_left_char = options.pad_left_char,
-        });
-        // 1/256 == 0.00390625
-        const frac_value: i32 = 390625 * @as(i32, (
-            if(self.value >= 0) self.value & 0xff
-            else (0x100 -% self.value) & 0xff
-        ));
-        var total_len: u32 = int_len;
-        if(frac_value > 0 or options.min_fraction_digits > 0) {
-            buffer[int_len] = options.decimal_char;
-            const frac_buffer = buffer + int_len + 1;
-            var frac_len = gba.format.formatDecimalI32(frac_buffer, frac_value, .{
-                .decimal_digits = options.decimal_digits,
-                .pad_left_len = 8,
-                .pad_left_char = options.decimal_digits[0],
-            });
-            assert(frac_len == 8);
-            total_len += 9; // decimal point plus 8 digits == 9 bytes
-            // Truncate to max_fraction_digits
-            if(frac_len > options.max_fraction_digits) {
-                total_len -= frac_len - options.max_fraction_digits;
-                frac_len = options.max_fraction_digits;
-            }
-            // Trim trailing zeros
-            while(buffer[total_len - 1] == options.decimal_digits[0] and (
-                frac_len > options.min_fraction_digits
-            )) {
-                frac_len -= 1;
-                total_len -= 1;
-            }
-            // Pad to min_fraction_digits
-            while(frac_len < options.min_fraction_digits) {
-                buffer[total_len] = options.decimal_digits[0];
-                frac_len += 1;
-                total_len += 1;
-            }
-            // No fraction digits, after all that? Remove the decimal point.
-            if(frac_len == 0) {
-                total_len -= 1;
-            }
-        }
-        if(total_len < options.pad_left_len and !options.pad_left_int) {
-            const pad_len = options.pad_left_len - total_len;
-            for(0..total_len) |pad_i| {
-                const j = options.pad_left_len - pad_i - 1;
-                assert(j >= pad_len);
-                buffer[j] = buffer[j - pad_len];
-            }
-            for(0..pad_len) |pad_i| {
-                buffer[pad_i] = options.pad_left_char;
-            }
-            return options.pad_left_len;
-        }
-        else {
-            return total_len;
-        }
-    }
-};
+pub const FixedI32R8 = FixedI(i32, 8);
 
 /// Fixed point number type. Signed, width 32 bits, radix 16 bits.
-pub const FixedI32R16 = packed struct(i32) {
-    pub const zero: FixedI32R16 = .initRaw(0);
-    pub const one: FixedI32R16 = .initInt(1);
-    
-    /// Raw internal value.
-    value: i32 = 0,
-    
-    pub inline fn initRaw(raw_value: i32) FixedI32R16 {
-        return FixedI32R16{ .value = raw_value };
-    }
-    
-    pub inline fn initInt(int_value: i16) FixedI32R16 {
-        return FixedI32R16.initRaw(@as(i32, int_value) << 16);
-    }
-    
-    pub fn initFloat32(comptime value: f32) FixedI32R16 {
-        return FixedI32R16.initRaw(@intFromFloat(value * 0x10000));
-    }
-    
-    pub fn initFloat64(comptime value: f64) FixedI32R16 {
-        return FixedI32R16.initRaw(@intFromFloat(value * 0x10000));
-    }
-    
-    /// Convert to an integer, truncating the value's fractional portion.
-    pub inline fn toInt(self: FixedI32R16) i16 {
-        return @intCast(self.value >> 16);
-    }
-    
-    /// Convert to a `FixedI16R8` value.
-    pub inline fn toI16R8(self: FixedI32R16) FixedI16R8 {
-        return FixedI16R8.initRaw(@intCast(self.value >> 8));
-    }
-    
-    /// Convert to a `FixedU16R16` value.
-    pub inline fn toU16R16(self: FixedI32R16) FixedU16R16 {
-        return FixedU16R16.initRaw(@intCast(self.value & 0xffff));
-    }
-    
-    /// Convert to a `FixedI32R8` value.
-    pub inline fn toI32R8(self: FixedI32R16) FixedI32R8 {
-        return FixedI32R8.initRaw(@intCast(self.value >> 8));
-    }
-    
-    /// Get a negated value.
-    pub inline fn negate(self: FixedI32R16) FixedI32R16 {
-        return FixedI32R16.initRaw(-self.value);
-    }
-    
-    /// Get an absolute value.
-    pub inline fn abs(self: FixedI32R16) FixedI32R16 {
-        return if(self.value >= 0) self else FixedI32R16.initRaw(-self.value);
-    }
-    
-    /// Add two values.
-    pub inline fn add(a: FixedI32R16, b: FixedI32R16) FixedI32R16 {
-        return FixedI32R16.initRaw(a.value + b.value);
-    }
-    
-    /// Subtract `b` from `a`.
-    pub inline fn sub(a: FixedI32R16, b: FixedI32R16) FixedI32R16 {
-        return FixedI32R16.initRaw(a.value - b.value);
-    }
-    
-    /// Multiply two values.
-    pub fn mul(a: FixedI32R16, b: FixedI32R16) FixedI32R16 {
-        // https://stackoverflow.com/a/1815371
-        var x: i32 = (a.value & 0xffff) * (b.value & 0xffff);
-        x = (a.value >> 16) * (b.value & 0xffff) + (x >> 16);
-        const s1 = x & 0xffff;
-        const s2 = x >> 16;
-        x = s1 + (a.value & 0xffff) * (b.value >> 16);
-        const s3 = x & 0xffff;
-        x = s2 + (a.value >> 16) * (b.value >> 16) + (x >> 16);
-        return FixedI32R16.initRaw((x << 16) | s3);
-        // TODO: Sometime figure out how to make this work using the
-        // very likely more performant `smull` ARM instruction.
-        // var product_lo: i32 = undefined;
-        // var product_hi: i32 = undefined;
-        // asm volatile (
-        //     \\ .arm
-        //     \\ smull r2, r3, r0, r1
-        //     : [product_lo] "={r2}" (product_lo),
-        //       [product_hi] "={r3}" (product_hi),
-        //     : [a.value] "={r0}" (a.value),
-        //       [b.value] "={r1}" (b.value),
-        // );
-    }
-    
-    /// Returns true when two values are exactly equal.
-    pub inline fn eql(a: FixedI32R16, b: FixedI32R16) bool {
-        return a.value == b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is less than `b`.
-    pub inline fn lessThan(a: FixedI32R16, b: FixedI32R16) bool {
-        return a.value < b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is greater than `b`.
-    pub inline fn greaterThan(a: FixedI32R16, b: FixedI32R16) bool {
-        return a.value > b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is less than or equal to `b`.
-    pub inline fn lessOrEqual(a: FixedI32R16, b: FixedI32R16) bool {
-        return a.value <= b.value;
-    }
-    
-    /// Compare two values. Returns true when `a` is greater than or equal to `b`.
-    pub inline fn greaterOrEqual(a: FixedI32R16, b: FixedI32R16) bool {
-        return a.value <= b.value;
-    }
-};
-
-// TODO: Generic Vec2 type function(s)
-
-/// Represents a 2-vector whose X and Y components are `FixedI32R8` values.
-pub const FixedVec2I32R8 = extern struct {
-    pub const zero: FixedVec2I32R8 = .{ .x = .initRaw(0), .y = .initRaw(0) };
-    pub const one: FixedVec2I32R8 = .{ .x = .initInt(1), .y = .initInt(1) };
-    
-    x: FixedI32R8 = .{},
-    y: FixedI32R8 = .{},
-    
-    pub inline fn toVec2I32R16(self: FixedVec2I32R8) FixedVec2I32R16 {
-        return .{
-            .x = self.x.toI32R16(),
-            .y = self.y.toI32R16(),
-        };
-    }
-    
-    pub fn negate(self: FixedVec2I32R8) FixedVec2I32R8 {
-        return .{
-            .x = self.x.negate(),
-            .y = self.y.negate(),
-        };
-    }
-    
-    pub fn add(a: FixedVec2I32R8, b: FixedVec2I32R8) FixedVec2I32R8 {
-        return .{
-            .x = a.x.add(b.x),
-            .y = a.y.add(b.y),
-        };
-    }
-    
-    pub fn sub(a: FixedVec2I32R8, b: FixedVec2I32R8) FixedVec2I32R8 {
-        return .{
-            .x = a.x.sub(b.x),
-            .y = a.y.sub(b.y),
-        };
-    }
-    
-    /// Multiply two values.
-    pub fn mul(a: FixedVec2I32R8, b: FixedVec2I32R8) FixedVec2I32R8 {
-        return .{
-            .x = a.x.mul(b.x),
-            .y = a.y.mul(b.y),
-        };
-    }
-    
-    pub fn scale(self: FixedVec2I32R8, scalar: FixedI32R8) FixedVec2I32R8 {
-        return .{
-            .x = self.x.mul(scalar),
-            .y = self.y.mul(scalar),
-        };
-    }
-};
-
-
-/// Represents a 2-vector whose X and Y components are `FixedI32R16` values.
-pub const FixedVec2I32R16 = extern struct {
-    pub const zero: FixedVec2I32R16 = .{ .x = .initRaw(0), .y = .initRaw(0) };
-    pub const one: FixedVec2I32R16 = .{ .x = .initInt(1), .y = .initInt(1) };
-    
-    x: FixedI32R16 = .{},
-    y: FixedI32R16 = .{},
-    
-    pub inline fn toVec2I32R8(self: FixedVec2I32R16) FixedVec2I32R8 {
-        return .{
-            .x = self.x.toI32R8(),
-            .y = self.y.toI32R8(),
-        };
-    }
-    
-    pub fn negate(self: FixedVec2I32R16) FixedVec2I32R16 {
-        return .{
-            .x = self.x.negate(),
-            .y = self.y.negate(),
-        };
-    }
-    
-    pub fn add(a: FixedVec2I32R16, b: FixedVec2I32R16) FixedVec2I32R16 {
-        return .{
-            .x = a.x.add(b.x),
-            .y = a.y.add(b.y),
-        };
-    }
-    
-    pub fn sub(a: FixedVec2I32R16, b: FixedVec2I32R16) FixedVec2I32R16 {
-        return .{
-            .x = a.x.sub(b.x),
-            .y = a.y.sub(b.y),
-        };
-    }
-    
-    /// Multiply two values.
-    pub fn mul(a: FixedVec2I32R16, b: FixedVec2I32R16) FixedVec2I32R16 {
-        return .{
-            .x = a.x.mul(b.x),
-            .y = a.y.mul(b.y),
-        };
-    }
-    
-    pub fn scale(self: FixedVec2I32R16, scalar: FixedI32R16) FixedVec2I32R16 {
-        return .{
-            .x = self.x.mul(scalar),
-            .y = self.y.mul(scalar),
-        };
-    }
-};
+pub const FixedI32R16 = FixedI(i32, 16);
