@@ -56,38 +56,33 @@ pub fn Mat2x2I(comptime T: type) type {
         /// `gba.math.FixedU16R16.cos`.
         /// This makes it faster than `initRotationLerp`, but less accurate.
         /// But it should still be accurate enough for almost all purposes.
-        /// See also `gba.bios.objAffineSet`.
         pub fn initRotation(angle: gba.math.FixedU16R16) Self {
-            const sin = angle.sin().toI16R8();
-            const cos = angle.cos().toI16R8();
-            const mat = Mat2x2FixedI32R16.initColumnMajor(
+            const sin = angle.sin().to(T);
+            const cos = angle.cos().to(T);
+            return Self.initColumnMajor(
                 cos,
                 sin,
                 sin.negate(),
                 cos,
             );
-            return mat.to(T);
         }
         
         /// Initialize a rotation matrix.
         /// Uses `gba.math.FixedU16R16.sinLerp` and
         /// `gba.math.FixedU16R16.cosLerp`.
         /// Slower than `initRotation`, but gives more accurate results.
-        /// See also `gba.bios.objAffineSet`.
         pub fn initRotationLerp(angle: gba.math.FixedU16R16) Self {
-            const sin = angle.sinLerp().toI16R8();
-            const cos = angle.cosLerp().toI16R8();
-            const mat = Mat2x2FixedI32R16.initColumnMajor(
+            const sin = angle.sinLerp().to(T);
+            const cos = angle.cosLerp().to(T);
+            return Self.initColumnMajor(
                 cos,
                 sin,
                 sin.negate(),
                 cos,
             );
-            return mat.to(T);
         }
         
         /// Initialize a scaling matrix.
-        /// See also `gba.bios.objAffineSet`.
         pub fn initScale(x: T, y: T) Self {
             return .initColumnMajor(x, .zero, .zero, y);
         }
@@ -157,7 +152,7 @@ pub fn Mat2x2I(comptime T: type) type {
         }
         
         /// Multiply a matrix and a vector.
-        pub fn mulVector(self: Self, vec: Vec2T) Vec2T {
+        pub fn mulVec2(self: Self, vec: Vec2T) Vec2T {
             const x = (
                 gba.math.mul(self.cols[0].x, vec.x) +
                 gba.math.mul(self.cols[1].x, vec.x)

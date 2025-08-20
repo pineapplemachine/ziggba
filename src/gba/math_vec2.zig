@@ -69,10 +69,15 @@ pub fn Vec2I(comptime T: type) type {
         }
         
         /// Convert to a three-dimensional vector type.
-        /// The Z component of the returned vector is 0.
-        pub fn toVec3(self: Self, comptime ToComponentT: type) Vec3(ToComponentT) {
+        pub fn toVec3(
+            self: Self,
+            /// The component type for the new `Vec3`.
+            comptime ToComponentT: type,
+            /// The Z component of the new `Vec3`.
+            z: ToComponentT,
+        ) Vec3(ToComponentT) {
             const v = self.toVec2(ToComponentT);
-            return .init(v.x, v.y, T_zero);
+            return .init(v.x, v.y, z);
         }
         
         /// Subtract this vector from the zero vector.

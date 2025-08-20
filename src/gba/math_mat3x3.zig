@@ -137,7 +137,7 @@ pub fn Mat3x3I(comptime T: type) type {
         }
         
         /// Multiply a matrix and a vector.
-        pub fn mulVector(self: Self, vec: Vec3T) Vec3T {
+        pub fn mulVec3(self: Self, vec: Vec3T) Vec3T {
             const x = (
                 gba.math.mul(self.cols[0].x, vec.x) +
                 gba.math.mul(self.cols[1].x, vec.x) +

@@ -266,17 +266,26 @@ pub const FixedU16R16 = packed struct(u16) {
     
     /// Initialize an angle, converting from degrees.
     /// FixedU16R16 internally represents angles as revolutions.
-    pub fn initDegrees(comptime deg: f64) FixedU16R16 {
+    ///
+    /// This function uses comptime-known float inputs because
+    /// the GBA has no hardware support for floating point arithmetic.
+    pub fn fromFloatDegrees(comptime deg: f64) FixedU16R16 {
         return FixedU16R16.fromFloat64(@mod(deg / 360.0, 1.0));
     }
     
     /// Initialize an angle, converting from radians.
     /// FixedU16R16 internally represents angles as revolutions.
-    pub fn initRadians(comptime rad: f64) FixedU16R16 {
+    ///
+    /// This function uses comptime-known float inputs because
+    /// the GBA has no hardware support for floating point arithmetic.
+    pub fn fromFloatRadians(comptime rad: f64) FixedU16R16 {
         return FixedU16R16.fromFloat64(@mod(rad / 6.283185307179586, 1.0));
     }
     
     /// Initialize with a floating point value.
+    ///
+    /// This function uses comptime-known float inputs because
+    /// the GBA has no hardware support for floating point arithmetic.
     pub fn fromFloat(comptime value: f64) Self {
         return Self.initRaw(@intFromFloat(value * radix_int));
     }
@@ -418,8 +427,7 @@ pub const FixedU16R16 = packed struct(u16) {
     
     /// Convert an angle to radians.
     pub fn toRadians(self: Self) FixedI32R16 {
-        const tau: f64 = 6.283185307179586;
-        return self.toFixedI(i32, 16).mul(.fromFloat(tau));
+        return self.toFixedI(i32, 16).mul(.tau);
     }
 
     /// Write the fixed point value with ASCII characters in decimal
@@ -461,6 +469,36 @@ pub fn FixedI(
         pub const one: Self = .fromInt(1);
         pub const negative_one: Self = .fromInt(-1);
         
+        /// Ratio of a circle's circumference to its diameter.
+        pub const pi: Self = .fromFloat(3.141592653589793);
+        
+        /// Twice `pi`.
+        pub const tau: Self = .fromFloat(6.283185307179586);
+        
+        /// Half of `pi`.
+        pub const half_pi: Self = .fromFloat(1.5707963267948966);
+        
+        /// Euler's constant. Also written as "e".
+        pub const euler: Self = .fromFloat(2.718281828459045);
+        
+        /// Square root of 2.
+        pub const sqrt_2: Self = .fromFloat(1.4142135623730951);
+        
+        /// Square root of one half (1/2).
+        pub const sqrt_1_2: Self = .fromFloat(0.7071067811865476);
+        
+        /// Natural log of 2, `ln(2)`.
+        pub const ln_2: Self = .fromFloat(0.6931471805599453);
+        
+        /// Natural log of 10, `ln(10)`.
+        pub const ln_10: Self = .fromFloat(2.302585092994046);
+        
+        /// Base 2 logarithm of Euler's constant, `log2(e)`.
+        pub const log2_e: Self = .fromFloat(1.4426950408889634);
+        
+        /// Base 10 logarithm of Euler's constant, `log10(e)`.
+        pub const log10_e: Self = .fromFloat(0.4342944819032518);
+        
         /// Raw internal value.
         value: ValueT = 0,
         
@@ -476,6 +514,9 @@ pub fn FixedI(
         }
         
         /// Initialize with a floating point value.
+        ///
+        /// This function uses comptime-known float inputs because
+        /// the GBA has no hardware support for floating point arithmetic.
         pub fn fromFloat(comptime value: f64) Self {
             return Self.initRaw(@intFromFloat(value * radix_int));
         }

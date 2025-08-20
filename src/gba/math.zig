@@ -71,7 +71,6 @@ pub const Vec3FixedI32R8 = @import("math_vec3.zig").Vec3FixedI32R8;
 pub const Vec3FixedI32R16 = @import("math_vec3.zig").Vec3FixedI32R16;
 
 // TODO: Vec4 types
-// TODO: Mat3x3 types
 // TODO: Mat4x4 types
 
 /// Returns true when the given type is an integer primitive type,
