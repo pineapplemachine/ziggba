@@ -66,7 +66,7 @@ pub fn getCodePointAlignment(point: i32) CodePointAlignment {
         0xff66...0xffdf => .normal, // halfwidth forms
         0xffe0...0xffee => .fullwidth_center,
         // Etc.
-        0xfff0...0x7fffffff => .normal,
+        0xffef...0x7fffffff => .normal,
     };
 }
 
