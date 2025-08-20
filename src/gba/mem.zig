@@ -13,6 +13,10 @@ pub const memcpyDma32 = @import("mem_dma.zig").memcpyDma32;
 pub const memsetDma16 = @import("mem_dma.zig").memsetDma16;
 pub const memsetDma32 = @import("mem_dma.zig").memsetDma32;
 
+// Allocator-related imports.
+pub const getUnreservedEWRAM = @import("mem_alloc.zig").getUnreservedEWRAM;
+pub const StackAllocator = @import("mem_alloc.zig").StackAllocator;
+
 // TODO: Maybe make these volatile pointers to u8?
 // Access to base addresses for memory regions. Intended mostly for internal use.
 /// Base address for external work RAM
