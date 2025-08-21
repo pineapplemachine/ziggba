@@ -461,12 +461,11 @@ pub const InterruptControl = packed struct(u16) {
 };
 
 /// Records the current state of the GBA's buttons (also called "keys").
-/// 
 /// Corresponds to REG_KEYINPUT.
 /// Note that a 0 bit indicates a pressed button and a 1 bit indicates a
 /// not-pressed button.
-pub const state: *align(2) volatile KeysState = @ptrFromInt(gba.mem.io + 0x130);
+pub const state: *align(2) volatile KeysState = @ptrCast(gba.mem.io.reg_keyinput);
 
 /// Corresponds to REG_KEYCNT.
 /// Can be used to request an interrupt when certain buttons are pressed.
-pub const interrupt: *align(2) volatile InterruptControl = @ptrFromInt(gba.mem.io + 0x132);
+pub const interrupt: *align(2) volatile InterruptControl = @ptrCast(gba.mem.io.reg_keycnt);

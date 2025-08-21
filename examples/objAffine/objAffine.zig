@@ -7,22 +7,22 @@ pub export fn main() void {
     gba.display.memcpyObjectTiles4Bpp(0, @ptrCast(&metr.box_tiles));
     gba.display.memcpyObjectPalette(0, @ptrCast(&metr.pal));
 
-    var metroid: gba.obj.Obj = .{
-        .mode = .affine,
-        .transform = .{ .affine_index = 0 },
-    };
-    metroid.setSize(.@"64x64");
-    metroid.setPosition(96, 32);
-    gba.obj.setOamTransform(metroid.transform.affine_index, .identity);
+    const metroid: gba.obj.Obj = .initAffine(.{
+        .size = .size_64x64,
+        .x = 96,
+        .y = 32,
+        .affine_index = 0,
+    });
+    gba.obj.setTransform(metroid.transform.affine_index, .identity);
     
-    var shadow_metroid: gba.obj.Obj = .{
-        .mode = .affine,
-        .transform = .{ .affine_index = 1 },
+    const shadow_metroid: gba.obj.Obj = .initAffine(.{
+        .size = .size_64x64,
+        .x = 96,
+        .y = 32,
+        .affine_index = 1,
         .palette = 1,
-    };
-    shadow_metroid.setSize(.@"64x64");
-    shadow_metroid.setPosition(96, 32);
-    gba.obj.setOamTransform(shadow_metroid.transform.affine_index, .identity);
+    });
+    gba.obj.setTransform(shadow_metroid.transform.affine_index, .identity);
 
     gba.obj.hideAllObjects();
     gba.obj.objects[0] = metroid;
@@ -39,7 +39,7 @@ pub export fn main() void {
     while(true) : (frame +%= 1) {
         gba.display.naiveVSync();
         
-        gba.obj.setOamTransform(metroid.transform.affine_index, .initRotation(
+        gba.obj.setTransform(metroid.transform.affine_index, .initRotation(
             .initRaw(@truncate(frame << 8)),
         ));
     }

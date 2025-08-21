@@ -103,37 +103,22 @@ pub const Control = packed struct(u16) {
 /// Mode 1 - Normal: 0, 1; Affine: 2
 ///
 /// Mode 2 - Affine: 2, 3
-pub const ctrl: *volatile [4]Control = @ptrFromInt(gba.mem.io + 0x08);
+pub const ctrl: *volatile [4]Control = @ptrCast(gba.mem.io.reg_bgcnt);
 
-/// Only the lowest 10 bits are used
-pub const Scroll = packed struct {
-    x: i16 = 0,
-    y: i16 = 0,
-
-    pub fn set(self: *volatile Scroll, x: i10, y: i10) void {
-        self.* = .{ .x = x, .y = y };
-    }
-};
-
-/// Controls background scroll. Values are modulo map size (wrapping is automatic)
+/// Controls scrolling for normal (non-affine) backgrounds. Write-only.
+/// Corresponds to REG_BG_OFS.
 ///
-/// These registers are write only.
-pub const scroll: *[4]Scroll = @ptrFromInt(gba.mem.io + 0x10);
+/// GBATEK documents that only the low nine bits of X and Y are used.
+/// However, since normal backgrounds wrap and their width and height are
+/// always evenly divisible into 512 pixels, there is not really a distinction.
+pub const scroll: *[4]gba.math.Vec2I16 = @ptrCast(gba.mem.io.reg_bg_ofs);
+
+// TODO: Cleanup TextScreenEntry etc.
 
 pub const TextScreenEntry = packed struct(u16) {
     tile_index: u10 = 0,
     flip: gba.display.Flip = .{},
     palette_index: u4 = 0,
-};
-
-// TODO: This is currently only used by the BIOS API
-pub const Affine = extern struct {
-    pa: gba.math.FixedI16R8 align(2) = gba.math.FixedI16R8.fromInt(1),
-    pb: gba.math.FixedI16R8 align(2) = .{},
-    pc: gba.math.FixedI16R8 align(2) = .{},
-    pd: gba.math.FixedI16R8 align(2) = gba.math.FixedI16R8.fromInt(1),
-    dx: gba.math.FixedI32R8 align(4) = .{},
-    dy: gba.math.FixedI32R8 align(4) = .{},
 };
 
 pub const TextScreenBlock = [1024]TextScreenEntry;
@@ -143,22 +128,24 @@ pub inline fn screenBlockMap(block: u5) [*]volatile TextScreenEntry {
     return @ptrCast(&screen_block_ram[block]);
 }
 
+/// Corresponds to REG_BG_AFFINE.
+/// See `bg_2_affine` and `bg_3_affine`.
+pub const bg_affine: *volatile [2]gba.math.Affine3x2 = (
+    @ptrCast(gba.mem.io.reg_bg_affine)
+);
+
 /// Holds an affine transformation matrix with a displacement/translation
 /// vector for background 2, when in affine mode. (Mode 1 or Mode 2.)
 ///
-/// The `transform` property corresponds to REG_BG2PA, REG_BG2PB, REG_BG2PC,
+/// The `abcd` property corresponds to REG_BG2PA, REG_BG2PB, REG_BG2PC,
 /// and REG_BG2PD.
-/// The `displace` property corresponds to REG_BG2X and REG_BG2Y.
-pub const bg_2_affine: *volatile gba.math.Affine3x2 = (
-    @ptrFromInt(gba.mem.io + 0x20)
-);
+/// The `disp` property corresponds to REG_BG2X and REG_BG2Y.
+pub const bg_2_affine: *volatile gba.math.Affine3x2 = &bg_affine[0];
 
 /// Holds an affine transformation matrix with a displacement/translation
 /// vector for background 3, when in affine mode. (Mode 2.)
 ///
-/// The `transform` property corresponds to REG_BG3PA, REG_BG3PB, REG_BG3PC,
+/// The `abcd` property corresponds to REG_BG3PA, REG_BG3PB, REG_BG3PC,
 /// and REG_BG3PD.
-/// The `displace` property corresponds to REG_BG3X and REG_BG3Y.
-pub const bg_3_affine: *volatile gba.math.Affine3x2 = (
-    @ptrFromInt(gba.mem.io + 0x20)
-);
+/// The `disp` property corresponds to REG_BG3X and REG_BG3Y.
+pub const bg_3_affine: *volatile gba.math.Affine3x2 = &bg_affine[1];

@@ -49,6 +49,7 @@ var current_page_addr: u32 = gba.mem.vram;
 
 pub const back_page: [*]volatile u16 = @ptrFromInt(gba.mem.vram + 0xA000);
 
+// TODO: Remove this (only `TextScreenBlock` is using this currently)
 pub const Flip = packed struct(u2) {
     h: bool = false,
     v: bool = false,
@@ -79,53 +80,52 @@ pub fn pageFlip() void {
     }
 }
 
-pub const ObjMapping = enum(u1) {
-    /// Tiles are stored in rows of 32 * 64 bytes
-    two_dimensions,
-    /// Tiles are stored sequentially
-    one_dimension,
-};
-
 pub const Priority = enum(u2) {
-    highest,
-    high,
-    low,
-    lowest,
+    highest = 0,
+    high = 1,
+    low = 2,
+    lowest = 3,
 };
 
+/// Represents the contents of the display control register REG_DISPCNT.
 pub const Control = packed struct(u16) {
-    /// Controls the capabilities of background layers
-    ///
-    /// Modes 0-2 are tile modes, modes 3-5 are bitmap modes
+    /// Controls the capabilities of background layers.
+    /// Modes 0, 1, and 2 are tile modes.
+    /// Modes 3, 4, and 5 are bitmap modes.
     pub const Mode = enum(u3) {
-        /// Tiled mode
-        ///
-        /// Provides 4 normal background layers (0-3)
+        /// Tiled mode.
+        /// Provides four normal background layers (0-3)
+        /// and no affine layers.
         mode0,
-        /// Tiled mode
-        ///
-        /// Provides 2 normal (0, 1) and one affine (2) background layer
+        /// Tiled mode.
+        /// Provides two normal (0, 1) and one affine (2) background layer.
         mode1,
-        /// Tiled mode
-        ///
-        /// Provides 2 affine (2, 3) background layers
+        /// Tiled mode.
+        /// Provides two affine (2, 3) background layers
+        /// and no normal non-affine layers.
         mode2,
-        /// Bitmap mode
-        ///
-        /// Provides a 16bpp full screen bitmap frame
+        /// Bitmap mode.
+        /// Provides a 16bpp full screen bitmap frame.
         mode3,
-        /// Bitmap mode
-        ///
-        /// Provides two 8bpp (256 color palette) frames
+        /// Bitmap mode.
+        /// Provides two 8bpp (256 color) frames.
         mode4,
-        /// Bitmap mode
-        ///
-        /// Provides two 16bpp 160x128 pixel frames
+        /// Bitmap mode.
+        /// Provides two 16bpp 160x128 pixel frames.
         mode5,
     };
     
+    pub const ObjMapping = enum(u1) {
+        /// Tiles are stored in rows of 32 * 64 bytes.
+        two_dimensions,
+        /// Tiles are stored sequentially.
+        one_dimension,
+    };
+    
+    // TODO: Documentation
+    
     mode: Mode = .mode0,
-    /// Read only, should stay false
+    /// Read only. Should stay false.
     gbc_mode: bool = false,
     page_select: u1 = 0,
     oam_access_in_hblank: bool = false,
@@ -142,9 +142,9 @@ pub const Control = packed struct(u16) {
 };
 
 /// Display control register. Corresponds to REG_DISPCNT.
-pub const ctrl: *volatile display.Control = @ptrFromInt(gba.mem.io);
+pub const ctrl: *volatile display.Control = @ptrCast(gba.mem.io.reg_dispcnt);
 
-/// Represents the contents of REG_DISPSTAT.
+/// Represents the contents of the display status register REG_DISPSTAT.
 pub const Status = packed struct(u16) {
     /// Enumeration of possible states for VBlank and HBlank, per the
     /// `vblank` and `hblank` status flags.
@@ -180,21 +180,21 @@ pub const Status = packed struct(u16) {
     vcount_select: u8 = 0,
 };
 
-/// Display Status Register
-///
-/// (`REG_DISPSTAT`)
-pub const status: *volatile display.Status = @ptrFromInt(gba.mem.io + 0x04);
+/// Display status register. Corresponds to REG_DISPSTAT.
+pub const status: *volatile display.Status = @ptrCast(gba.mem.io.reg_dispstat);
 
-/// Current y location of the LCD hardware
-///
-/// (`REG_VCOUNT`)
-pub const vcount: *align(2) const volatile u8 = @ptrFromInt(gba.mem.io + 0x06);
+/// Indicates the currently drawn scanline. Read-only.
+/// Corresponds to REG_VCOUNT.
+/// Values range from 0 through 227. Values 160 through 227 indicate hidden
+/// scanlines within the VBlank area.
+pub const vcount: *align(2) const volatile u8 = @ptrCast(gba.mem.io.reg_vcount);
 
 /// Wait until VBlank.
-/// You probably want to use `gba.bios.vblankIntrWait` instead of this.
+/// You probably want to enable interrupts and use
+/// `gba.bios.vblankIntrWait` instead of this.
 pub fn naiveVSync() void {
-    while (vcount.* >= 160) {} // wait till VDraw
-    while (vcount.* < 160) {} // wait till VBlank
+    while (vcount.* >= 160) {} // wait for VDraw
+    while (vcount.* < 160) {} // wait for VBlank
 }
 
 /// Describes a mosaic effect.

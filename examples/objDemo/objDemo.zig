@@ -1,6 +1,4 @@
 const gba = @import("gba");
-const display = gba.display;
-const obj = gba.obj;
 
 export var header linksection(".gbaheader") = gba.Header.init("OBJDEMO", "AODE", "00", 0);
 
@@ -12,19 +10,19 @@ fn loadSpriteData() void {
 }
 
 pub export fn main() void {
-    display.ctrl.* = .{
+    gba.display.ctrl.* = .{
         .obj_mapping = .one_dimension,
         .obj = true,
     };
 
     loadSpriteData();
 
-    var metroid: gba.obj.Obj = .{
-        .x_pos = 100,
-        .y_pos = 150,
-    };
-    metroid.setSize(.@"64x64");
-
+    const metroid: gba.obj.Obj = .init(.{
+        .size = .size_64x64,
+        .x = 100,
+        .y = 150,
+    });
+    
     var input: gba.input.BufferedKeysState = .{};
     var x: i9 = 96;
     var y: i8 = 32;
@@ -32,7 +30,7 @@ pub export fn main() void {
     var tile_index: i10 = 0;
 
     while (true) {
-        display.naiveVSync();
+        gba.display.naiveVSync();
 
         input.poll();
 
@@ -50,7 +48,7 @@ pub export fn main() void {
 
         metroid.palette = if (input.isPressed(.select)) 1 else 0;
 
-        display.ctrl.obj_mapping = (
+        gba.display.ctrl.obj_mapping = (
             if (input.isPressed(.start)) .two_dimensions else .one_dimension
         );
 
