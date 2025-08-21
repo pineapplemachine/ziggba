@@ -6,7 +6,7 @@ const gba = @import("gba.zig");
 /// Affine transformation matrices are interleaved with object attributes.
 /// OAM should only be updated during VBlank, to avoid graphical glitches.
 /// (See `gba.bios.vblankIntrWait`.)
-pub const objects: *align(8) volatile [128]Obj = @ptrFromInt(gba.mem.oam);
+pub const objects: *align(8) volatile [128]Obj = @ptrCast(gba.mem.oam);
 
 /// Set all objects to hidden.
 /// You likely want to do this upon initialization, if you're enabling objects.
@@ -26,7 +26,7 @@ pub fn hideAllObjects() void {
 ///
 /// Values start at index 3, and only every 4th value after that is really
 /// an affine value. Other values belong to object attributes.
-pub const oam_affine_values: [*]gba.math.FixedI16R8 = @ptrCast(gba.mem.oam);
+pub const oam_affine_values: [*]volatile gba.math.FixedI16R8 = @ptrCast(gba.mem.oam);
 
 /// Write an affine transformation matrix to OAM, for use with objects.
 /// Should only be updated during VBlank, to avoid graphical glitches.
@@ -42,7 +42,7 @@ pub fn setTransform(index: u5, transform: gba.math.Affine2x2) void {
 }
 
 // TODO: probably rename to Object?
-pub const Obj = extern struct {
+pub const Obj = packed struct(u48) {
     /// Enumeration of rendering modes for sprites.
     const Mode = enum(u2) {
         /// Normal rendering.
@@ -117,29 +117,29 @@ pub const Obj = extern struct {
     /// Represents a combination of `Shape` and `ShapeSize`.
     pub const Size = packed struct(u4) {
         /// Represents an object size of 8x8 pixels (1x1 tiles).
-        pub const size_8x8: Size = .init(.square, .size_2),
+        pub const size_8x8: Size = .init(.square, .size_2);
         /// Represents an object size of 16x16 pixels (2x2 tiles).
-        pub const size_16x16: Size = .init(.square, .size_4),
+        pub const size_16x16: Size = .init(.square, .size_4);
         /// Represents an object size of 32x32 pixels (4x4 tiles).
-        pub const size_32x32: Size = .init(.square, .size_16),
+        pub const size_32x32: Size = .init(.square, .size_16);
         /// Represents an object size of 64x64 pixels (8x8 tiles).
-        pub const size_64x64: Size = .init(.square, .size_64),
+        pub const size_64x64: Size = .init(.square, .size_64);
         /// Represents an object size of 16x8 pixels (2x1 tiles).
-        pub const size_16x8: Size = .init(.wide, .size_2),
+        pub const size_16x8: Size = .init(.wide, .size_2);
         /// Represents an object size of 32x8 pixels (4x1 tiles).
-        pub const size_32x8: Size = .init(.wide, .size_4)),
+        pub const size_32x8: Size = .init(.wide, .size_4);
         /// Represents an object size of 32x16 pixels (4x2 tiles).
-        pub const size_32x16: Size = .init(.wide, .size_16)),
+        pub const size_32x16: Size = .init(.wide, .size_16);
         /// Represents an object size of 64x32 pixels (8x4 tiles).
-        pub const size_64x32: Size = .init(.wide, .size_64)),
+        pub const size_64x32: Size = .init(.wide, .size_64);
         /// Represents an object size of 8x16 pixels (1x2 tiles).
-        pub const size_8x16: Size = .init(.tall, .size_2),
+        pub const size_8x16: Size = .init(.tall, .size_2);
         /// Represents an object size of 8x32 pixels (1x4 tiles).
-        pub const size_8x32: Size = .init(.tall, .size_4)),
+        pub const size_8x32: Size = .init(.tall, .size_4);
         /// Represents an object size of 16x32 pixels (2x4 tiles).
-        pub const size_16x32: Size = .init(.tall, .size_16)),
+        pub const size_16x32: Size = .init(.tall, .size_16);
         /// Represents an object size of 32x64 pixels (4x8 tiles).
-        pub const size_32x64: Size = .init(.tall, .size_64)),
+        pub const size_32x64: Size = .init(.tall, .size_64);
         
         shape: Shape = .square,
         shape_size: ShapeSize = .size_2,
@@ -151,15 +151,17 @@ pub const Obj = extern struct {
 
     /// Used to set transformation effects on an object.
     const Transform = packed union {
-        /// Sprite flipping flags. Applies to normal (not affine) objects.
-        flip: packed struct(u5) {
+        pub const Flip = packed struct(u5) {
             /// Unused bits.
             _: u3 = 0,
             /// Flip the sprite horizontally, when set.
             x: bool = false,
             /// Flip the sprite vertically, when set.
             y: bool = false,
-        },
+        };
+        
+        /// Sprite flipping flags. Applies to normal (not affine) objects.
+        flip: Flip,
         /// Index of an affine transformation matrix in OAM.
         /// Applies to affine objects.
         /// See `setTransform`.

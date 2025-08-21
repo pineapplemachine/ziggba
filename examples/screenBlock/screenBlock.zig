@@ -16,7 +16,7 @@ fn initMap() void {
         .screen_base_block = 28,
         .tile_map_size = .{ .normal = .size_64x64 },
     };
-    gba.bg.scroll[0].set(0, 0);
+    gba.bg.scroll[0] = .zero;
 
     // create the tiles: basic tile and a cross
     gba.display.bg_charblocks[0].bpp_4[0] = @bitCast([_]u32{
@@ -83,6 +83,6 @@ pub export fn main() void {
             prev_screen_block = curr_screen_block;
         }
 
-        gba.bg.scroll[0].set(x, y);
+        gba.bg.scroll[0] = .init(x, y);
     }
 }

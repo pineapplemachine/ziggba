@@ -25,10 +25,10 @@ pub const Palette = extern union {
 };
 
 /// Palette used for backgrounds.
-pub const bg_palette: *volatile Palette = @ptrFromInt(gba.mem.palette);
+pub const bg_palette: *volatile Palette = @ptrCast(&gba.mem.palette[0x000]);
 
 /// Palette used for objects/sprites.
-pub const obj_palette: *volatile Palette = @ptrFromInt(gba.mem.palette + 0x200);
+pub const obj_palette: *volatile Palette = @ptrCast(&gba.mem.palette[0x100]);
 
 /// Copy memory into the background palette.
 pub fn memcpyBackgroundPalette(

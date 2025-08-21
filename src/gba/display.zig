@@ -1,17 +1,20 @@
 const std = @import("std");
 const gba = @import("gba.zig");
-const display = @This();
-
-// Window-related imports.
-pub const Window = @import("display_window.zig").Window;
-pub const window = @import("display_window.zig").window;
 
 // Blending-related imports.
 pub const Blend = @import("display_blend.zig").Blend;
 pub const blend = @import("display_blend.zig").blend;
 
+// Palette-related imports.
+pub const Palette = @import("display_palette.zig").Palette;
+pub const bg_palette = @import("display_palette.zig").bg_palette;
+pub const obj_palette = @import("display_palette.zig").obj_palette;
+pub const memcpyBackgroundPalette = @import("display_palette.zig").memcpyBackgroundPalette;
+pub const memcpyBackgroundPaletteBank = @import("display_palette.zig").memcpyBackgroundPaletteBank;
+pub const memcpyObjectPalette = @import("display_palette.zig").memcpyObjectPalette;
+pub const memcpyObjectPaletteBank = @import("display_palette.zig").memcpyObjectPaletteBank;
+
 // Imports for types and definitions related to VRAM.
-pub const vram = @import("display_vram.zig").vram;
 pub const Screenblock = @import("display_vram.zig").Screenblock;
 pub const BackgroundMap = @import("display_vram.zig").BackgroundMap;
 pub const AffineBackgroundMap = @import("display_vram.zig").AffineBackgroundMap;
@@ -36,18 +39,27 @@ pub const memcpyBackgroundTiles8Bpp = @import("display_vram.zig").memcpyBackgrou
 pub const memcpyObjectTiles4Bpp = @import("display_vram.zig").memcpyObjectTiles4Bpp;
 pub const memcpyObjectTiles8Bpp = @import("display_vram.zig").memcpyObjectTiles8Bpp;
 
-// Palette-related imports.
-pub const Palette = @import("display_palette.zig").Palette;
-pub const bg_palette = @import("display_palette.zig").bg_palette;
-pub const obj_palette = @import("display_palette.zig").obj_palette;
-pub const memcpyBackgroundPalette = @import("display_palette.zig").memcpyBackgroundPalette;
-pub const memcpyBackgroundPaletteBank = @import("display_palette.zig").memcpyBackgroundPaletteBank;
-pub const memcpyObjectPalette = @import("display_palette.zig").memcpyObjectPalette;
-pub const memcpyObjectPaletteBank = @import("display_palette.zig").memcpyObjectPaletteBank;
+// Window-related imports.
+pub const Window = @import("display_window.zig").Window;
+pub const window = @import("display_window.zig").window;
 
-var current_page_addr: u32 = gba.mem.vram;
+/// Width of GBA video output, in pixels.
+pub const screen_width = 240;
 
-pub const back_page: [*]volatile u16 = @ptrFromInt(gba.mem.vram + 0xA000);
+/// Height of GBA video output, in pixels.
+pub const screen_height = 160;
+
+/// Width of GBA video output, in 8x8 pixel tiles.
+pub const screen_width_tiles = 30;
+
+/// Height of GBA video output, in 8x8 pixel tiles.
+pub const screen_height_tiles = 20;
+
+var current_page_addr: u32 = gba.mem.vram_address;
+
+pub const back_page: [*]volatile u16 = (
+    @ptrFromInt(gba.mem.vram_address + 0xa000)
+);
 
 // TODO: Remove this (only `TextScreenBlock` is using this currently)
 pub const Flip = packed struct(u2) {
@@ -142,7 +154,7 @@ pub const Control = packed struct(u16) {
 };
 
 /// Display control register. Corresponds to REG_DISPCNT.
-pub const ctrl: *volatile display.Control = @ptrCast(gba.mem.io.reg_dispcnt);
+pub const ctrl: *volatile Control = @ptrCast(gba.mem.io.reg_dispcnt);
 
 /// Represents the contents of the display status register REG_DISPSTAT.
 pub const Status = packed struct(u16) {
@@ -181,7 +193,7 @@ pub const Status = packed struct(u16) {
 };
 
 /// Display status register. Corresponds to REG_DISPSTAT.
-pub const status: *volatile display.Status = @ptrCast(gba.mem.io.reg_dispstat);
+pub const status: *volatile Status = @ptrCast(gba.mem.io.reg_dispstat);
 
 /// Indicates the currently drawn scanline. Read-only.
 /// Corresponds to REG_VCOUNT.

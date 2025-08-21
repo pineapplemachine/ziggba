@@ -41,11 +41,11 @@ pub const Blend = extern struct {
         };
         
         /// Select layers for blend A.
-        a: LayerFlags align(1) = .none,
+        a: LayerFlags = .none,
         /// Determines blending behavior.
         mode: Mode = .none,
         /// Select layers for blend B.
-        b: LayerFlags align(1) = .none,
+        b: LayerFlags = .none,
         /// Unused bits.
         _: u2 = 0,
         
@@ -140,7 +140,7 @@ pub const Blend = extern struct {
         y_weight: u5,
     ) Blend {
         return .{
-            .ctrl = .initWhite(a),
+            .ctrl = .initWhite(a_flags),
             .alpha = .init(a_weight, 0),
             .luma = .init(y_weight),
         };
@@ -153,7 +153,7 @@ pub const Blend = extern struct {
         y_weight: u5,
     ) Blend {
         return .{
-            .ctrl = .initBlack(a),
+            .ctrl = .initBlack(a_flags),
             .alpha = .init(a_weight, 0),
             .luma = .init(y_weight),
         };

@@ -42,11 +42,11 @@ pub const Window = extern struct {
     /// Represents the structure of REG_WININ.
     pub const Inner = packed struct(u16) {
         /// Indicates which layers should be affected by the window 0 region.
-        win0: LayerFlags align(1) = .none,
+        win0: LayerFlags = .none,
         /// Unused bits.
         _1: u2 = 0,
         /// Indicates which layers should be affected by the window 1 region.
-        win1: LayerFlags align(1) = .none,
+        win1: LayerFlags = .none,
         /// Unused bits.
         _2: u2 = 0,
         
@@ -62,12 +62,12 @@ pub const Window = extern struct {
     pub const Other = packed struct(u16) {
         /// Indicates which layers should be affected by the region not
         /// overlapping window 0, window 1, or any object set to window mode.
-        outer: LayerFlags align(1) = .none,
+        outer: LayerFlags = .none,
         /// Unused bits.
         _1: u2 = 0,
         /// Indicates which layers should be affected by objects set to
         /// window mode. See `gba.obj.Obj.effect`.
-        obj: LayerFlags align(1) = .none,
+        obj: LayerFlags = .none,
         /// Unused bits.
         _2: u2 = 0,
         

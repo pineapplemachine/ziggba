@@ -1,5 +1,7 @@
 //! Provides an interface for wait state control.
 
+const gba = @import("gba.zig");
+
 /// Describes the contents of REG_WAITCNT.
 pub const WaitControl = packed struct(u16) {
     /// Reflects the uninitialized state of REG_WAITCNT at startup.
@@ -48,7 +50,7 @@ pub const WaitControl = packed struct(u16) {
         mhz_16_78 = 3,
     };
     
-    pub const GamepakType = enum(u2) {
+    pub const GamepakType = enum(u1) {
         /// Game Boy Advance game pak.
         gba = 0,
         /// Game Boy Color game pak.
@@ -72,7 +74,7 @@ pub const WaitControl = packed struct(u16) {
     /// PHI terminal output.
     terminal: TerminalOutput = .disable,
     /// Unused bit.
-    _1: u1,
+    _1: u1 = 0,
     /// Enable or disable gamepak prefetch buffer.
     prefetch: bool = false,
     /// Gamepak type flag. Read-only.

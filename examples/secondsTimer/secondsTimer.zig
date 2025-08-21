@@ -8,7 +8,7 @@ fn initMap() void {
         .screen_base_block = 28,
         .tile_map_size = .{ .normal = .size_32x32 },
     };
-    gba.bg.scroll[0].set(0, 0);
+    gba.bg.scroll[0] = .zero;
 
     // Create tiles for numeric digits
     gba.display.bg_charblocks[0].bpp_4[0] = @bitCast([_]u32{

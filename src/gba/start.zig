@@ -16,7 +16,7 @@ extern var __iwram_end__: u8;
 export fn _start_zig() noreturn {
     // Initialize REG_WAITCNT.
     // TODO: Provide a build option to more easily customize this behavior
-    gba.mem.wait_ctrl = .default;
+    gba.mem.wait_ctrl.* = .default;
     // Use BIOS function to clear data.
     // Don't clear EWRAM or IWRAM: Anything not overwritten later in this
     // startup routine can safely be garbage bytes.

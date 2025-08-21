@@ -4,16 +4,13 @@ const gba = @import("gba.zig");
 extern var __data_start__: u8;
 extern var __data_end__: u8;
 
-// TODO: declaration in gba.mem could probably already just look like this?
-const ewram: *volatile [0x40000]u8 = @ptrFromInt(gba.mem.ewram);
-
 /// Get EWRAM not reserved at link time for the ROM's data section,
 /// i.e. EWRAM not reserved for global variables.
 pub fn getUnreservedEWRAM() []u8 {
     const data_len: usize = (
         @intFromPtr(&__data_end__) - @intFromPtr(&__data_start__)
     );
-    return ewram[data_len..];
+    return gba.mem.ewram[data_len..];
 }
 
 /// Implements a very simple allocation strategy given an owned buffer.

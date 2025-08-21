@@ -111,7 +111,7 @@ pub const ctrl: *volatile [4]Control = @ptrCast(gba.mem.io.reg_bgcnt);
 /// GBATEK documents that only the low nine bits of X and Y are used.
 /// However, since normal backgrounds wrap and their width and height are
 /// always evenly divisible into 512 pixels, there is not really a distinction.
-pub const scroll: *[4]gba.math.Vec2I16 = @ptrCast(gba.mem.io.reg_bg_ofs);
+pub const scroll: *volatile [4]gba.math.Vec2I16 = @ptrCast(gba.mem.io.reg_bg_ofs);
 
 // TODO: Cleanup TextScreenEntry etc.
 
@@ -122,7 +122,7 @@ pub const TextScreenEntry = packed struct(u16) {
 };
 
 pub const TextScreenBlock = [1024]TextScreenEntry;
-pub const screen_block_ram: [*]volatile TextScreenBlock = @ptrCast(gba.display.vram);
+pub const screen_block_ram: [*]volatile TextScreenBlock = @ptrCast(gba.mem.vram);
 
 pub inline fn screenBlockMap(block: u5) [*]volatile TextScreenEntry {
     return @ptrCast(&screen_block_ram[block]);

@@ -3,9 +3,6 @@
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
-/// Pointer to the system's VRAM.
-pub const vram: [*]volatile align(2) u16 = @ptrFromInt(gba.mem.vram);
-
 /// Holds data for 32x32 non-affine background tiles, or up to 2048 affine
 /// tiles.
 /// A background can use one or more screenblocks.
@@ -581,25 +578,25 @@ pub const ObjectCharblockTiles = extern union {
 };
 
 /// Represents all 32 screenblocks in VRAM.
-pub const screenblocks: *volatile [32]Screenblock = @ptrFromInt(gba.mem.vram);
+pub const screenblocks: *volatile [32]Screenblock = @ptrCast(gba.mem.vram);
 
 /// Represents all six charblocks in VRAM.
-pub const charblocks: *volatile [6]Charblock = @ptrFromInt(gba.mem.vram);
+pub const charblocks: *volatile [6]Charblock = @ptrCast(gba.mem.vram);
 
 /// Represents the tiles of all six charblocks in VRAM as one flat array.
-pub const charblock_tiles: *volatile CharblockTiles(6) = @ptrFromInt(gba.mem.vram);
+pub const charblock_tiles: *volatile CharblockTiles = @ptrCast(charblocks);
 
 /// Represents the four charblocks in VRAM that can be used in backgrounds.
-pub const bg_charblocks: *volatile [4]Charblock = @ptrFromInt(gba.mem.vram);
+pub const bg_charblocks: *volatile [4]Charblock = charblocks[0..4];
 
 /// Represents the tiles of the charblocks usable with backgrounds.
-pub const bg_charblock_tiles: *volatile BackgroundCharblockTiles = @ptrFromInt(gba.mem.vram);
+pub const bg_charblock_tiles: *volatile BackgroundCharblockTiles = @ptrCast(bg_charblocks);
 
 /// Represents the two charblocks in VRAM that can be used in objects.
-pub const obj_charblocks: *volatile [2]Charblock = @ptrFromInt(gba.mem.vram + 0x10000);
+pub const obj_charblocks: *volatile [2]Charblock = charblocks[4..6];
 
 /// Represents the tiles of the charblocks usable with objects.
-pub const obj_charblock_tiles: *volatile ObjectCharblockTiles = @ptrFromInt(gba.mem.vram + 0x10000);
+pub const obj_charblock_tiles: *volatile ObjectCharblockTiles = @ptrCast(obj_charblocks);
 
 /// Enumeration of bits per pixel values for tiles.
 ///
@@ -765,7 +762,7 @@ pub fn memcpyTiles4Bpp(
     const offset = tile_offset + (@as(u16, block) << 9);
     assert(offset + data.len <= 0xc00); // 6 banks * 0x200 tiles/bank
     // Tile4Bpp is 32 bytes long
-    gba.mem.memcpy16(vram + (offset << 4), data.ptr, data.len << 4);
+    gba.mem.memcpy16(&gba.mem.vram[offset << 4], data.ptr, data.len << 4);
 }
 
 /// Copy memory for 256-color tiles into a charblock.
@@ -784,7 +781,7 @@ pub fn memcpyTiles8Bpp(
     const offset = tile_offset + (@as(u16, block) << 8);
     assert(offset + data.len <= 0x600); // 6 banks * 0x100 tiles/bank
     // Tile8Bpp is 64 bytes long
-    gba.mem.memcpy16(vram + (offset << 5), data.ptr, data.len << 5);
+    gba.mem.memcpy16(&gba.mem.vram[offset << 5], data.ptr, data.len << 5);
 }
 
 /// Copy memory for 16-color tiles into background charblock VRAM.

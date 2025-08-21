@@ -342,7 +342,7 @@ pub const Control = packed struct(u32) {
     dmg: Dmg = .{},
     /// Corresponds to REG_SNDDSCNT.
     dsound: DirectSound = .{},
-}
+};
 
 /// Represents the contents of REG_SNDSTAT.
 pub const Status = packed struct(u16) {
@@ -404,14 +404,14 @@ pub const PulseChannel1 = extern struct {
     
     /// Control pitch sweep in channel 1 (Pulse 1).
     /// Corresponds to tonc REG_SND1SWEEP.
-    sweep: Sweep,
+    sweep: PulseChannelSweep = .{},
     /// Control length, duty, and envelope in channel 1 (Pulse 1).
     /// Corresponds to tonc REG_SND1CNT.
-    ctrl: Control,
+    ctrl: PulseChannelControl = .{},
     /// Control rate (determines pitch/frequency) in channel 1 (Pulse 1).
     /// Corresponds to tonc REG_SND1FREQ.
-    freq: Frequency,
-}
+    freq: PulseChannelFrequency = .{},
+};
 
 /// Encapsulates sound registers relating to channel 2 (Pulse 2).
 pub const PulseChannel2 = extern struct {
@@ -420,11 +420,11 @@ pub const PulseChannel2 = extern struct {
     
     /// Control length, duty, and envelope in channel 2 (Pulse 2).
     /// Corresponds to tonc REG_SND2CNT.
-    ctrl: Control,
+    ctrl: PulseChannelControl = .{},
     /// Control rate (determines pitch/frequency) in channel 2 (Pulse 2).
     /// Corresponds to tonc REG_SND2FREQ.
-    freq: Frequency,
-}
+    freq: PulseChannelFrequency = .{},
+};
 
 /// Encapsulates sound registers relating to channel 3 (Wave).
 pub const WaveChannel = extern struct {
@@ -434,14 +434,14 @@ pub const WaveChannel = extern struct {
     
     /// Waveform select for channel 3 (Wave).
     /// Corresponds to REG_SND3SEL.
-    select: Select,
+    select: WaveChannelSelect = .{},
     /// Control length and volume in channel 3 (Wave).
     /// Corresponds to tonc REG_SND3CNT.
-    ctrl: Control,
+    ctrl: WaveChannelControl = .{},
     /// Control rate (determines pitch/frequency) in channel 3 (Wave).
     /// Corresponds to tonc REG_SND3FREQ.
-    freq: Frequency,
-}
+    freq: WaveChannelFrequency = .{},
+};
 
 /// Encapsulates sound registers relating to channel 4 (Noise).
 pub const NoiseChannel = extern struct {
@@ -450,11 +450,11 @@ pub const NoiseChannel = extern struct {
     
     /// Control length and envelope in channel 4 (Noise).
     /// Corresponds to tonc REG_SND4CNT.
-    ctrl: Control,
+    ctrl: NoiseChannelControl = .{},
     /// Control the frequency and quality of noise in channel 4 (Noise).
     /// Corresponds to tonc REG_SND4FREQ.
-    freq: Frequency,
-}
+    freq: NoiseChannelFrequency = .{},
+};
 
 /// Refers to hardware registers used to affect PSG channel 1 (Pulse 1).
 pub const pulse_1: *volatile PulseChannel1 = @ptrCast(gba.mem.io.reg_snd1sweep);

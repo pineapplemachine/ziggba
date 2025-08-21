@@ -19,17 +19,3 @@ pub const sound = @import("sound.zig");
 pub const text = @import("text.zig");
 pub const Timer = @import("timer.zig").Timer;
 pub const timers = @import("timer.zig").timers;
-
-/// Pointer to EWRAM (external work RAM).
-/// More plentiful than IWRAM, but slower.
-pub const ewram: *volatile [0x20000]u16 = @ptrFromInt(gba.mem.ewram);
-
-/// Pointer to IWRAM (internal work RAM).
-/// Not as large as EWRAM, but faster.
-pub const iwram: *volatile [0x2000]u32 = @ptrFromInt(gba.mem.iwram);
-
-/// Width of the GBA video output in pixels.
-pub const screen_width = 240;
-
-/// Height of the GBA video output in pixels.
-pub const screen_height = 160;

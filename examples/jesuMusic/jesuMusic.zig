@@ -570,37 +570,37 @@ const Track = struct {
         }
         switch (self.output) {
             .pulse_1 => {
-                gba.sound.pulse_1.ctrl.* = gba.sound.PulseChannelControl{
+                gba.sound.pulse_1.ctrl = gba.sound.PulseChannelControl{
                     .len = 0x3f,
                     .duty = self.duty,
                     .step = self.decay,
                     .volume = self.volume,
                 };
-                gba.sound.pulse_1.freq.* = gba.sound.PulseChannelFrequency{
+                gba.sound.pulse_1.freq = gba.sound.PulseChannelFrequency{
                     .rate = @intCast(self.rate),
                     .reset = reset_note,
                 };
             },
             .pulse_2 => {
-                gba.sound.pulse_2.ctrl.* = gba.sound.PulseChannelControl{
+                gba.sound.pulse_2.ctrl = gba.sound.PulseChannelControl{
                     .len = 0x3f,
                     .duty = self.duty,
                     .step = self.decay,
                     .volume = self.volume,
                 };
-                gba.sound.pulse_2.freq.* = gba.sound.PulseChannelFrequency{
+                gba.sound.pulse_2.freq = gba.sound.PulseChannelFrequency{
                     .rate = @intCast(self.rate),
                     .reset = reset_note,
                 };
             },
             .wave => {},
             .noise => {
-                gba.sound.noise.ctrl.* = gba.sound.NoiseChannelControl{
+                gba.sound.noise.ctrl = gba.sound.NoiseChannelControl{
                     .len = 0x3f,
                     .step = self.decay,
                     .volume = self.volume,
                 };
-                gba.sound.noise.freq.* = gba.sound.NoiseChannelFrequency{
+                gba.sound.noise.freq = gba.sound.NoiseChannelFrequency{
                     .shift = 0x1,
                     .divisor = .div_16,
                     .reset = reset_note,
@@ -763,13 +763,13 @@ pub export fn main() void {
     };
 
     // Initialize sound registers to allow playback.
-    gba.sound.ctrl.status.* = gba.sound.Status{
+    gba.sound.status.* = gba.sound.Status{
         .pulse_1 = true,
         .pulse_2 = true,
         .noise = true,
         .master = true,
     };
-    gba.sound.ctrl.dmg.* = gba.sound.Dmg{
+    gba.sound.ctrl.dmg = gba.sound.Control.Dmg{
         .volume_left = 0x7,
         .volume_right = 0x7,
         .left_pulse_1 = true,
@@ -790,7 +790,7 @@ pub export fn main() void {
     };
     var map = gba.display.BackgroundMap.initCtrl(bg0_ctrl);
     gba.bg.ctrl[0] = bg0_ctrl;
-    gba.bg.scroll[0].set(0, 0);
+    gba.bg.scroll[0] = .zero;
     gba.display.bg_palette.banks[0][1] = .rgb(31, 31, 31);
     gba.display.bg_palette.banks[0][2] = .rgb(0, 0, 0);
     gba.display.bg_palette.banks[1][1] = .rgb(31, 31, 31);
