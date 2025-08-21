@@ -1,16 +1,6 @@
 const gba = @import("gba.zig");
 
-/// DMA (direct memory access) can be used to copy or fill data between
-/// regions in memory.
-/// You should expect DMA copies to be little faster than either
-/// `gba.mem.memcpy32` or `gba.bios.cpuFastSetCopy`, and fills to be slower
-/// than either `gba.mem.memset32` or `gba.bios.cpuFastSetFill`.
-/// The faster copies come with the tradeoff of disabling interrupts while the
-/// operation is ongoing, because the CPU is stopped while the DMA controller
-/// does its work.
-///
-/// Note that source and destination addresses only use the least significant
-/// 27 bits (for internal memory) or 28 bits (for any memory)
+/// Direct memory access.
 pub const Dma = extern struct {
     pub const DestinationAdjustment = enum(u2) {
         /// Increment after each transfer.
@@ -83,9 +73,11 @@ pub const Dma = extern struct {
 
     /// Source pointer to copy memory from.
     /// For DMA 0, can only be internal memory.
+    /// Corresponds to REG_DMAxSAD. (Write-only.)
     source: *const volatile anyopaque,
     /// Destination pointer to copy memory to.
     /// For DMA 0-2, can only be internal memory.
+    /// Corresponds to REG_DMAxDAD. (Write-only.)
     dest: *volatile anyopaque,
     /// Number of transfers.
     /// Counts the number of words or half-words to transfer, depending
@@ -93,13 +85,25 @@ pub const Dma = extern struct {
     /// For DMA0-2, only the low 14 bits are used.
     /// A value of zero is treated as max length, i.e. 0x4000 for DMA0-2
     /// or 0x10000 for DMA3.
+    /// Corresponds to the low 16 bits of REG_DMAxCNT. (Write-only.)
     count: u16 = 0,
     /// Indicates various parameters for the transfer, including length.
+    /// Corresponds to the high 16 bits of REG_DMAxCNT.
     ctrl: Control,
 };
 
-/// Direct memory access.
-pub const dma: *volatile [4]Dma = @ptrFromInt(gba.mem.io + 0xB0);
+/// Direct memory access (DMA) can be used to copy or fill data in
+/// regions of memory.
+/// You should expect DMA copies to be little faster than either
+/// `gba.mem.memcpy32` or `gba.bios.cpuFastSetCopy`, and fills to be slower
+/// than either `gba.mem.memset32` or `gba.bios.cpuFastSetFill`.
+/// The faster copies come with the tradeoff of disabling interrupts while the
+/// operation is ongoing, because the CPU is stopped while the DMA controller
+/// does its work.
+///
+/// Note that source and destination addresses only use the least significant
+/// 27 bits (for internal memory) or 28 bits (for any memory)
+pub const dma: *volatile [4]Dma = @ptrCast(gba.mem.io.reg_dma);
 
 /// Copy memory using the DMA.
 /// This is a bit faster than any BIOS or user code implementation, but the CPU

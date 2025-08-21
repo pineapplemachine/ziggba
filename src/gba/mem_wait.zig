@@ -40,8 +40,11 @@ pub const WaitControl = packed struct(u16) {
     
     pub const TerminalOutput = enum(u2) {
         disable = 0,
+        /// 4.19MHz.
         mhz_4_19 = 1,
+        /// 8.38MHz.
         mhz_8_38 = 2,
+        /// 16.78MHz.
         mhz_16_78 = 3,
     };
     
