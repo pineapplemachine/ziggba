@@ -1,9 +1,10 @@
 const std = @import("std");
 const gba = @import("gba.zig");
-const Color = gba.Color;
 const display = @This();
 
-pub const window = @import("display_window.zig");
+// Window-related imports.
+pub const Window = @import("display_window.zig").Window;
+pub const window = @import("display_window.zig").window;
 
 pub const vram = @import("display_vram.zig").vram;
 pub const Screenblock = @import("display_vram.zig").Screenblock;
