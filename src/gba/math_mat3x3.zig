@@ -1,3 +1,4 @@
+//! This module implements a 3x3 matrix.
 
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
@@ -29,7 +30,7 @@ pub fn Mat3x3I(comptime T: type) type {
         pub const identity: Self = .initColumns(.x_1, .y_1, .z_1);
         
         /// Column vectors for this matrix.
-        cols: [3]Vec3T,
+        cols: [3]Vec3T = .{ .zero, .zero, .zero },
         
         /// Components are given in row-major order.
         pub fn initRowMajor(

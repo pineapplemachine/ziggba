@@ -1,3 +1,5 @@
+//! This module implements a 2x2 matrix.
+
 const gba = @import("gba.zig");
 
 /// Returns either a `Mat2x2I` or `Mat2x2FixedI` type depending
@@ -27,7 +29,7 @@ pub fn Mat2x2I(comptime T: type) type {
         pub const identity: Self = .initColumns(.x_1, .y_1);
         
         /// Column vectors for this matrix.
-        cols: [2]Vec2T,
+        cols: [2]Vec2T = .{ .zero, .zero },
         
         /// Components are given in row-major order.
         pub fn initRowMajor(x1y1: T, x2y1: T, x1y2: T, x2y2: T) Self {

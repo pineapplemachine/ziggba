@@ -1,3 +1,5 @@
+//! This module implements a three-dimensional vector.
+
 const gba = @import("gba.zig");
 
 pub fn Vec3(comptime T: type) type {
@@ -34,9 +36,9 @@ pub fn Vec3I(comptime T: type) type {
         pub const y_1: Self = .init(T_zero, T_one, T_zero);
         pub const z_1: Self = .init(T_zero, T_zero, T_one);
         
-        x: T,
-        y: T,
-        z: T,
+        x: T = T_zero,
+        y: T = T_zero,
+        z: T = T_zero,
         
         pub fn init(x: T, y: T, z: T) Self {
             return .{ .x = x, .y = y, .z = z };
