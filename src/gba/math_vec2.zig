@@ -1,9 +1,14 @@
+//! This module implements two-dimensional vectors, of various types.
+
 const gba = @import("gba.zig");
 
 /// Returns either a `Vec2I`, `Vec2U`, or `Vec2FixedI` type depending
 /// on the given vector component type.
 pub fn Vec2(comptime T: type) type {
-    if(comptime(gba.math.isSignedFixedPointType(T))) {
+    if(comptime(T == bool)) {
+        return Vec2B(T);
+    }
+    else if(comptime(gba.math.isSignedFixedPointType(T))) {
         return Vec2I(T);
     }
     else if(comptime(gba.math.isSignedIntPrimitiveType(T))) {
@@ -16,6 +21,66 @@ pub fn Vec2(comptime T: type) type {
         @compileError("No Vec2 implementation is available for this type.");
     }
 }
+
+/// Represents a vector with two boolean components.
+pub const Vec2B = packed struct(u2) {
+    const Self = @This();
+    const T = bool;
+    
+    pub const one: Vec2B = .init(true, true);
+    pub const zero: Vec2B = .init(false, false);
+    pub const x_1: Vec2B = .init(true, false);
+    pub const y_1: Vec2B = .init(false, true);
+    
+    pub const both = one;
+    pub const neither = zero;
+    pub const only_x = x_1;
+    pub const only_y = y_1;
+    
+    x: T = false,
+    y: T = false,
+    
+    pub fn init(x: T, y: T) Self {
+        return .{ .x = x, .y = y };
+    }
+    
+    /// Invert each component, i.e. `!self`.
+    pub fn invert(self: Self) Self {
+        return .{ .x = !self.x, .y = !self.y };
+    }
+    
+    /// Returns true when both components of the vector are false.
+    pub fn isNeither(self: Self) bool {
+        return !self.x and !self.y;
+    }
+    
+    /// Returns true when both components of the vector are true.
+    pub fn isBoth(self: Self) bool {
+        return self.x and self.y;
+    }
+    
+    /// Logical conjunction of two vectors, i.e. `a and b`.
+    pub fn conj(a: Self, b: Self) Self {
+        return .init(a.x and b.x, a.y and b.y);
+    }
+    
+    /// Logical disjunction of two vectors, i.e. `a or b`.
+    pub fn disj(a: Self, b: Self) Self {
+        return .init(a.x or b.x, a.y or b.y);
+    }
+    
+    /// Check if two vectors are equal.
+    pub fn eql(a: Self, b: Self) Self {
+        return a.x == b.x and a.y == b.y;
+    }
+    
+    /// Get the dot product of two vectors.
+    pub fn dot(a: Self, b: Self) u2 {
+        const x: u2 = @intFromBool(a.x and b.x);
+        const y: u2 = @intFromBool(a.x and b.x);
+        return x + y;
+    }
+};
 
 /// Represents a vector with two signed components.
 pub fn Vec2I(comptime T: type) type {
@@ -36,8 +101,8 @@ pub fn Vec2I(comptime T: type) type {
         pub const x_1: Self = .init(T_one, T_zero);
         pub const y_1: Self = .init(T_zero, T_one);
         
-        x: T,
-        y: T,
+        x: T = T_zero,
+        y: T = T_zero,
         
         pub fn init(x: T, y: T) Self {
             return .{ .x = x, .y = y };

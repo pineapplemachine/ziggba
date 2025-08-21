@@ -51,6 +51,7 @@ pub const RectU32 = @import("math_rect.zig").RectU32;
 
 // 2-vector types.
 pub const Vec2 = @import("math_vec2.zig").Vec2;
+pub const Vec2B = @import("math_vec2.zig").Vec2B;
 pub const Vec2I = @import("math_vec2.zig").Vec2I;
 pub const Vec2U = @import("math_vec2.zig").Vec2U;
 pub const Vec2FixedI = @import("math_vec2.zig").Vec2FixedI;
