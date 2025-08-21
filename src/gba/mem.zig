@@ -5,6 +5,9 @@ const std = @import("std");
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
+/// Named definitions for all the system's hardware registers.
+pub const io = @import("mem_io");
+
 // Imports for DMA-related API.
 pub const Dma = @import("mem_dma.zig").Dma;
 pub const dma = @import("mem_dma.zig").dma;
@@ -44,6 +47,37 @@ extern fn memset_thumb(dst: [*]volatile u8, src: u8, n: u32) callconv(.c) void;
 extern fn memset16_thumb(dst: [*]volatile u16, src: u16, n: u32) callconv(.c) void;
 extern fn memset32_thumb(dst: [*]volatile u32, src: u32, n: u32) callconv(.c) void;
 
+/// Base address for external work RAM (EWRAM).
+pub const ewram_address = 0x02000000;
+
+/// Base address for internal work RAM (IWRAM).
+pub const iwram_address = 0x03000000;
+
+/// Base address for memory-mapped input/output (MMIO) registers.
+pub const io_address = 0x04000000;
+
+/// Base address for palette data.
+/// Note that this region of memory does not support 8-bit writes.
+pub const palette_address = 0x05000000;
+
+/// Base address for video RAM (VRAM).
+/// Note that this region of memory does not support 8-bit writes.
+pub const vram_address = 0x06000000;
+
+/// Base address for object attribute data (OAM).
+pub const oam_address = 0x07000000;
+
+/// Base address for gamepak ROM.
+pub const rom_address = 0x08000000;
+
+/// Base address for wait state 1 gamepak ROM.
+pub const rom_wait_1_address = 0x0a000000;
+
+/// Base address for wait state 2 gamepak ROM.
+pub const rom_wait_2_address = 0x0c000000;
+
+/// Base address for save RAM (SRAM).
+pub const sram_address = 0x0e000000;
 /// Copy memory from a source to a destination pointer.
 /// Use this function for pointers that aren't certain to be aligned on
 /// either a word or half-word boundary.
