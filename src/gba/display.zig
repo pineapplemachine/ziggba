@@ -6,6 +6,11 @@ const display = @This();
 pub const Window = @import("display_window.zig").Window;
 pub const window = @import("display_window.zig").window;
 
+// Blending-related imports.
+pub const Blend = @import("display_blend.zig").Blend;
+pub const blend = @import("display_blend.zig").blend;
+
+// Imports for types and definitions related to VRAM.
 pub const vram = @import("display_vram.zig").vram;
 pub const Screenblock = @import("display_vram.zig").Screenblock;
 pub const BackgroundMap = @import("display_vram.zig").BackgroundMap;
@@ -31,6 +36,7 @@ pub const memcpyBackgroundTiles8Bpp = @import("display_vram.zig").memcpyBackgrou
 pub const memcpyObjectTiles4Bpp = @import("display_vram.zig").memcpyObjectTiles4Bpp;
 pub const memcpyObjectTiles8Bpp = @import("display_vram.zig").memcpyObjectTiles8Bpp;
 
+// Palette-related imports.
 pub const Palette = @import("display_palette.zig").Palette;
 pub const bg_palette = @import("display_palette.zig").bg_palette;
 pub const obj_palette = @import("display_palette.zig").obj_palette;
@@ -191,71 +197,17 @@ pub fn naiveVSync() void {
     while (vcount.* < 160) {} // wait till VBlank
 }
 
-/// Describes a mosaic effect
+/// Describes a mosaic effect.
 pub const Mosaic = packed struct(u16) {
-    pub const Size = packed struct(u8) {
-        x: u4 = 0,
-        y: u4 = 0,
-    };
-
-    bg: Mosaic.Size = .{},
-    sprite: Mosaic.Size = .{},
+    /// Mosaic pixel size for backgrounds.
+    /// The actual size in pixels will be `bg_size + 1`.
+    bg_size: gba.math.Vec2(u4) = .zero,
+    /// Mosaic pixel size for objects/sprites.
+    /// The actual size in pixels will be `obj_size + 1`.
+    obj_size: gba.math.Vec2(u4) = .zero,
 };
 
-/// Controls size of mosaic effects for backgrounds and sprites where it is active
-///
-/// (`REG_MOSAIC`)
-pub const mosaic: *volatile Mosaic = @ptrFromInt(gba.mem.io + 0x4C);
-
-// TODO: One struct per hardware register
-/// Represents the contents of REG_BLDCNT, REG_BLDALPHA, and REG_BLDY.
-pub const Blend = packed struct(u48) {
-    pub const Layers = packed struct(u6) {
-        bg0: bool = false,
-        bg1: bool = false,
-        bg2: bool = false,
-        bg3: bool = false,
-        obj: bool = false,
-        backdrop: bool = false,
-    };
-
-    /// Enumeration of blending modes.
-    pub const Mode = enum(u2) {
-        /// No blending. Blending effects are disabled.
-        none,
-        /// Blend A and B layers.
-        blend,
-        /// Blend A with white.
-        white,
-        /// Blend A with black.
-        black,
-    };
-
-    /// Select target layers for blend A.
-    a: Blend.Layers,
-    /// Determines blending behavior.
-    mode: Blend.Mode,
-    /// Select target layers for blend B.
-    b: Blend.Layers,
-    /// Blend weight for blend A. Clamped to a maximum of 16.
-    ev_a: u5,
-    /// Unused bits.
-    _0: u3,
-    /// Blend weight for blend B. Clamped to a maximum of 16.
-    /// Used as a ratio with `ev_a` when `mode` is `Mode.blend`.
-    ev_b: u5,
-    /// Unused bits.
-    _1: u3,
-    /// Blend weight for white or black. Clamped to a maximum of 16.
-    /// Used as a ratio with `ev_a` when `mode` is `Mode.white` or
-    /// `Mode.black`.
-    ///
-    /// Write-only.
-    ev_y: u5,
-    /// Unused bits.
-    _2: u27,
-};
-
-/// Controls for alpha blending.
-/// Corresponds to REG_BLDCNT, REG_BLDALPHA, and REG_BLDY.
-pub const blend: *volatile Blend = @ptrFromInt(gba.mem.io + 0x50);
+/// Controls size of mosaic effects for backgrounds and sprites,
+/// where they are active. Write-only.
+/// Corresponds to REG_MOSAIC.
+pub const mosaic: *volatile Mosaic = @ptrCast(gba.mem.io.reg_mosaic);
