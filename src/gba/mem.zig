@@ -223,3 +223,30 @@ pub fn memset32(
         memset32_thumb(@ptrCast(destination), value, count_words);
     }
 }
+
+/// Represents the contents of the internal memory control register.
+pub const InternalMemoryControl = packed struct(u32) {
+    /// Disable IWRAM and EWRAM. When off: Empty/prefetch.
+    disable_wram: bool = false,
+    /// Unknown bits.
+    _1: u2,
+    /// Disable CGB bootrom.
+    disable_cgb_boot: bool = false,
+    /// Unused bit.
+    _3: u1,
+    /// Enable EWRAM. When off, EWRAM memory addresses mirror IWRAM.
+    enable_ewram: bool = true,
+    /// Unused bits.
+    _4: u18,
+    /// Wait control for EWRAM.
+    /// On GBA and GBA SP, this can be set to 0xe to overclock EWRAM access.
+    /// However, this is not well supported on any other hardware.
+    ewram_wait: u4 = 0xd,
+    /// Unknown bits.
+    _5: u4,
+};
+
+/// Internal memory control.
+pub const internal_ctrl: *volatile InternalMemoryControl = (
+    @ptrFromInt(io_address + 0x800)
+);
