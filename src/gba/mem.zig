@@ -38,6 +38,9 @@ pub const oam = 0x07000000;
 pub const rom = 0x08000000;
 /// Base address for save RAM
 pub const sram = 0x0E000000;
+// Imports related to wait state control (memory access timings).
+pub const wait_ctrl = @import("mem_wait.zig").wait_ctrl;
+pub const WaitControl = @import("mem_wait.zig").WaitControl;
 
 // These functions are implemented in assembly in `mem.s`.
 extern fn memcpy_thumb(dst: [*]volatile u8, src: [*]const volatile u8, n: u32) callconv(.c) void;
