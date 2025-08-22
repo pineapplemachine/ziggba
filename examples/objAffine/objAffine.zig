@@ -29,7 +29,7 @@ pub export fn main() void {
     gba.obj.objects[1] = shadow_metroid;
     
     gba.display.ctrl.* = gba.display.Control{
-        .obj_mapping = .one_dimension,
+        .obj_mapping = .map_1d,
         .bg0 = true,
         .obj = true,
     };

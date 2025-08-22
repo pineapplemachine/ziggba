@@ -13,10 +13,7 @@ fn loadImageData() void {
 }
 
 pub export fn main() void {
-    gba.display.ctrl.* = .{
-        .mode = .mode4,
-        .bg2 = true,
-    };
+    gba.display.ctrl.* = .initMode4(.{});
 
     loadImageData();
 

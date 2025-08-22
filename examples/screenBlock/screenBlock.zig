@@ -2,23 +2,14 @@ const gba = @import("gba");
 
 export var gameHeader linksection(".gbaheader") = gba.Header.init("SCREENBLOCK", "ASBE", "00", 0);
 
-const cross_tx = 15;
-const cross_ty = 10;
+pub export fn main() void {
+    // Initialize a background.
+    const bg0_map = gba.display.BackgroundMap.setup(0, .{
+        .base_screenblock = 28,
+        .size = .size_64x64,
+    });
 
-fn screenIndex(tx: u32, ty: u32, pitch: u32) u32 {
-    const sbb: u32 = ((tx >> 5) + (ty >> 5) * (pitch >> 5));
-    return sbb * 1024 + ((tx & 31) + (ty & 31) * 32);
-}
-
-fn initMap() void {
-    // Init background
-    gba.bg.ctrl[0] = .{
-        .screen_base_block = 28,
-        .tile_map_size = .{ .normal = .size_64x64 },
-    };
-    gba.bg.scroll[0] = .zero;
-
-    // create the tiles: basic tile and a cross
+    // Initialize tiles: basic tile and a cross.
     gba.display.bg_charblocks[0].bpp_4[0] = @bitCast([_]u32{
         0x11111111, 0x01111111, 0x01111111, 0x01111111,
         0x01111111, 0x01111111, 0x01111111, 0x00000001,
@@ -28,61 +19,71 @@ fn initMap() void {
         0x00011000, 0x01100110, 0x00100100, 0x00000000,
     });
 
-    // Create the background palette
+    // Create the background palette.
     gba.display.bg_palette.banks[0][1] = .red;
     gba.display.bg_palette.banks[1][1] = .green;
     gba.display.bg_palette.banks[2][1] = .blue;
     gba.display.bg_palette.banks[3][1] = .rgb(16, 16, 16);
 
-    const bg0_map: [*]volatile gba.bg.TextScreenEntry = @ptrCast(&gba.bg.screen_block_ram[28]);
-
-    // Create the map: four contigent blocks of 0x0000, 0x1000, 0x2000, 0x3000
-    var map_index: usize = 0;
-    for (0..4) |palette_index| {
-        for (0..32 * 32) |_| {
-            bg0_map[map_index].palette_index = @intCast(palette_index);
-            map_index += 1;
-        }
+    // Create the map: four contigent blocks of 0x0000, 0x1000, 0x2000, 0x3000.
+    for(0..4) |palette_index| {
+        bg0_map.getScreenblock(@intCast(palette_index)).fill(.{
+            .palette = @intCast(palette_index),
+        });
     }
-}
-
-pub export fn main() void {
-    initMap();
-    gba.display.ctrl.* = .{
+    
+    // Initialize the display.
+    gba.display.ctrl.* = .initMode0(.{
         .bg0 = true,
         .obj = true,
-    };
-
+    });
+    
+    // Enable VBlank interrupts.
+    // This will allow running the main loop once per frame.
+    gba.display.status.vblank_interrupt = true;
+    gba.interrupt.enable.vblank = true;
+    gba.interrupt.master.enable = true;
+    
+    // These variables will be used to track the position of a cross.
+    const cross_pos_initial: gba.math.Vec2I16 = .init(15, 10);
+    var cross_pos_current: gba.math.Vec2I16 = cross_pos_initial;
+    var cross_pos_prev_tile: gba.math.Vec2I16 = cross_pos_current;
+    
+    // This variable will be used in tracking button inputs,
+    // for moving the cross around on the background.
     var input: gba.input.KeysState = .{};
-    var x: i10 = 0;
-    var y: i10 = 0;
-    var tx: u6 = 0;
-    var ty: u6 = 0;
-    var curr_screen_block: usize = 0;
-    var prev_screen_block: usize = cross_ty * 32 + cross_tx;
 
-    const bg0_map: [*]volatile gba.bg.TextScreenEntry = @ptrCast(&gba.bg.screen_block_ram[28]);
-    bg0_map[prev_screen_block].tile_index += 1;
+    while(true) {
+        // Run this loop only once per frame.
+        gba.bios.vblankIntrWait();
 
-    while (true) {
-        gba.display.naiveVSync();
-
+        // Update cross position depending on dpad input.
         input.poll();
-
-        x +%= input.getAxisHorizontal();
-        y +%= input.getAxisVertical();
-
-        tx = @truncate((@as(u10, @bitCast(x)) >> 3) + cross_tx);
-        ty = @truncate((@as(u10, @bitCast(y)) >> 3) + cross_ty);
-
-        curr_screen_block = screenIndex(tx, ty, 64);
-
-        if (prev_screen_block != curr_screen_block) {
-            bg0_map[prev_screen_block].tile_index -%= 1;
-            bg0_map[curr_screen_block].tile_index +%= 1;
-            prev_screen_block = curr_screen_block;
-        }
-
-        gba.bg.scroll[0] = .init(x, y);
+        cross_pos_current.x +%= input.getAxisHorizontal();
+        cross_pos_current.y +%= input.getAxisVertical();
+        
+        // Divide position vector by 8 via `x >> 3, y >> 3`.
+        const cross_pos_current_tile = cross_pos_current.asr(3);
+        
+        // Clear a previous position tile and set a current position tile
+        // to represent the current cross position.
+        const bg0_prev_x: u6 = @bitCast(@as(i6, @truncate(cross_pos_prev_tile.x)));
+        const bg0_prev_y: u6 = @bitCast(@as(i6, @truncate(cross_pos_prev_tile.y)));
+        const bg0_current_x: u6 = @bitCast(@as(i6, @truncate(cross_pos_current_tile.x)));
+        const bg0_current_y: u6 = @bitCast(@as(i6, @truncate(cross_pos_current_tile.y)));
+        bg0_map.set(bg0_prev_x, bg0_prev_y, .{
+            .tile = 0,
+            .palette = bg0_map.getScreenblockOffset(bg0_prev_x, bg0_prev_y),
+        });
+        bg0_map.set(bg0_current_x, bg0_current_y, .{
+            .tile = 1,
+            .palette = bg0_map.getScreenblockOffset(bg0_current_x, bg0_current_y),
+        });
+        cross_pos_prev_tile = cross_pos_current_tile;
+        
+        // Keep the cross centered via background scrolling.
+        gba.bg.scroll[0] = cross_pos_current.sub(
+            gba.display.screen_size.lsr(1).toVec2(i16)
+        );
     }
 }

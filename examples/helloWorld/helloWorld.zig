@@ -3,17 +3,14 @@ const gba = @import("gba");
 export var header linksection(".gbaheader") = gba.Header.init("HELLOWORLD", "AHWE", "00", 0);
 
 pub export fn main() void {
-    // Write to a logging API recognized by some emulators, including mGBA.
-    gba.debug.write("Hello, world!") catch {};
-    
     // Initialize a color palette.
     gba.display.bg_palette.banks[0][0] = .black;
     gba.display.bg_palette.banks[0][1] = .white;
     
     // Initialize a background, to be used for displaying text.
     gba.bg.ctrl[0] = .{
-        .screen_base_block = 31,
-        .tile_map_size = .{ .normal = .size_32x32 },
+        .base_screenblock = 31,
+        .size = .normal_32x32,
     };
     const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
     normal_bg_map.getBaseScreenblock().fillLinear(.{});

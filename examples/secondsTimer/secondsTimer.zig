@@ -5,8 +5,8 @@ export const gameHeader linksection(".gbaheader") = gba.Header.init("SECSTIMER",
 fn initMap() void {
     // Init background
     gba.bg.ctrl[0] = gba.bg.Control{
-        .screen_base_block = 28,
-        .tile_map_size = .{ .normal = .size_32x32 },
+        .base_screenblock = 28,
+        .size = .normal_32x32,
     };
     gba.bg.scroll[0] = .zero;
 

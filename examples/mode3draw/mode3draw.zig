@@ -3,10 +3,7 @@ const gba = @import("gba");
 export var header linksection(".gbaheader") = gba.Header.init("MODE3DRAW", "AWJE", "00", 0);
 
 pub export fn main() void {
-    gba.display.ctrl.* = .{
-        .mode = .mode3,
-        .bg2 = true,
-    };
+    gba.display.ctrl.* = .initMode3(.{});
 
     // Fill screen with grey color
     gba.bitmap.Mode3.fill(.rgb(12, 12, 12));

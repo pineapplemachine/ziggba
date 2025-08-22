@@ -10,10 +10,10 @@ fn loadSpriteData() void {
 }
 
 pub export fn main() void {
-    gba.display.ctrl.* = .{
-        .obj_mapping = .one_dimension,
+    gba.display.ctrl.* = .initMode0(.{
+        .obj_mapping = .map_1d,
         .obj = true,
-    };
+    });
 
     loadSpriteData();
 
@@ -49,7 +49,7 @@ pub export fn main() void {
         metroid.palette = if (input.isPressed(.select)) 1 else 0;
 
         gba.display.ctrl.obj_mapping = (
-            if (input.isPressed(.start)) .two_dimensions else .one_dimension
+            if (input.isPressed(.start)) .map_2d else .map_1d
         );
 
         metroid.setPosition(@bitCast(x), @bitCast(y));

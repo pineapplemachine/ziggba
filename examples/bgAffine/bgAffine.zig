@@ -28,8 +28,8 @@ pub export fn main() void {
     
     // Initialize a regular background. This will be used to display text.
     gba.bg.ctrl[0] = .{
-        .screen_base_block = 4,
-        .tile_map_size = .{ .normal = .size_32x32 },
+        .base_screenblock = 4,
+        .size = .normal_32x32,
     };
     const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
     normal_bg_map.getBaseScreenblock().fillRect(.{ .tile = 128 }, 0, 0, 32, 16);
@@ -37,8 +37,8 @@ pub export fn main() void {
     
     // Initialize an affine background layer.
     gba.bg.ctrl[2] = .{
-        .screen_base_block = 5,
-        .tile_map_size = .{ .affine = .size_16 },
+        .base_screenblock = 5,
+        .size = .affine_16,
     };
     const affine_bg_map = gba.display.AffineBackgroundMap.initCtrl(gba.bg.ctrl[2]);
     for(0..affine_bg_map.width()) |x| {
@@ -65,11 +65,10 @@ pub export fn main() void {
     });
     
     // Initialize the display.
-    gba.display.ctrl.* = gba.display.Control{
-        .mode = .mode1,
-        .bg0 = true, // Normal
-        .bg2 = true, // Affine
-    };
+    gba.display.ctrl.* = .initMode1(.{
+        .bg0 = true, // Normal background
+        .bg2 = true, // Affine background
+    });
     
     // Initialize some important variables.
     var angle: gba.math.FixedU16R16 = .{};

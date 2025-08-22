@@ -61,8 +61,8 @@ pub export fn main() void {
     
     // Initialize a background, to be used for displaying text.
     gba.bg.ctrl[0] = .{
-        .screen_base_block = 31,
-        .tile_map_size = .{ .normal = .size_32x32 },
+        .base_screenblock = 31,
+        .size = .normal_32x32,
     };
     const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
     normal_bg_map.getBaseScreenblock().fillLinear(.{});

@@ -785,8 +785,8 @@ pub export fn main() void {
 
     // Initialize graphics.
     const bg0_ctrl = gba.bg.Control{
-        .screen_base_block = 24,
-        .tile_map_size = .{ .normal = .size_32x32 },
+        .base_screenblock = 24,
+        .size = .normal_32x32,
     };
     var map = gba.display.BackgroundMap.initCtrl(bg0_ctrl);
     gba.bg.ctrl[0] = bg0_ctrl;

@@ -72,13 +72,13 @@ pub export fn main() void {
     };
 
     gba.bg.ctrl[0] = .{
-        .tile_base_block = charblock_4bpp_index,
-        .screen_base_block = screenblock_4bpp_index,
+        .base_charblock = charblock_4bpp_index,
+        .base_screenblock = screenblock_4bpp_index,
     };
 
     gba.bg.ctrl[1] = .{
-        .tile_base_block = charblock_8bpp_index,
-        .screen_base_block = screenblock_8bpp_index,
+        .base_charblock = charblock_8bpp_index,
+        .base_screenblock = screenblock_8bpp_index,
         .bpp = .bpp_8,
     };
 }

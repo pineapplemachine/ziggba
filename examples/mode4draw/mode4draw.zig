@@ -27,10 +27,7 @@ const palette = [_]gba.ColorRgb555{
 pub export fn main() void {
     gba.display.memcpyBackgroundPalette(0, &palette);
 
-    gba.display.ctrl.* = .{
-        .mode = .mode4,
-        .bg2 = true,
-    };
+    gba.display.ctrl.* = .initMode4(.{});
 
     // Fill screen with grey color
     gba.bitmap.Mode4.fill(1);
