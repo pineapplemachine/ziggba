@@ -148,24 +148,79 @@ pub fn Vec2I(comptime T: type) type {
         /// Subtract this vector from the zero vector.
         pub fn negate(self: Self) Self {
             return .{
-                .x = gba.math.negate(self.x),
-                .y = gba.math.negate(self.y),
+                .x = gba.math.negate(T, self.x),
+                .y = gba.math.negate(T, self.y),
+            };
+        }
+        
+        /// Logical bit shift left on both components,
+        /// with the number of bits known at comptime.
+        pub fn lsl(self: Self, comptime bits: comptime_int) Self {
+            return .{
+                .x = gba.math.lsl(T, self.x, bits),
+                .y = gba.math.lsl(T, self.y, bits),
+            };
+        }
+        
+        /// Logical bit shift right on both components,
+        /// with the number of bits known at comptime.
+        pub fn lsr(self: Self, comptime bits: comptime_int) Self {
+            return .{
+                .x = gba.math.lsr(T, self.x, bits),
+                .y = gba.math.lsr(T, self.y, bits),
+            };
+        }
+        
+        /// Arithmetic bit shift right on both components,
+        /// with the number of bits known at comptime.
+        pub fn asr(self: Self, comptime bits: comptime_int) Self {
+            return .{
+                .x = gba.math.asr(T, self.x, bits),
+                .y = gba.math.asr(T, self.y, bits),
+            };
+        }
+        
+        /// Logical bit shift left on both components,
+        /// accepting a variable number of bits.
+        pub fn lslVar(self: Self, bits: anytype) Self {
+            return .{
+                .x = gba.math.lslVar(T, self.x, bits),
+                .y = gba.math.lslVar(T, self.y, bits),
+            };
+        }
+        
+        /// Logical bit shift right on both components,
+        /// accepting a variable number of bits.
+        pub fn lsrVar(self: Self, bits: anytype) Self {
+            return .{
+                .x = gba.math.lsrVar(T, self.x, bits),
+                .y = gba.math.lsrVar(T, self.y, bits),
+            };
+        }
+        
+        /// Arithmetic bit shift right on both components,
+        /// accepting a variable number of bits.
+        pub fn asrVar(self: Self, bits: anytype) Self {
+            return .{
+                .x = gba.math.asrVar(T, self.x, bits),
+                .y = gba.math.asrVar(T, self.y, bits),
             };
         }
         
         /// Returns true when both components of the vector are zero.
         pub fn isZero(self: Self) bool {
             return (
-                gba.math.eql(self.x, T_zero) and
-                gba.math.eql(self.y, T_zero)
+                gba.math.eql(T, self.x, T_zero) and
+                gba.math.eql(T, self.y, T_zero)
             );
         }
         
         /// Get the squared magnitude of the vector.
         pub fn hypotSq(self: Self) T {
             return gba.math.add(
-                gba.math.mul(self.x, self.x),
-                gba.math.mul(self.y, self.y)
+                T,
+                gba.math.mul(T, self.x, self.x),
+                gba.math.mul(T, self.y, self.y)
             );
         }
         
@@ -201,40 +256,41 @@ pub fn Vec2I(comptime T: type) type {
         /// Add two vectors.
         pub fn add(a: Self, b: Self) Self {
             return .{
-                .x = gba.math.add(a.x, b.x),
-                .y = gba.math.add(a.y, b.y),
+                .x = gba.math.add(T, a.x, b.x),
+                .y = gba.math.add(T, a.y, b.y),
             };
         }
         
         /// Subtract vector `b` from vector `a`.
         pub fn sub(a: Self, b: Self) Self {
             return .{
-                .x = gba.math.sub(a.x, b.x),
-                .y = gba.math.sub(a.y, b.y),
+                .x = gba.math.sub(T, a.x, b.x),
+                .y = gba.math.sub(T, a.y, b.y),
             };
         }
         
         /// Multiply both components of a vector by a scalar value.
         pub fn scale(self: Self, scalar: T) Self {
             return .{
-                .x = gba.math.mul(self.x, scalar),
-                .y = gba.math.mul(self.y, scalar),
+                .x = gba.math.mul(T, self.x, scalar),
+                .y = gba.math.mul(T, self.y, scalar),
             };
         }
         
         /// Check if two vectors are equal.
         pub fn eql(a: Self, b: Self) Self {
             return (
-                gba.math.eql(a.x, b.x) and
-                gba.math.eql(a.y, b.y)
+                gba.math.eql(T, a.x, b.x) and
+                gba.math.eql(T, a.y, b.y)
             );
         }
         
         /// Get the dot product of two vectors.
         pub fn dot(a: Self, b: Self) T {
             return gba.math.add(
-                gba.math.mul(a.x, b.x),
-                gba.math.mul(a.y, b.y)
+                T,
+                gba.math.mul(T, a.x, b.x),
+                gba.math.mul(T, a.y, b.y),
             );
         }
     };
@@ -278,6 +334,60 @@ pub fn Vec2U(comptime T: type) type {
             }
         }
         
+        /// Logical bit shift left on both components,
+        /// with the number of bits known at comptime.
+        pub fn lsl(self: Self, comptime bits: comptime_int) Self {
+            return .{
+                .x = gba.math.lsl(T, self.x, bits),
+                .y = gba.math.lsl(T, self.y, bits),
+            };
+        }
+        
+        /// Logical bit shift right on both components,
+        /// with the number of bits known at comptime.
+        pub fn lsr(self: Self, comptime bits: comptime_int) Self {
+            return .{
+                .x = gba.math.lsr(T, self.x, bits),
+                .y = gba.math.lsr(T, self.y, bits),
+            };
+        }
+        
+        /// Arithmetic bit shift right on both components,
+        /// with the number of bits known at comptime.
+        pub fn asr(self: Self, comptime bits: comptime_int) Self {
+            return .{
+                .x = gba.math.asr(T, self.x, bits),
+                .y = gba.math.asr(T, self.y, bits),
+            };
+        }
+        
+        /// Logical bit shift left on both components,
+        /// accepting a variable number of bits.
+        pub fn lslVar(self: Self, bits: anytype) Self {
+            return .{
+                .x = gba.math.lslVar(T, self.x, bits),
+                .y = gba.math.lslVar(T, self.y, bits),
+            };
+        }
+        
+        /// Logical bit shift right on both components,
+        /// accepting a variable number of bits.
+        pub fn lsrVar(self: Self, bits: anytype) Self {
+            return .{
+                .x = gba.math.lsrVar(T, self.x, bits),
+                .y = gba.math.lsrVar(T, self.y, bits),
+            };
+        }
+        
+        /// Arithmetic bit shift right on both components,
+        /// accepting a variable number of bits.
+        pub fn asrVar(self: Self, bits: anytype) Self {
+            return .{
+                .x = gba.math.asrVar(T, self.x, bits),
+                .y = gba.math.asrVar(T, self.y, bits),
+            };
+        }
+        
         /// Returns true when both components of the vector are zero.
         pub fn isZero(self: Self) bool {
             return self.x == 0 and self.y == 0;
@@ -297,22 +407,43 @@ pub fn Vec2U(comptime T: type) type {
         
         /// Add two vectors.
         pub fn add(a: Self, b: Self) Self {
-            return .{ .x = a.x + b.x, .y = a.y + b.y };
+            return .{
+                .x = gba.math.add(T, a.x, b.x),
+                .y = gba.math.add(T, a.y, b.y),
+            };
         }
         
         /// Subtract vector `b` from vector `a`.
         pub fn sub(a: Self, b: Self) Self {
-            return .{ .x = a.x - b.x, .y = a.y - b.y };
+            return .{
+                .x = gba.math.sub(T, a.x, b.x),
+                .y = gba.math.sub(T, a.y, b.y),
+            };
         }
         
         /// Multiply both components of a vector by a scalar value.
         pub fn scale(self: Self, scalar: T) Self {
-            return .{ .x = self.x * scalar, .y = self.y * scalar };
+            return .{
+                .x = gba.math.mul(T, self.x, scalar),
+                .y = gba.math.mul(T, self.y, scalar),
+            };
         }
         
         /// Check if two vectors are equal.
         pub fn eql(a: Self, b: Self) Self {
-            return a.x == b.x and a.y == b.y;
+            return (
+                gba.math.eql(T, a.x, b.x) and
+                gba.math.eql(T, a.y, b.y)
+            );
+        }
+        
+        /// Get the dot product of two vectors.
+        pub fn dot(a: Self, b: Self) T {
+            return gba.math.add(
+                T,
+                gba.math.mul(T, a.x, b.x),
+                gba.math.mul(T, a.y, b.y),
+            );
         }
     };
 }

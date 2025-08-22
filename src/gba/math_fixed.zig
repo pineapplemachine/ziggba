@@ -27,6 +27,7 @@
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 const isGbaTarget = @import("util.zig").isGbaTarget;
+const isStructType = @import("util.zig").isStructType;
 
 extern var FixedI32R8_mul_arm: u8;
 extern var FixedI32R16_mul_arm: u8;
@@ -39,12 +40,16 @@ test {
 
 /// Returns true when the given type is a fixed point type.
 pub fn isFixedPointType(comptime T: type) bool {
-    return comptime(@hasDecl(T, "is_fixed_point_type"));
+    return comptime(
+        isStructType(T) and
+        @hasDecl(T, "is_fixed_point_type")
+    );
 }
 
 /// Returns true when the given type is a signed fixed point type.
 pub fn isSignedFixedPointType(comptime T: type) bool {
     return comptime(
+        isStructType(T) and
         @hasDecl(T, "is_fixed_point_type") and
         @hasDecl(T, "is_signed_fixed_point_type")
     );
@@ -53,6 +58,7 @@ pub fn isSignedFixedPointType(comptime T: type) bool {
 /// Returns true when the given type is an unsigned fixed point type.
 pub fn isUnsignedFixedPointType(comptime T: type) bool {
     return comptime(
+        isStructType(T) and
         @hasDecl(T, "is_fixed_point_type") and
         !@hasDecl(T, "is_signed_fixed_point_type")
     );
@@ -246,6 +252,8 @@ pub const FixedU16R16 = packed struct(u16) {
     const ValueT = u16;
     const radix_bits: comptime_int = 16;
     const radix_int: comptime_int = 1 << radix_bits;
+    const T_bits = @bitSizeOf(ValueT);
+    const SignedT = gba.math.getSignedIntPrimitiveType(T_bits);
     
     pub const is_fixed_point_type: bool = true;
     
@@ -287,7 +295,7 @@ pub const FixedU16R16 = packed struct(u16) {
     /// This function uses comptime-known float inputs because
     /// the GBA has no hardware support for floating point arithmetic.
     pub fn fromFloat(comptime value: f64) Self {
-        return Self.initRaw(@intFromFloat(value * radix_int));
+        return .initRaw(@intFromFloat(value * radix_int));
     }
     
     /// Convert to a signed fixed-point type.
@@ -312,7 +320,10 @@ pub const FixedU16R16 = packed struct(u16) {
     /// Convert to another numeric type.
     /// Only supports other fixed-point types.
     pub fn to(self: Self, comptime ToT: type) ToT {
-        if(comptime(isSignedFixedPointType(ToT))) {
+        if(comptime(ToT == Self)) {
+            return self;
+        }
+        else if(comptime(isSignedFixedPointType(ToT))) {
             const ToValueT = @FieldType(ToT, "value");
             const bits_all = @bitSizeOf(ToValueT);
             const bits_int = @bitSizeOf(
@@ -320,9 +331,6 @@ pub const FixedU16R16 = packed struct(u16) {
                 unreachable
             );
             return self.toFixedI(ToValueT, bits_all - bits_int);
-        }
-        else if(comptime(ToT == Self)) {
-            return self;
         }
         else {
             @compileError("Cannot convert fixed point value to this type.");
@@ -332,22 +340,54 @@ pub const FixedU16R16 = packed struct(u16) {
     /// Invert this value.
     /// For angles, this is equivalent to adding 180 degrees.
     pub inline fn invert(self: Self) Self {
-        return Self.initRaw(self.value +% 0x8000);
+        return .initRaw(self.value +% 0x8000);
+    }
+    
+    /// Logical bit shift left, with the number of bits known at comptime.
+    pub fn lsl(self: Self, comptime bits: comptime_int) Self {
+        return .initRaw(self.value << bits);
+    }
+    
+    /// Logical bit shift right, with the number of bits known at comptime.
+    pub fn lsr(self: Self, comptime bits: comptime_int) Self {
+        return .initRaw(self.value >> bits);
+    }
+    
+    /// Arithmetic bit shift right, with the number of bits known at comptime.
+    pub fn asr(self: Self, comptime bits: comptime_int) Self {
+        const i_value: SignedT = @bitCast(self.value);
+        return .initRaw(@bitCast(i_value >> bits));
+    }
+    
+    /// Logical bit shift left, with a variable number of bits.
+    pub fn lslVar(self: Self, bits: u4) Self {
+        return .initRaw(self.value << bits);
+    }
+    
+    /// Logical bit shift right, with a variable number of bits.
+    pub fn lsrVar(self: Self, bits: u4) Self {
+        return .initRaw(self.value >> bits);
+    }
+    
+    /// Arithmetic bit shift right, with a variable number of bits.
+    pub fn asrVar(self: Self, bits: u4) Self {
+        const i_value: SignedT = @bitCast(self.value);
+        return .initRaw(@bitCast(i_value >> bits));
     }
     
     /// Add two values.
     pub inline fn add(a: Self, b: Self) Self {
-        return Self.initRaw(a.value + b.value);
+        return .initRaw(a.value + b.value);
     }
     
     /// Subtract `b` from `a`.
     pub inline fn sub(a: Self, b: Self) Self {
-        return Self.initRaw(a.value - b.value);
+        return .initRaw(a.value - b.value);
     }
     
     /// Multiply two values.
     pub fn mul(a: Self, b: Self) Self {
-        return Self.initRaw(@intCast(
+        return .initRaw(@intCast(
             (@as(u32, a.value) * @as(u32, b.value)) >> 16
         ));
     }
@@ -463,6 +503,8 @@ pub fn FixedI(
     const int_bits = @bitSizeOf(ValueT) - radix_bits;
     const IntT = gba.math.getSignedIntPrimitiveType(int_bits);
     const radix_int: comptime_int = 1 << radix_bits;
+    const T_bits = @bitSizeOf(ValueT);
+    const UnsignedT = gba.math.getUnsignedIntPrimitiveType(T_bits);
     return packed struct(ValueT) {
         const Self = @This();
         
@@ -514,7 +556,7 @@ pub fn FixedI(
         
         /// Initialize with an integer value.
         pub inline fn fromInt(int_value: IntT) Self {
-            return Self.initRaw(@as(ValueT, int_value) << radix_bits);
+            return .initRaw(@as(ValueT, int_value) << radix_bits);
         }
         
         /// Initialize with a floating point value.
@@ -522,7 +564,7 @@ pub fn FixedI(
         /// This function uses comptime-known float inputs because
         /// the GBA has no hardware support for floating point arithmetic.
         pub fn fromFloat(comptime value: f64) Self {
-            return Self.initRaw(@intFromFloat(value * radix_int));
+            return .initRaw(@intFromFloat(value * radix_int));
         }
         
         /// Convert to an integer, truncating the value's fractional portion.
@@ -584,7 +626,7 @@ pub fn FixedI(
         
         /// Get a negated value.
         pub inline fn negate(self: Self) Self {
-            return Self.initRaw(-self.value);
+            return .initRaw(-self.value);
         }
         
         /// Get an absolute value.
@@ -592,14 +634,46 @@ pub fn FixedI(
             return if(self.value >= 0) self else Self.negate();
         }
         
+        /// Logical bit shift left, with the number of bits known at comptime.
+        pub fn lsl(self: Self, comptime bits: comptime_int) Self {
+            return .initRaw(self.value << bits);
+        }
+        
+        /// Logical bit shift right, with the number of bits known at comptime.
+        pub fn lsr(self: Self, comptime bits: comptime_int) Self {
+            const u_value: UnsignedT = @bitCast(self.value);
+            return .initRaw(@bitCast(u_value >> bits));
+        }
+        
+        /// Arithmetic bit shift right, with the number of bits known at comptime.
+        pub fn asr(self: Self, comptime bits: comptime_int) Self {
+            return .initRaw(self.value >> bits);
+        }
+        
+        /// Logical bit shift left, with a variable number of bits.
+        pub fn lslVar(self: Self, bits: u4) Self {
+            return .initRaw(self.value << bits);
+        }
+        
+        /// Logical bit shift right, with a variable number of bits.
+        pub fn lsrVar(self: Self, bits: u4) Self {
+            const u_value: UnsignedT = @bitCast(self.value);
+            return .initRaw(@bitCast(u_value >> bits));
+        }
+        
+        /// Arithmetic bit shift right, with a variable number of bits.
+        pub fn asrVar(self: Self, bits: u4) Self {
+            return .initRaw(self.value >> bits);
+        }
+        
         /// Add two values.
         pub inline fn add(a: Self, b: Self) Self {
-            return Self.initRaw(a.value + b.value);
+            return .initRaw(a.value + b.value);
         }
         
         /// Subtract `b` from `a`.
         pub inline fn sub(a: Self, b: Self) Self {
-            return Self.initRaw(a.value - b.value);
+            return .initRaw(a.value - b.value);
         }
         
         /// Multiply two values.

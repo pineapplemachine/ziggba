@@ -77,6 +77,7 @@ pub const Vec3FixedI32R16 = @import("math_vec3.zig").Vec3FixedI32R16;
 
 // TODO: Vec4 types
 // TODO: Mat4x4 types
+// TODO: Complex type
 
 /// Returns true when the given type is an integer primitive type,
 /// signed or unsigned.
@@ -221,6 +222,98 @@ pub inline fn negate(comptime T: type, value: T) T {
     }
     else {
         return -value;
+    }
+}
+
+/// Generic logical bit shift left function that works on both
+/// integer primitives and fixed point values.
+/// The number of bits to shift by must be known at comptime.
+pub inline fn lsl(comptime T: type, value: T, comptime bits: comptime_int) T {
+    if(comptime(isFixedPointType(T))) {
+        return value.lsl(bits);
+    }
+    else {
+        return value << bits;
+    }
+}
+
+/// Generic logical bit shift right function that works on both
+/// integer primitives and fixed point values.
+/// The number of bits to shift by must be known at comptime.
+pub inline fn lsr(comptime T: type, value: T, comptime bits: comptime_int) T {
+    if(comptime(isFixedPointType(T))) {
+        return value.lsr(bits);
+    }
+    else if(comptime(isUnsignedIntPrimitiveType(T))) {
+        return value >> bits;
+    }
+    else {
+        const UnsignedT = getUnsignedIntPrimitiveType(@bitSizeOf(T));
+        const i_value: UnsignedT = @bitCast(value);
+        return @bitCast(i_value >> bits);
+    }
+}
+
+/// Generic arithmetic bit shift right function that works on both
+/// integer primitives and fixed point values.
+/// The number of bits to shift by must be known at comptime.
+pub inline fn asr(comptime T: type, value: T, comptime bits: comptime_int) T {
+    if(comptime(isFixedPointType(T))) {
+        return value.lsr(bits);
+    }
+    else if(comptime(isSignedIntPrimitiveType(T))) {
+        return value >> bits;
+    }
+    else {
+        const SignedT = getSignedIntPrimitiveType(@bitSizeOf(T));
+        const i_value: SignedT = @bitCast(value);
+        return @bitCast(i_value >> bits);
+    }
+}
+
+/// Generic logical bit shift left function that works on both
+/// integer primitives and fixed point values.
+/// The number of bits to shift can be a variable.
+pub inline fn lslVar(comptime T: type, value: T, bits: anytype) T {
+    if(comptime(isFixedPointType(T))) {
+        return value.lslVar(bits);
+    }
+    else {
+        return value << bits;
+    }
+}
+
+/// Generic logical bit shift right function that works on both
+/// integer primitives and fixed point values.
+/// The number of bits to shift can be a variable.
+pub inline fn lsrVar(comptime T: type, value: T, bits: anytype) T {
+    if(comptime(isFixedPointType(T))) {
+        return value.lsrVar(bits);
+    }
+    else if(comptime(isUnsignedIntPrimitiveType(T))) {
+        return value >> bits;
+    }
+    else {
+        const UnsignedT = getUnsignedIntPrimitiveType(@bitSizeOf(T));
+        const i_value: UnsignedT = @bitCast(value);
+        return @bitCast(i_value >> bits);
+    }
+}
+
+/// Generic arithmetic bit shift right function that works on both
+/// integer primitives and fixed point values.
+/// The number of bits to shift can be a variable.
+pub inline fn asrVar(comptime T: type, value: T, bits: anytype) T {
+    if(comptime(isFixedPointType(T))) {
+        return value.lsrVar(bits);
+    }
+    else if(comptime(isSignedIntPrimitiveType(T))) {
+        return value >> bits;
+    }
+    else {
+        const SignedT = getSignedIntPrimitiveType(@bitSizeOf(T));
+        const i_value: SignedT = @bitCast(value);
+        return @bitCast(i_value >> bits);
     }
 }
 
