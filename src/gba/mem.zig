@@ -254,8 +254,8 @@ pub const InternalMemoryControl = packed struct(u32) {
     disable_wram: bool = false,
     /// Unknown bits.
     _1: u2,
-    /// Disable CGB bootrom.
-    disable_cgb_boot: bool = false,
+    /// Disable GBC bootrom.
+    disable_gbc_boot: bool = false,
     /// Unused bit.
     _3: u1,
     /// Enable EWRAM. When off, EWRAM memory addresses mirror IWRAM.

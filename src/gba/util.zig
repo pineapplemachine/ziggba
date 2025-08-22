@@ -9,3 +9,11 @@ pub fn isGbaTarget() bool {
         builtin.cpu.model == &std.Target.arm.cpu.arm7tdmi
     );
 }
+
+/// Returns true when the given type is any struct type.
+pub fn isStructType(comptime T: type) bool {
+    return switch(@typeInfo(T)) {
+        .@"struct" => true,
+        else => false,
+    };
+}

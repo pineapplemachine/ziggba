@@ -215,6 +215,19 @@ pub const Obj = packed struct(u48) {
     /// Used in combination with shape. See `Obj.setSize`.
     shape_size: ShapeSize = .size_2,
     /// Base tile index for the sprite.
+    /// This is always multiplied by 32 bytes (the size of a 4bpp tile) to
+    /// determine offset in VRAM.
+    /// This means that the index counts half-tiles for 8bpp objects,
+    /// and should be multiplied by 2 to count full tiles.
+    ///
+    /// Specifically how this decides the appearance of a sprite depends on
+    /// `gba.display.ctrl.obj_mapping`.
+    /// With 1D mapping, the object's tiles are represented flat in VRAM,
+    /// in a contiguous line of tiles in row-major order.
+    /// With 2D mapping, the charblock is treated as a 256 pixel wide bitmap,
+    /// and each row of the object is stored with a linear offset which lines
+    /// it up in the bitmap in this way.
+    ///
     /// Note that graphics modes 3, 4, and 5 (bitmap modes) use the lower 512
     /// object tiles for screen bitmap data.
     /// This means that, in these modes, you probably want this value to be

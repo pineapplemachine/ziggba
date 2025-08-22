@@ -1,9 +1,13 @@
-const std = @import("std");
 const gba = @import("gba.zig");
 
 // Blending-related imports.
 pub const Blend = @import("display_blend.zig").Blend;
 pub const blend = @import("display_blend.zig").blend;
+
+// Imports related to REG_DISPCNT.
+pub const Mode = @import("display_ctrl.zig").Mode;
+pub const Control = @import("display_ctrl.zig").Control;
+pub const ctrl = @import("display_ctrl.zig").ctrl;
 
 // Palette-related imports.
 pub const Palette = @import("display_palette.zig").Palette;
@@ -49,14 +53,26 @@ pub const screen_width = 240;
 /// Height of GBA video output, in pixels.
 pub const screen_height = 160;
 
+/// Size of GBA video output in pixels, represented as a vector.
+pub const screen_size: gba.math.Vec2U8 = (
+    .init(screen_width, screen_height)
+);
+
 /// Width of GBA video output, in 8x8 pixel tiles.
 pub const screen_width_tiles = 30;
 
 /// Height of GBA video output, in 8x8 pixel tiles.
 pub const screen_height_tiles = 20;
 
+/// Size of GBA video output in tiles, represented as a vector.
+pub const screen_size_tiles: gba.math.Vec2U8 = (
+    .init(screen_width_tiles, screen_height_tiles)
+);
+
+// TODO: Relocate this
 var current_page_addr: u32 = gba.mem.vram_address;
 
+// TODO: Relocate this
 pub const back_page: [*]volatile u16 = (
     @ptrFromInt(gba.mem.vram_address + 0xa000)
 );
@@ -67,11 +83,12 @@ pub const Flip = packed struct(u2) {
     v: bool = false,
 };
 
+// TODO: Relocate this
 fn pageSize() u17 {
     return switch (ctrl.mode) {
-        .mode3 => gba.bitmap.Mode3.page_size,
-        .mode4 => gba.bitmap.Mode4.page_size,
-        .mode5 => gba.bitmap.Mode5.page_size,
+        .mode_3 => gba.bitmap.Mode3.page_size,
+        .mode_4 => gba.bitmap.Mode4.page_size,
+        .mode_5 => gba.bitmap.Mode5.page_size,
         else => 0,
     };
 }
@@ -84,7 +101,7 @@ pub fn currentPage() []volatile u16 {
 // TODO: This might make more sense elsewhere
 pub fn pageFlip() void {
     switch (ctrl.mode) {
-        .mode4, .mode5 => {
+        .mode_4, .mode_5 => {
             current_page_addr ^= 0xA000;
             ctrl.page_select ^= 1;
         },
@@ -92,6 +109,7 @@ pub fn pageFlip() void {
     }
 }
 
+// TODO: Document this
 pub const Priority = enum(u2) {
     highest = 0,
     high = 1,
@@ -99,64 +117,7 @@ pub const Priority = enum(u2) {
     lowest = 3,
 };
 
-/// Represents the contents of the display control register REG_DISPCNT.
-pub const Control = packed struct(u16) {
-    /// Controls the capabilities of background layers.
-    /// Modes 0, 1, and 2 are tile modes.
-    /// Modes 3, 4, and 5 are bitmap modes.
-    pub const Mode = enum(u3) {
-        /// Tiled mode.
-        /// Provides four normal background layers (0-3)
-        /// and no affine layers.
-        mode0,
-        /// Tiled mode.
-        /// Provides two normal (0, 1) and one affine (2) background layer.
-        mode1,
-        /// Tiled mode.
-        /// Provides two affine (2, 3) background layers
-        /// and no normal non-affine layers.
-        mode2,
-        /// Bitmap mode.
-        /// Provides a 16bpp full screen bitmap frame.
-        mode3,
-        /// Bitmap mode.
-        /// Provides two 8bpp (256 color) frames.
-        mode4,
-        /// Bitmap mode.
-        /// Provides two 16bpp 160x128 pixel frames.
-        mode5,
-    };
-    
-    pub const ObjMapping = enum(u1) {
-        /// Tiles are stored in rows of 32 * 64 bytes.
-        two_dimensions,
-        /// Tiles are stored sequentially.
-        one_dimension,
-    };
-    
-    // TODO: Documentation
-    
-    mode: Mode = .mode0,
-    /// Read only. Should stay false.
-    gbc_mode: bool = false,
-    page_select: u1 = 0,
-    oam_access_in_hblank: bool = false,
-    obj_mapping: ObjMapping = .two_dimensions,
-    force_blank: bool = false,
-    bg0: bool = false,
-    bg1: bool = false,
-    bg2: bool = false,
-    bg3: bool = false,
-    obj: bool = false,
-    window_0: bool = false,
-    window_1: bool = false,
-    window_obj: bool = false,
-};
-
-/// Display control register. Corresponds to REG_DISPCNT.
-pub const ctrl: *volatile Control = @ptrCast(gba.mem.io.reg_dispcnt);
-
-/// Represents the contents of the display status register REG_DISPSTAT.
+/// Represents the structure of the display status register REG_DISPSTAT.
 pub const Status = packed struct(u16) {
     /// Enumeration of possible states for VBlank and HBlank, per the
     /// `vblank` and `hblank` status flags.
@@ -201,15 +162,16 @@ pub const status: *volatile Status = @ptrCast(gba.mem.io.reg_dispstat);
 /// scanlines within the VBlank area.
 pub const vcount: *align(2) const volatile u8 = @ptrCast(gba.mem.io.reg_vcount);
 
-/// Wait until VBlank.
+/// This function runs in a loop until the next VBlank starts.
 /// You probably want to enable interrupts and use
 /// `gba.bios.vblankIntrWait` instead of this.
 pub fn naiveVSync() void {
-    while (vcount.* >= 160) {} // wait for VDraw
-    while (vcount.* < 160) {} // wait for VBlank
+    while(vcount.* >= 160) {} // wait for VDraw
+    while(vcount.* < 160) {} // wait for VBlank
 }
 
 /// Describes a mosaic effect.
+/// Represents the structure of REG_MOSAIC.
 pub const Mosaic = packed struct(u16) {
     /// Mosaic pixel size for backgrounds.
     /// The actual size in pixels will be `bg_size + 1`.
