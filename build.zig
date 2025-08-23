@@ -8,12 +8,12 @@ pub fn build(std_b: *std.Build) void {
     
     // TODO: Use tile and palette data created by the build system for demos
     
-    // Build font data
+    // Build font data with `zig build font`.
     
     const font_step = std_b.step("font", "Build fonts for gba.text");
     font_step.dependOn(&b.addBuildFontsStep().step);
     
-    // Examples
+    // Build examples.
     
     _ = b.addExecutable(.{
         .name = "charBlock",
@@ -74,7 +74,6 @@ pub fn build(std_b: *std.Build) void {
         .name = "tileDemo",
         .root_source_file = b.path("examples/tileDemo/tileDemo.zig"),
     });
-    
     
     var bgAffine = b.addExecutable(.{
         .name = "bgAffine",
@@ -140,7 +139,7 @@ pub fn build(std_b: *std.Build) void {
     mode4flip_pal_step.step.dependOn(&mode4flip_front_step.step);
     mode4flip_pal_step.step.dependOn(&mode4flip_back_step.step);
     
-    // Tests
+    // Run tests with `zig build test`.
     
     const test_math = std_b.addRunArtifact(std_b.addTest(.{
         .root_source_file = std_b.path("src/gba/math.zig"),
