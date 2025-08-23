@@ -346,30 +346,33 @@ pub const Control = packed struct(u32) {
 
 /// Represents the contents of REG_SNDSTAT.
 pub const Status = packed struct(u16) {
-    /// Whether the Pulse 1 channel should be currently playing.
+    /// Indicates whether any note is currently paying on the Pulse 1 channel.
+    /// Counts length, but not volume envelope, in deciding when a note ends.
+    /// This is read-only in REG_SNDSTAT.
     pulse_1: bool = false,
-    /// Whether the Pulse 2 channel should be currently playing.
+    /// Indicates whether any note is currently paying on the Pulse 2 channel.
+    /// Counts length, but not volume envelope, in deciding when a note ends.
+    /// This is read-only in REG_SNDSTAT.
     pulse_2: bool = false,
-    /// Whether the Wave channel should be currently playing.
+    /// Indicates whether any note is currently paying on the Wave channel.
+    /// This is read-only in REG_SNDSTAT.
     wave: bool = false,
-    /// Whether the Noise channel should be currently playing.
+    /// Indicates whether any note is currently paying on the Noise channel.
+    /// Counts length, but not volume envelope, in deciding when a note ends.
+    /// This is read-only in REG_SNDSTAT.
     noise: bool = false,
     /// Unused bits.
     _1: u3 = 0,
     /// Master sound enable. Must be set if any sound is to be
     /// heard at all.
-    master: bool,
+    master: bool = false,
     /// Unused bits.
     _2: u8 = 0,
     
-    pub fn init(master: bool, channels: ChannelFlags) Status {
-        return .{
-            .master = master,
-            .pulse_1 = channels.pulse_1,
-            .pulse_2 = channels.pulse_2,
-            .wave = channels.wave,
-            .noise = channels.noise,
-        };
+    /// Initialize a `Status value with a given value for the master audio
+    /// enabled/disabled flag.
+    pub fn init(master: bool) Status {
+        return .{ .master = master };
     }
 };
 
@@ -396,77 +399,45 @@ pub const Bias = packed struct(u16) {
     cycle: Cycle = .bits_9,
 };
 
-/// Encapsulates sound registers relating to channel 1 (Pulse 1).
-pub const PulseChannel1 = extern struct {
-    pub const Sweep = PulseChannelSweep;
-    pub const Control = PulseChannelControl;
-    pub const Frequency = PulseChannelFrequency;
-    
-    /// Control pitch sweep in channel 1 (Pulse 1).
-    /// Corresponds to tonc REG_SND1SWEEP.
-    sweep: PulseChannelSweep = .{},
-    /// Control length, duty, and envelope in channel 1 (Pulse 1).
-    /// Corresponds to tonc REG_SND1CNT.
-    ctrl: PulseChannelControl = .{},
-    /// Control rate (determines pitch/frequency) in channel 1 (Pulse 1).
-    /// Corresponds to tonc REG_SND1FREQ.
-    freq: PulseChannelFrequency = .{},
-};
+/// Control pitch sweep in channel 1 (Pulse 1).
+/// Corresponds to tonc REG_SND1SWEEP.
+pub const pulse_1_sweep: *volatile PulseChannelSweep = @ptrCast(gba.mem.io.reg_snd1sweep);
 
-/// Encapsulates sound registers relating to channel 2 (Pulse 2).
-pub const PulseChannel2 = extern struct {
-    pub const Control = PulseChannelControl;
-    pub const Frequency = PulseChannelFrequency;
-    
-    /// Control length, duty, and envelope in channel 2 (Pulse 2).
-    /// Corresponds to tonc REG_SND2CNT.
-    ctrl: PulseChannelControl = .{},
-    /// Control rate (determines pitch/frequency) in channel 2 (Pulse 2).
-    /// Corresponds to tonc REG_SND2FREQ.
-    freq: PulseChannelFrequency = .{},
-};
+/// Control length, duty, and envelope in channel 1 (Pulse 1).
+/// Corresponds to tonc REG_SND1CNT.
+pub const pulse_1_ctrl: *volatile PulseChannelControl = @ptrCast(gba.mem.io.reg_snd1cnt);
 
-/// Encapsulates sound registers relating to channel 3 (Wave).
-pub const WaveChannel = extern struct {
-    pub const Select = WaveChannelSelect;
-    pub const Control = WaveChannelControl;
-    pub const Frequency = WaveChannelFrequency;
-    
-    /// Waveform select for channel 3 (Wave).
-    /// Corresponds to REG_SND3SEL.
-    select: WaveChannelSelect = .{},
-    /// Control length and volume in channel 3 (Wave).
-    /// Corresponds to tonc REG_SND3CNT.
-    ctrl: WaveChannelControl = .{},
-    /// Control rate (determines pitch/frequency) in channel 3 (Wave).
-    /// Corresponds to tonc REG_SND3FREQ.
-    freq: WaveChannelFrequency = .{},
-};
+/// Control rate (determines pitch/frequency) in channel 1 (Pulse 1).
+/// Corresponds to tonc REG_SND1FREQ.
+pub const pulse_1_freq: *volatile PulseChannelFrequency = @ptrCast(gba.mem.io.reg_snd1freq);
 
-/// Encapsulates sound registers relating to channel 4 (Noise).
-pub const NoiseChannel = extern struct {
-    pub const Control = NoiseChannelControl;
-    pub const Frequency = NoiseChannelFrequency;
-    
-    /// Control length and envelope in channel 4 (Noise).
-    /// Corresponds to tonc REG_SND4CNT.
-    ctrl: NoiseChannelControl = .{},
-    /// Control the frequency and quality of noise in channel 4 (Noise).
-    /// Corresponds to tonc REG_SND4FREQ.
-    freq: NoiseChannelFrequency = .{},
-};
+/// Control length, duty, and envelope in channel 2 (Pulse 2).
+/// Corresponds to tonc REG_SND2CNT.
+pub const pulse_2_ctrl: *volatile PulseChannelControl = @ptrCast(gba.mem.io.reg_snd2cnt);
 
-/// Refers to hardware registers used to affect PSG channel 1 (Pulse 1).
-pub const pulse_1: *volatile PulseChannel1 = @ptrCast(gba.mem.io.reg_snd1sweep);
+/// Control rate (determines pitch/frequency) in channel 2 (Pulse 2).
+/// Corresponds to tonc REG_SND2FREQ.
+pub const pulse_2_freq: *volatile PulseChannelFrequency = @ptrCast(gba.mem.io.reg_snd2freq);
 
-/// Refers to hardware registers used to affect PSG channel 2 (Pulse 2).
-pub const pulse_2: *volatile PulseChannel2 = @ptrCast(gba.mem.io.reg_snd2cnt);
+/// Waveform select for channel 3 (Wave).
+/// Corresponds to REG_SND3SEL.
+pub const wave_select: *volatile WaveChannelSelect = @ptrCast(gba.mem.io.reg_snd3sel);
 
-/// Refers to hardware registers used to affect PSG channel 3 (Wave).
-pub const wave: *volatile WaveChannel = @ptrCast(gba.mem.io.reg_snd3sel);
+/// Control length and volume in channel 3 (Wave).
+/// Corresponds to tonc REG_SND3CNT.
+pub const wave_ctrl: *volatile WaveChannelControl = @ptrCast(gba.mem.io.reg_snd3cnt);
 
-/// Refers to hardware registers used to affect PSG channel 4 (Noise).
-pub const noise: *volatile NoiseChannel = @ptrCast(gba.mem.io.reg_snd4cnt);
+/// Control rate (determines pitch/frequency) in channel 3 (Wave).
+/// Corresponds to tonc REG_SND3FREQ.
+pub const wave_freq: *volatile WaveChannelFrequency = @ptrCast(gba.mem.io.reg_snd3freq);
+
+/// Control length and envelope in channel 4 (Noise).
+/// Corresponds to tonc REG_SND4CNT.
+pub const noise_ctrl: *volatile NoiseChannelControl = @ptrCast(gba.mem.io.reg_snd4cnt);
+
+/// Control the frequency and quality of noise in channel 4 (Noise).
+/// Corresponds to tonc REG_SND4FREQ.
+pub const noise_freq: *volatile NoiseChannelFrequency = @ptrCast(gba.mem.io.reg_snd4freq);
 
 /// Corresponds to tonc REG_SNDCNT.
 pub const ctrl: *volatile Control = @ptrCast(gba.mem.io.reg_sndcnt);
