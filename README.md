@@ -30,7 +30,7 @@ ZigGBA's `zig build` will write example ROMs to `zig-out/bin/`. These are files 
 
 Pass the `-Dgdb` flag to `zig build` to also output an `*.elf` file containing debug symbols.
 
-See the [ziggba-example](github.com/pineapplemachine/ziggba-example) repository for an example of a project which uses ZigGBA as a dependency.
+See the [ziggba-example](https://www.github.com/pineapplemachine/ziggba-example) repository for an example of a project which uses ZigGBA as a dependency.
 
 ## Showcase
 
