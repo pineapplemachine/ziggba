@@ -40,9 +40,9 @@ pub const charsets = [_]Charset{
     .init("latin_supplement", "latin", .init(8, 12), .init(0, 120, 128, 72)),
     .init("greek", "greek", .init(8, 12), .init(0, 0, 128, 108)),
     .init("cyrillic", "cyrillic", .init(9, 12), .init(0, 0, 144, 192)),
-    .init("arrows", "arrows", .init(10, 12), .init(0, 0, 160, 72)),
+    .init("arrows", "arrows", .init(10, 12), .init(0, 0, 160, 84)),
     .init("cjk_symbols", "cjk_symbols", .init(10, 12), .init(0, 0, 160, 48)),
-    .init("kana", "kana", .init(10, 12), .init(0, 0, 160, 48)),
+    .init("kana", "kana", .init(10, 12), .init(0, 0, 160, 144)),
     .init("fullwidth", "fullwidth", .init(10, 12), .init(0, 0, 160, 180)),
 };
 
