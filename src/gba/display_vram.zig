@@ -3,17 +3,15 @@
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
-/// Pointer to the system's VRAM.
-pub const vram: [*]volatile align(2) u16 = @ptrFromInt(gba.mem.vram);
-
 /// Holds data for 32x32 non-affine background tiles, or up to 2048 affine
 /// tiles.
 /// A background can use one or more screenblocks.
 pub const Screenblock = extern union {
     /// Describes a tile within a normal (non-affine) background.
     pub const Entry = packed struct(u16) {
-        /// Offset added to a background's `tile_base_block` to determine the
+        /// Offset added to a background's `base_charblock` to determine the
         /// tile that should be displayed.
+        /// See `gba.bg.Control.base_charblock`.
         tile: u10 = 0,
         /// Display the tile flipped horizontally.
         flip_x: bool = false,
@@ -160,19 +158,63 @@ pub const Screenblock = extern union {
 /// data for a normal (non-affine) background.
 pub const BackgroundMap = struct {
     /// Index of the first screenblock containing tilemap data for a background.
-    /// Corresponds to `screen_base_block` in a REG_BGxCNT background control
+    /// Corresponds to `base_screenblock` in a REG_BGxCNT background control
     /// register.
-    screenblock_index: u5,
+    /// See `gba.bg.Control.base_screenblock`.
+    base_screenblock: u5,
     /// Size of the background map.
     size: gba.bg.Size.Normal,
+    
+    /// Options accepted by `setup`.
+    pub const SetupOptions = struct {
+        /// Determines drawing order.
+        priority: gba.display.Priority = .highest,
+        /// Sets the charblock that serves as the base for tile indexing.
+        /// Each charblock contains 512 4bpp tiles or 256 8bpp tiles.
+        base_charblock: u2 = 0,
+        /// Enables mosaic effect.
+        mosaic: bool = false,
+        /// Which format to expect charblock tile data to be in, whether
+        /// 4bpp or 8bpp paletted.
+        bpp: gba.display.TileBpp = .bpp_4,
+        /// Index of the first screenblock containing tilemap data.
+        base_screenblock: u5,
+        /// Determines the size of the background.
+        size: gba.bg.Size.Normal = .size_32x32,
+        /// Initial background scrolling.
+        scroll: gba.math.Vec2I16 = .zero,
+    };
+    
+    /// Initialize a background.
+    /// This function sets up `gba.bg.ctrl[bg_index]` and
+    /// `gba.bg.scroll[bg_index]` with the given options.
+    /// It does _not_ modify `gba.display.ctrl`, which must be initialized
+    /// separately.
+    /// Note that `bg_index` may be 0-3 in graphics mode 0 or 0-1 in mode 1.
+    /// In other graphics modes, no normal backgrounds are available at all.
+    pub fn setup(bg_index: u2, options: SetupOptions) BackgroundMap {
+        gba.bg.scroll[bg_index] = options.scroll;
+        gba.bg.ctrl[bg_index] = gba.bg.Control {
+            .priority = options.priority,
+            .base_charblock = options.base_charblock,
+            .mosaic = options.mosaic,
+            .bpp = options.bpp,
+            .base_screenblock = options.base_screenblock,
+            .size = .initNormal(options.size),
+        };
+        return .{
+            .base_screenblock = options.base_screenblock,
+            .size = options.size,
+        };
+    }
     
     /// Initialize a `BackgroundMap` object from the information in a
     /// REG_BGxCNT background control register.
     /// This function assumes that the background is normal (non-affine).
     pub fn initCtrl(ctrl: gba.bg.Control) BackgroundMap {
         return .{
-            .screenblock_index = ctrl.screen_base_block,
-            .size = ctrl.tile_map_size.normal,
+            .base_screenblock = ctrl.base_screenblock,
+            .size = ctrl.size.normal,
         };
     }
     
@@ -188,9 +230,9 @@ pub const BackgroundMap = struct {
     
     /// Get tile data at a given coordinate.
     pub fn get(self: BackgroundMap, x: u6, y: u6) Screenblock.Entry {
-        const screenblock_index = self.getScreenblockIndex(x, y);
-        assert(screenblock_index < self.getScreenblockCount());
-        const screenblock = &screenblocks[screenblock_index];
+        const base_screenblock = self.getScreenblockIndex(x, y);
+        assert(base_screenblock < self.getScreenblockCount());
+        const screenblock = &screenblocks[base_screenblock];
         return screenblock.get(@truncate(x), @truncate(y));
     }
     
@@ -202,26 +244,34 @@ pub const BackgroundMap = struct {
         y: u6,
         entry: Screenblock.Entry,
     ) void {
-        const screenblock_index = self.getScreenblockIndex(x, y);
-        assert(screenblock_index < self.getScreenblockCount());
-        const screenblock = &screenblocks[screenblock_index];
+        const base_screenblock = self.getScreenblockIndex(x, y);
+        assert(base_screenblock < self.getScreenblockCount());
+        const screenblock = &screenblocks[base_screenblock];
         screenblock.set(@truncate(x), @truncate(y), entry);
     }
     
+    /// Get the `Screeblock` at a given offset from this background's
+    /// `base_screenblock` index.
     pub fn getScreenblock(self: BackgroundMap, i: u2) *volatile Screenblock {
         assert(i < self.getScreenblockCount());
-        return &screenblocks[self.screenblock_index + i];
+        return &screenblocks[self.base_screenblock + i];
     }
     
+    /// Get the first `Screenblock` used by this background.
     pub fn getBaseScreenblock(self: BackgroundMap) *volatile Screenblock {
-        return &screenblocks[self.screenblock_index];
+        return &screenblocks[self.base_screenblock];
     }
     
     /// Given a tile coordinate, get the index of the screenblock which it
     /// belongs to.
     pub inline fn getScreenblockIndex(self: BackgroundMap, x: u6, y: u6) u5 {
+        return self.base_screenblock + self.getScreenblockOffset(x, y);
+    }
+    
+    /// Given a tile coordinate, get the offset of the screenblock which it
+    /// belongs to, relative to `base_screenblock`.
+    pub inline fn getScreenblockOffset(self: BackgroundMap, x: u6, y: u6) u2 {
         return @intCast(
-            self.screenblock_index +
             (x >> 5) +
             ((y >> 5) << @intFromEnum(self.size.x))
         );
@@ -238,8 +288,8 @@ pub const BackgroundMap = struct {
     pub fn fill(self: BackgroundMap, entry: Screenblock.Entry) void {
         const screenblock_count = self.size.getScreenblockCount();
         const entry_count: u32 = @as(u32, screenblock_count) << 10;
-        const entries: [*]Screenblock.Entry = (
-            @ptrCast(&screenblocks[self.screenblock_index].entries)
+        const entries: [*]volatile Screenblock.Entry = (
+            @ptrCast(&screenblocks[self.base_screenblock].entries)
         );
         for(0..entry_count) |i| {
             entries[i] = entry;
@@ -258,7 +308,7 @@ pub const BackgroundMap = struct {
         assert((rect_x + rect_width) <= 32 and (rect_y + rect_height) <= 32);
         switch(self.size) {
             .size_32x32 => {
-                screenblocks[self.screenblock_index].fillRect(
+                screenblocks[self.base_screenblock].fillRect(
                     entry,
                     @intCast(rect_x),
                     @intCast(rect_y),
@@ -268,7 +318,7 @@ pub const BackgroundMap = struct {
             },
             .size_64x32 => {
                 if(rect_x > 32) {
-                    screenblocks[self.screenblock_index + 1].fillRect(
+                    screenblocks[self.base_screenblock + 1].fillRect(
                         entry,
                         @intCast(rect_x - 32),
                         @intCast(rect_y),
@@ -278,14 +328,14 @@ pub const BackgroundMap = struct {
                 }
                 else if(rect_x + rect_width > 32) {
                     const lo_x = 32 - rect_x;
-                    screenblocks[self.screenblock_index].fillRect(
+                    screenblocks[self.base_screenblock].fillRect(
                         entry,
                         @intCast(rect_x),
                         @intCast(rect_y),
                         @intCast(lo_x),
                         @intCast(rect_height),
                     );
-                    screenblocks[self.screenblock_index + 1].fillRect(
+                    screenblocks[self.base_screenblock + 1].fillRect(
                         entry,
                         0,
                         @intCast(rect_y),
@@ -294,7 +344,7 @@ pub const BackgroundMap = struct {
                     );
                 }
                 else {
-                    screenblocks[self.screenblock_index].fillRect(
+                    screenblocks[self.base_screenblock].fillRect(
                         entry,
                         @intCast(rect_x),
                         @intCast(rect_y),
@@ -305,7 +355,7 @@ pub const BackgroundMap = struct {
             },
             .size_32x64 => {
                 if(rect_y > 32) {
-                    screenblocks[self.screenblock_index + 1].fillRect(
+                    screenblocks[self.base_screenblock + 1].fillRect(
                         entry,
                         @intCast(rect_x),
                         @intCast(rect_y - 32),
@@ -315,14 +365,14 @@ pub const BackgroundMap = struct {
                 }
                 else if(rect_y + rect_height > 32) {
                     const lo_y = 32 - rect_y;
-                    screenblocks[self.screenblock_index].fillRect(
+                    screenblocks[self.base_screenblock].fillRect(
                         entry,
                         @intCast(rect_x),
                         @intCast(rect_y),
                         @intCast(rect_width),
                         @intCast(lo_y),
                     );
-                    screenblocks[self.screenblock_index + 1].fillRect(
+                    screenblocks[self.base_screenblock + 1].fillRect(
                         entry,
                         @intCast(rect_x),
                         0,
@@ -331,7 +381,7 @@ pub const BackgroundMap = struct {
                     );
                 }
                 else {
-                    screenblocks[self.screenblock_index].fillRect(
+                    screenblocks[self.base_screenblock].fillRect(
                         entry,
                         @intCast(rect_x),
                         @intCast(rect_y),
@@ -343,7 +393,7 @@ pub const BackgroundMap = struct {
             .size_64x64 => {
                 if(rect_x > 32) {
                     if(rect_y > 32) {
-                        screenblocks[self.screenblock_index + 3].fillRect(
+                        screenblocks[self.base_screenblock + 3].fillRect(
                             entry,
                             @intCast(rect_x - 32),
                             @intCast(rect_y - 32),
@@ -353,14 +403,14 @@ pub const BackgroundMap = struct {
                     }
                     else if(rect_y + rect_height > 32) {
                         const lo_y = 32 - rect_y;
-                        screenblocks[self.screenblock_index + 1].fillRect(
+                        screenblocks[self.base_screenblock + 1].fillRect(
                             entry,
                             @intCast(rect_x - 32),
                             @intCast(rect_y),
                             @intCast(rect_width),
                             @intCast(lo_y),
                         );
-                        screenblocks[self.screenblock_index + 3].fillRect(
+                        screenblocks[self.base_screenblock + 3].fillRect(
                             entry,
                             @intCast(rect_x - 32),
                             0,
@@ -369,7 +419,7 @@ pub const BackgroundMap = struct {
                         );
                     }
                     else {
-                        screenblocks[self.screenblock_index + 1].fillRect(
+                        screenblocks[self.base_screenblock + 1].fillRect(
                             entry,
                             @intCast(rect_x - 32),
                             @intCast(rect_y),
@@ -381,14 +431,14 @@ pub const BackgroundMap = struct {
                 else if(rect_x + rect_width > 32) {
                     const lo_x = 32 - rect_x;
                     if(rect_y > 32) {
-                        screenblocks[self.screenblock_index + 2].fillRect(
+                        screenblocks[self.base_screenblock + 2].fillRect(
                             entry,
                             @intCast(rect_x),
                             @intCast(rect_y - 32),
                             @intCast(lo_x),
                             @intCast(rect_height),
                         );
-                        screenblocks[self.screenblock_index + 3].fillRect(
+                        screenblocks[self.base_screenblock + 3].fillRect(
                             entry,
                             0,
                             @intCast(rect_y - 32),
@@ -398,28 +448,28 @@ pub const BackgroundMap = struct {
                     }
                     else if(rect_y + rect_height > 32) {
                         const lo_y = 32 - rect_y;
-                        screenblocks[self.screenblock_index].fillRect(
+                        screenblocks[self.base_screenblock].fillRect(
                             entry,
                             @intCast(rect_x),
                             @intCast(rect_y),
                             @intCast(lo_x),
                             @intCast(lo_y),
                         );
-                        screenblocks[self.screenblock_index + 1].fillRect(
+                        screenblocks[self.base_screenblock + 1].fillRect(
                             entry,
                             0,
                             @intCast(rect_y),
                             @intCast(rect_width - lo_x),
                             @intCast(lo_y),
                         );
-                        screenblocks[self.screenblock_index + 2].fillRect(
+                        screenblocks[self.base_screenblock + 2].fillRect(
                             entry,
                             @intCast(rect_x),
                             0,
                             @intCast(lo_x),
                             @intCast(rect_height - lo_y),
                         );
-                        screenblocks[self.screenblock_index + 3].fillRect(
+                        screenblocks[self.base_screenblock + 3].fillRect(
                             entry,
                             0,
                             0,
@@ -428,14 +478,14 @@ pub const BackgroundMap = struct {
                         );
                     }
                     else {
-                        screenblocks[self.screenblock_index].fillRect(
+                        screenblocks[self.base_screenblock].fillRect(
                             entry,
                             @intCast(rect_x),
                             @intCast(rect_y),
                             @intCast(lo_x),
                             @intCast(rect_height),
                         );
-                        screenblocks[self.screenblock_index + 1].fillRect(
+                        screenblocks[self.base_screenblock + 1].fillRect(
                             entry,
                             0,
                             @intCast(rect_y),
@@ -454,9 +504,10 @@ pub const BackgroundMap = struct {
 /// data for an affine background.
 pub const AffineBackgroundMap = struct {
     /// Index of the first screenblock containing tilemap data for a background.
-    /// Corresponds to `screen_base_block` in a REG_BGxCNT background control
+    /// Corresponds to `base_screenblock` in a REG_BGxCNT background control
     /// register.
-    screenblock_index: u5,
+    /// See `gba.bg.Control.base_screenblock`.
+    base_screenblock: u5,
     /// Size of the background map.
     size: gba.bg.Size.Affine,
     
@@ -465,8 +516,8 @@ pub const AffineBackgroundMap = struct {
     /// This function assumes that the background is an affine background.
     pub fn initCtrl(ctrl: gba.bg.Control) AffineBackgroundMap {
         return .{
-            .screenblock_index = ctrl.screen_base_block,
-            .size = ctrl.tile_map_size.affine,
+            .base_screenblock = ctrl.base_screenblock,
+            .size = ctrl.size.affine,
         };
     }
     
@@ -492,8 +543,8 @@ pub const AffineBackgroundMap = struct {
     /// Get tile data at a given coordinate.
     pub fn get(self: AffineBackgroundMap, x: u7, y: u7) Screenblock.AffineEntry {
         const tile_index = self.getTileIndex(x, y);
-        const screenblock_index = self.screenblock_index + (tile_index >> 11);
-        const screenblock = &screenblocks[screenblock_index];
+        const base_screenblock = self.base_screenblock + (tile_index >> 11);
+        const screenblock = &screenblocks[base_screenblock];
         return screenblock.getAffine(@truncate(tile_index));
     }
     
@@ -508,8 +559,8 @@ pub const AffineBackgroundMap = struct {
         entry: Screenblock.AffineEntry,
     ) void {
         const tile_index = self.getTileIndex(x, y);
-        const screenblock_index = self.screenblock_index + (tile_index >> 11);
-        const screenblock = &screenblocks[screenblock_index];
+        const base_screenblock = self.base_screenblock + (tile_index >> 11);
+        const screenblock = &screenblocks[base_screenblock];
         screenblock.setAffine(@truncate(tile_index), entry);
     }
     
@@ -523,7 +574,7 @@ pub const AffineBackgroundMap = struct {
     /// Given a tile coordinate, get the index of the screenblock which it
     /// belongs to.
     pub inline fn getScreenblockIndex(self: AffineBackgroundMap, x: u7, y: u7) u5 {
-        return self.screenblock_index + (
+        return self.base_screenblock + (
             @as(u5, @intCast(self.getTileIndex(x, y) >> 11))
         );
     }
@@ -581,35 +632,49 @@ pub const ObjectCharblockTiles = extern union {
 };
 
 /// Represents all 32 screenblocks in VRAM.
-pub const screenblocks: *volatile [32]Screenblock = @ptrFromInt(gba.mem.vram);
+pub const screenblocks: *volatile [32]Screenblock = @ptrCast(gba.mem.vram);
 
 /// Represents all six charblocks in VRAM.
-pub const charblocks: *volatile [6]Charblock = @ptrFromInt(gba.mem.vram);
+pub const charblocks: *volatile [6]Charblock = @ptrCast(gba.mem.vram);
 
 /// Represents the tiles of all six charblocks in VRAM as one flat array.
-pub const charblock_tiles: *volatile CharblockTiles(6) = @ptrFromInt(gba.mem.vram);
+pub const charblock_tiles: *volatile CharblockTiles = @ptrCast(charblocks);
 
 /// Represents the four charblocks in VRAM that can be used in backgrounds.
-pub const bg_charblocks: *volatile [4]Charblock = @ptrFromInt(gba.mem.vram);
+pub const bg_charblocks: *volatile [4]Charblock = charblocks[0..4];
 
 /// Represents the tiles of the charblocks usable with backgrounds.
-pub const bg_charblock_tiles: *volatile BackgroundCharblockTiles = @ptrFromInt(gba.mem.vram);
+pub const bg_charblock_tiles: *volatile BackgroundCharblockTiles = @ptrCast(bg_charblocks);
 
 /// Represents the two charblocks in VRAM that can be used in objects.
-pub const obj_charblocks: *volatile [2]Charblock = @ptrFromInt(gba.mem.vram + 0x10000);
+pub const obj_charblocks: *volatile [2]Charblock = charblocks[4..6];
 
 /// Represents the tiles of the charblocks usable with objects.
-pub const obj_charblock_tiles: *volatile ObjectCharblockTiles = @ptrFromInt(gba.mem.vram + 0x10000);
+pub const obj_charblock_tiles: *volatile ObjectCharblockTiles = @ptrCast(obj_charblocks);
+
+/// Enumeration of bits per pixel values for tiles.
+///
+/// Determines whether palettes are accessed via banks of 16 colors (4bpp)
+/// or a single palette of 256 colors (8bpp).
+///
+/// Naturally, 8bpp image data consumes twice as much memory as 4bpp
+/// image data.
+pub const TileBpp = enum(u1) {
+    /// Palettes are stored in 16 banks of 16 colors, 4 bits per pixel.
+    bpp_4 = 0,
+    /// Single palette of 256 colors, 8 bits per pixel.
+    bpp_8 = 1,
+};
 
 /// Represents a 16-color 8x8 pixel tile, 4 bits per pixel.
 /// Also called an "s-tile", or single-size tile.
 pub const Tile4Bpp = extern union {
-    pixels: [32]u8,
+    data_8: [32]u8,
     data_16: [16]u16,
     data_32: [8]u32,
     
-    pub fn init(pixels: [32]u8) Tile4Bpp {
-        return Tile4Bpp{ .pixels = pixels };
+    pub fn init(data_8: [32]u8) Tile4Bpp {
+        return Tile4Bpp{ .data_8 = data_8 };
     }
     
     /// Fill all pixels in the tile with a given color.
@@ -644,8 +709,8 @@ pub const Tile4Bpp = extern union {
         const i: u8 = x + (@as(u8, y) << 3);
         const i_half = i >> 1;
         return switch(x & 1) {
-            0 => @truncate(self.pixels[i_half]),
-            1 => @truncate(self.pixels[i_half] >> 4),
+            0 => @truncate(self.data_8[i_half]),
+            1 => @truncate(self.data_8[i_half] >> 4),
             else => unreachable,
         };
     }
@@ -674,17 +739,17 @@ pub const Tile4Bpp = extern union {
     pub fn setPixel8(self: *volatile Tile4Bpp, x: u3, y: u3, color: u4) void {
         const i: u8 = x + (@as(u8, y) << 3);
         const i_half = i >> 1;
-        self.pixels[i_half] = switch(x & 1) {
-            0 => (self.pixels[i_half] & 0xf0) | color,
-            1 => (self.pixels[i_half] & 0x0f) | (@as(u8, color) << 4),
+        self.data_8[i_half] = switch(x & 1) {
+            0 => (self.data_8[i_half] & 0xf0) | color,
+            1 => (self.data_8[i_half] & 0x0f) | (@as(u8, color) << 4),
             else => unreachable,
         };
         
         if((x & 1) != 0) {
-            self.pixels[i_half] = (self.pixels[i_half] & 0x0f) | (@as(u8, color) << 4);
+            self.data_8[i_half] = (self.data_8[i_half] & 0x0f) | (@as(u8, color) << 4);
         }
         else {
-            self.pixels[i_half] = (self.pixels[i_half] & 0xf0) | color;
+            self.data_8[i_half] = (self.data_8[i_half] & 0xf0) | color;
         }
     }
 };
@@ -696,13 +761,13 @@ pub const Tile8Bpp = extern union {
     data_16: [32]u16,
     data_32: [16]u32,
     
-    pub fn init(pixels: [64]u8) Tile4Bpp {
-        return Tile4Bpp{ .pixels = pixels };
+    pub fn init(pixels: [64]u8) Tile8Bpp {
+        return Tile8Bpp{ .pixels = pixels };
     }
     
     /// Get the color of a pixel at a given coordinate.
     /// Colors are indices into a palette.
-    pub fn getPixel(self: Tile4Bpp, x: u3, y: u3) u8 {
+    pub fn getPixel(self: Tile8Bpp, x: u3, y: u3) u8 {
         const i: u8 = x + (@as(u8, y) << 3);
         return self.pixels[i];
     }
@@ -712,7 +777,7 @@ pub const Tile8Bpp = extern union {
     ///
     /// This function can be safely used if the tile is in VRAM,
     /// but it comes with a performance cost.
-    pub fn setPixel16(self: *volatile Tile4Bpp, x: u3, y: u3, value: u8) void {
+    pub fn setPixel16(self: *volatile Tile8Bpp, x: u3, y: u3, value: u8) void {
         const i: u8 = x + (@as(u8, y) << 3);
         const i_half = i >> 1;
         self.data_16[i_half] = switch(x & 1) {
@@ -726,7 +791,7 @@ pub const Tile8Bpp = extern union {
     /// Colors are indices into a palette.
     ///
     /// This function is not safe to use if the tile is located in VRAM.
-    pub fn setPixel8(self: *volatile Tile4Bpp, x: u3, y: u3, value: u8) void {
+    pub fn setPixel8(self: *volatile Tile8Bpp, x: u3, y: u3, value: u8) void {
         const i: u8 = x + (@as(u8, y) << 3);
         self.pixels[i] = value;
     }
@@ -751,7 +816,7 @@ pub fn memcpyTiles4Bpp(
     const offset = tile_offset + (@as(u16, block) << 9);
     assert(offset + data.len <= 0xc00); // 6 banks * 0x200 tiles/bank
     // Tile4Bpp is 32 bytes long
-    gba.mem.memcpy16(vram + (offset << 4), data.ptr, data.len << 4);
+    gba.mem.memcpy16(&gba.mem.vram[offset << 4], data.ptr, data.len << 4);
 }
 
 /// Copy memory for 256-color tiles into a charblock.
@@ -770,7 +835,7 @@ pub fn memcpyTiles8Bpp(
     const offset = tile_offset + (@as(u16, block) << 8);
     assert(offset + data.len <= 0x600); // 6 banks * 0x100 tiles/bank
     // Tile8Bpp is 64 bytes long
-    gba.mem.memcpy16(vram + (offset << 5), data.ptr, data.len << 5);
+    gba.mem.memcpy16(&gba.mem.vram[offset << 5], data.ptr, data.len << 5);
 }
 
 /// Copy memory for 16-color tiles into background charblock VRAM.

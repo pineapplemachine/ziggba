@@ -14,10 +14,21 @@ extern var __iwram_start__: u8;
 extern var __iwram_end__: u8;
 
 export fn _start_zig() noreturn {
+    // Initialize REG_WAITCNT.
+    // TODO: Provide a build option to more easily customize this behavior
+    gba.mem.wait_ctrl.* = .default;
     // Use BIOS function to clear data.
-    gba.bios.registerRamReset(gba.bios.RegisterRamResetFlags.all);
-    // Clear .bss section.
-    // gba.mem.memset32(&__bss_start__, 0, @intFromPtr(&__bss_end__) - @intFromPtr(&__bss_start__));
+    // Don't clear EWRAM or IWRAM: Anything not overwritten later in this
+    // startup routine can safely be garbage bytes.
+    // TODO: Provide a build option to more easily customize this behavior
+    gba.bios.registerRamReset(.{
+        .palette = true,
+        .vram = true,
+        .oam = true,
+        .sio_registers = true,
+        .sound_registers = true,
+        .other_registers = true,
+    });
     // Copy .iwram section to IWRAM.
     gba.bios.cpuSetCopy32(
         @alignCast(@ptrCast(&__iwram_lma)),

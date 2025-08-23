@@ -74,7 +74,7 @@ memset32_thumb:
 // Clobbers r3 and r12
 memcpy_arm:
     cmp     r2, #1
-    bxls    lr                  // return to thumb caller if n < 1
+    bxls    lr                  // return if n < 1
     ands    r3, r0, #1          // var lsb = dst & 1
     beq     .memcpy_arm_dst_16_aligned // branch if lsb == 0
     ands    r3, r1, #1          // lsb = src & 1
@@ -87,7 +87,7 @@ memcpy_arm:
     add     r1, #1              // src += 1
     add     r0, #1              // dst += 1
     bhi     .memcpy_arm_loop_8  // branch if n != 0
-    bx      lr                  // return to thumb caller
+    bx      lr                  // return
 .memcpy_arm_dst_16_aligned:
     ands    r3, r1, #1          // lsb = src & 1
     beq     .memcpy_arm_cpy16_check_len // branch if lsb == 0
@@ -107,7 +107,7 @@ memcpy_arm:
     add     r12, r0, r2         // r12 = dst + n
     strb    r3, [r12, #-1]      // store r3 to mem @ r12 - 1
 .memcpy_arm_cpy16_fallthrough:
-    movs    r2, r2, lsr #1      // n >>= 1
+    mov     r2, r2, lsr #1      // n >>= 1
     // Falls through to memcpy16_arm like a tail call
 
 // Copy half-word-aligned memory.
@@ -117,7 +117,7 @@ memcpy_arm:
 // Clobbers r3 and r12
 memcpy16_arm:
     cmp     r2, #1
-    bxls    lr                  // return to thumb caller if n < 1
+    bxls    lr                  // return if n < 1
     ands    r3, r0, #3          // var lsb = dst & 3
     beq     .memcpy16_arm_dst_32_aligned // branch if lsb == 0
     ands    r3, r1, #3          // lsb = src & 3
@@ -130,7 +130,7 @@ memcpy16_arm:
     add     r1, #2              // src += 2
     add     r0, #2              // dst += 2
     bhi     .memcpy16_arm_loop_16 // branch if n != 0
-    bx      lr                  // return to thumb caller
+    bx      lr                  // return
 .memcpy16_arm_dst_32_aligned:
     ands    r3, r1, #3          // lsb = src & 3
     beq     .memcpy16_arm_cpy32_check_len // branch if lsb == 0
@@ -150,7 +150,7 @@ memcpy16_arm:
     add     r12, r0, r2, lsl #1 // r12 = dst + (n << 1)
     strh    r3, [r12, #-2]      // store r3 to mem @ r12 - 2
 .memcpy16_arm_cpy32_fallthrough:
-    movs    r2, r2, lsr #1      // n >>= 1
+    mov     r2, r2, lsr #1      // n >>= 1
     // Falls through to memcpy32_arm like a tail call
 
 // Copy word-aligned memory.
@@ -174,12 +174,10 @@ memcpy32_arm:
     pop     {r4-r10}            // restore registers from stack
 .memcpy32_arm_loop_words:
     subs    r12, r12, #1        // n_words -= 1
-    ldrcs   r3, [r1]            // if n_words >= 0: load mem @ src to r3
-    strcs   r3, [r0]            // if n_words >= 0: store r3 to mem @ dst
-    add     r1, #4              // src += 4
-    add     r0, #4              // dst += 4
+    ldmiacs r1!, {r3}           // if n_words >= 0: load mem @ src to r3; src += 4
+    stmiacs r0!, {r3}           // if n_words >= 0: store r3 to mem @ dst; dst += 4
     bhi     .memcpy32_arm_loop_words // branch if n_words != 0
-    bx      lr                  // return to thumb caller
+    bx      lr                  // return
 
 // Set memory.
 // r0: dst Destination pointer in, end of destination buffer out
@@ -199,7 +197,7 @@ memset_arm:
     add     r12, r0, r2         // r12 = dst + n
     strb    r1, [r12, #-1]      // store r3 to mem @ r12 - 1
 .memset_arm_dst_16_fallthrough:
-    movs    r2, r2, lsr #1      // n >>= 1
+    mov     r2, r2, lsr #1      // n >>= 1
     orr     r1, r1, lsl #8      // r1 = r1 | (r1 << 8)
     // Falls through to memset16_arm like a tail call
 
@@ -221,7 +219,7 @@ memset16_arm:
     add     r12, r0, r2, lsl #1 // r12 = dst + (n << 1)
     strh    r1, [r12, #-2]      // store r3 to mem @ r12 - 1
 .memset16_arm_dst_32_fallthrough:
-    movs    r2, r2, lsr #1      // n >>= 1
+    mov     r2, r2, lsr #1      // n >>= 1
     orr     r1, r1, lsl #16     // r1 = r1 | (r1 << 16)
     // Falls through to memset32_arm like a tail call
 
@@ -256,4 +254,4 @@ memset32_arm:
     strcs   r1, [r0]            // if n_words >= 0: store r1 to mem @ dst
     add     r0, #4              // dst += 4
     bhi     .memset32_arm_loop_words // branch if n_words != 0
-    bx      lr                  // return to thumb caller
+    bx      lr                  // return

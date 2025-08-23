@@ -16,9 +16,10 @@ fn loadData() void {
 pub export fn main() void {
     loadData();
     gba.bg.ctrl[0] = .{
-        .screen_base_block = screenblock_index,
-        .tile_map_size = .{ .normal = .size_64x32 },
+        .base_screenblock = screenblock_index,
+        .size = .normal_64x32,
     };
+    gba.bg.scroll[0] = .zero;
 
     gba.display.ctrl.* = .{
         .bg0 = true,
@@ -36,6 +37,6 @@ pub export fn main() void {
         x +%= input.getAxisHorizontal();
         y +%= input.getAxisVertical();
 
-        gba.bg.scroll[0].set(x, y);
+        gba.bg.scroll[0] = .init(x, y);
     }
 }

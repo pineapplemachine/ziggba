@@ -1,4 +1,0 @@
-[submodule "src/build/zigimg"]
-	path = src/build/zigimg
-	url = https://github.com/zigimg/zigimg.git
-	branch = master

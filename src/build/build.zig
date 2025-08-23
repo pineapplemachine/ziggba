@@ -1,302 +1,447 @@
 //! This module provides helpers for building Zig code as a GBA ROM.
 
 const std = @import("std");
-const ImageConverter = @import("image_converter.zig").ImageConverter;
 
-pub const GBAColor = @import("../gba/color.zig").Color;
+pub const color = @import("color.zig");
 pub const font = @import("font.zig");
-pub const tiles = @import("tiles.zig");
-pub const ImageSourceTarget = @import("image_converter.zig").ImageSourceTarget;
+pub const image = @import("image.zig");
 
-fn libRoot() []const u8 {
-    return std.fs.path.dirname(@src().file) orelse ".";
-}
+const gba_linker_script_path = "src/gba/gba.ld";
+const gba_start_zig_file_path = "src/gba/start.zig";
+const gba_lib_file_path = "src/gba/gba.zig";
 
-const gba_linker_script = libRoot() ++ "/../gba/gba.ld";
-const gba_crt0_asm = libRoot() ++ "/../gba/crt0.s";
-const gba_isr_asm = libRoot() ++ "/../gba/isr.s";
-const gba_mem_asm = libRoot() ++ "/../gba/mem.s";
-const gba_start_zig_file = libRoot() ++ "/../gba/start.zig";
-const gba_lib_file = libRoot() ++ "/../gba/gba.zig";
-
-var is_debug: ?bool = null;
-var use_gdb_option: ?bool = null;
-
-pub const Options = struct {
-    text_charset_latin: bool = false,
-    text_charset_latin_supplement: bool = false,
-    text_charset_greek: bool = false,
-    text_charset_cyrillic: bool = false,
-    text_charset_arrows: bool = false,
-    text_charset_kana: bool = false,
-    text_charset_fullwidth_punctuation: bool = false,
-    text_charset_fullwidth_latin: bool = false,
-    text_charset_cjk_symbols: bool = false,
+const asm_file_paths = [_][]const u8{
+    "src/gba/crt0.s",
+    "src/gba/isr.s",
+    "src/gba/math.s",
+    "src/gba/mem.s",
 };
 
-const gba_thumb_target_query = blk: {
-    var target = std.Target.Query{
-        .cpu_arch = std.Target.Cpu.Arch.thumb,
-        .cpu_model = .{ .explicit = &std.Target.arm.cpu.arm7tdmi },
-        .os_tag = .freestanding,
+pub const GbaBuild = struct {
+    pub const CliOptions = struct {
+        debug: bool = false,
+        gdb: bool = false,
     };
-    target.cpu_features_add.addFeature(@intFromEnum(std.Target.arm.Feature.thumb_mode));
-    break :blk target;
-};
-
-pub fn addFontImports(b: *std.Build, module: *std.Build.Module) void {
-    module.addAnonymousImport("ziggba_font_latin.bin", .{
-        .root_source_file = b.path("assets/font_latin.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_latin_supplement.bin", .{
-        .root_source_file = b.path("assets/font_latin_supplement.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_greek.bin", .{
-        .root_source_file = b.path("assets/font_greek.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_cyrillic.bin", .{
-        .root_source_file = b.path("assets/font_cyrillic.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_arrows.bin", .{
-        .root_source_file = b.path("assets/font_arrows.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_kana.bin", .{
-        .root_source_file = b.path("assets/font_kana.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_fullwidth_punctuation.bin", .{
-        .root_source_file = b.path("assets/font_fullwidth_punctuation.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_fullwidth_latin.bin", .{
-        .root_source_file = b.path("assets/font_fullwidth_latin.bin"),
-    });
-    module.addAnonymousImport("ziggba_font_cjk_symbols.bin", .{
-        .root_source_file = b.path("assets/font_cjk_symbols.bin"),
-    });
-}
-
-/// Add a build step to compile a static library.
-/// The library will be compiled to run on the GBA.
-pub fn addGBAStaticLibrary(
-    b: *std.Build,
-    name: []const u8,
-    options: *std.Build.Step.Options,
-    module: *std.Build.Module,
-) *std.Build.Step.Compile {
-    const lib = b.addLibrary(.{
-        .linkage = .static,
-        .name = name,
-        .root_module = module,
-    });
-    lib.root_module.addOptions("gba_build_options", options);
-    addFontImports(b, lib.root_module);
-    lib.setLinkerScript(.{
-        .src_path = .{
-            .owner = b,
-            .sub_path = gba_linker_script,
-        },
-    });
-    return lib;
-}
-
-pub fn addGBAModule(
-    b: *std.Build,
-    name: []const u8,
-    source_file: []const u8,
-    debug: bool,
-    options: *std.Build.Step.Options,
-) *std.Build.Module {
-    const module = b.addModule(name, .{
-        .root_source_file = .{ .src_path = .{ .owner = b, .sub_path = source_file } },
-        .target = b.resolveTargetQuery(gba_thumb_target_query),
-        .optimize = if (debug) .Debug else .ReleaseFast,
-    });
-    module.addOptions("ziggba_build_options", options);
-    addFontImports(b, module);
-    return module;
-}
-
-pub fn addGBAOptions(b: *std.Build, options: Options) *std.Build.Step.Options {
-    const build_options = b.addOptions();
-    build_options.addOption(bool, "text_charset_latin", options.text_charset_latin);
-    build_options.addOption(bool, "text_charset_latin_supplement", options.text_charset_latin_supplement);
-    build_options.addOption(bool, "text_charset_greek", options.text_charset_greek);
-    build_options.addOption(bool, "text_charset_cyrillic", options.text_charset_cyrillic);
-    build_options.addOption(bool, "text_charset_arrows", options.text_charset_arrows);
-    build_options.addOption(bool, "text_charset_kana", options.text_charset_kana);
-    build_options.addOption(bool, "text_charset_fullwidth_punctuation", options.text_charset_fullwidth_punctuation);
-    build_options.addOption(bool, "text_charset_fullwidth_latin", options.text_charset_fullwidth_latin);
-    build_options.addOption(bool, "text_charset_cjk_symbols", options.text_charset_cjk_symbols);
-    return build_options;
-}
-
-/// Add a build step to compile an executable, i.e. a GBA ROM.
-pub fn addGBAExecutable(
-    b: *std.Build,
-    rom_name: []const u8,
-    source_file: []const u8,
-    options: ?Options,
-) *std.Build.Step.Compile {
-    const build_options = addGBAOptions(b, options orelse .{});
     
-    const debug = is_debug orelse blk: {
-        const dbg = b.option(bool, "debug", "Generate a debug build") orelse false;
-        is_debug = dbg;
-        break :blk dbg;
+    /// These build options control some aspects of how ZigGBA is compiled.
+    pub const BuildOptions = struct {
+        /// Options relating to `gba.text`.
+        /// Each charset flag, e.g. `charset_latin`, controls whether `gba.text`
+        /// will embed font data for a certain subset of Unicode code points
+        /// into the compiled ROM.
+        text_charsets: font.CharsetFlags = .{},
     };
-
-    const use_gdb = use_gdb_option orelse blk: {
-        const gdb = b.option(bool, "gdb", "Generate a ELF file for easier debugging with mGBA remote GDB support") orelse false;
-        use_gdb_option = gdb;
-        break :blk gdb;
+    
+    /// `std.Target.Query` object for GBA thumb compilation target.
+    pub const thumb_target_query = blk: {
+        var target = std.Target.Query{
+            .cpu_arch = std.Target.Cpu.Arch.thumb,
+            .cpu_model = .{ .explicit = &std.Target.arm.cpu.arm7tdmi },
+            .os_tag = .freestanding,
+        };
+        target.cpu_features_add.addFeature(
+            @intFromEnum(std.Target.arm.Feature.thumb_mode)
+        );
+        break :blk target;
     };
-
-    const start_zig_obj = b.addObject(.{
-        .name = "gba_start",
-        .root_source_file = .{
-            .src_path = .{
-                .owner = b,
-                .sub_path = gba_start_zig_file,
+    
+    b: *std.Build,
+    ziggba_dep: ?*std.Build.Dependency,
+    thumb_target: std.Build.ResolvedTarget,
+    optimize_mode: std.builtin.OptimizeMode,
+    gdb: bool,
+    
+    pub fn create(b: *std.Build) *GbaBuild {
+        const gba_b = b.allocator.create(GbaBuild) catch @panic("OOM");
+        gba_b.* = GbaBuild.init(b);
+        return gba_b;
+    }
+    
+    pub fn init(b: *std.Build) GbaBuild {
+        const cli_options = GbaBuild.getCliOptions(b);
+        var ziggba_dep: ?*std.Build.Dependency = null;
+        for(b.available_deps) |dep| {
+            if(std.mem.eql(u8, dep[0], "ziggba")) {
+                ziggba_dep = b.dependency("ziggba", .{});
+                break;
+            }
+        }
+        return .{
+            .b = b,
+            .ziggba_dep = ziggba_dep,
+            .thumb_target = b.resolveTargetQuery(GbaBuild.thumb_target_query),
+            .optimize_mode = if(cli_options.debug) .Debug else .ReleaseFast,
+            .gdb = cli_options.gdb,
+        };
+    }
+    
+    /// Get the allocator belonging to the underling `std.Build` instance.
+    pub fn allocator(self: GbaBuild) std.mem.Allocator {
+        return self.b.allocator;
+    }
+    
+    /// Get a path relative to the build directory.
+    pub fn path(self: GbaBuild, sub_path: []const u8) std.Build.LazyPath {
+        return self.b.path(sub_path);
+    }
+    
+    /// Get a path relative to the ZigGBA build directory.
+    pub fn ziggbaPath(self: GbaBuild, sub_path: []const u8) std.Build.LazyPath {
+        if(self.ziggba_dep) |dep| {
+            return .{
+                .dependency = .{
+                    .dependency = dep,
+                    .sub_path = sub_path,
+                },
+            };
+        }
+        else {
+            return self.b.path(sub_path);
+        }
+    }
+    
+    /// Get options passed via compiler arguments.
+    /// - -Ddebug - Do a debug build, instead of an optimized release build.
+    /// - -Dgdb - Output an ELF containing debug symbols.
+    pub fn getCliOptions(b: *std.Build) CliOptions {
+        return .{
+            .debug = blk: {
+                break :blk b.option(
+                    bool,
+                    "debug",
+                    "Build the GBA ROM in debug mode instead of release mode.",
+                ) orelse false;
             },
-        },
-        .target = b.resolveTargetQuery(gba_thumb_target_query),
-        .optimize = if (debug) .Debug else .ReleaseFast,
-    });
-    start_zig_obj.root_module.addOptions("gba_build_options", build_options);
-
-    const exe = b.addExecutable(.{
-        .name = rom_name,
-        .root_source_file = .{
-            .src_path = .{
-                .owner = b,
-                .sub_path = source_file,
+            .gdb = blk: {
+                break :blk b.option(
+                    bool,
+                    "gdb",
+                    "Generate an ELF file with debug symbols alongside the GBA ROM.",
+                ) orelse false;
             },
-        },
-        .target = b.resolveTargetQuery(gba_thumb_target_query),
-        .optimize = if (debug) .Debug else .ReleaseFast,
-    });
-
-    exe.addObject(start_zig_obj);
-    exe.setLinkerScript(.{
-        .src_path = .{
-            .owner = b,
-            .sub_path = gba_linker_script,
-        },
-    });
-    exe.addAssemblyFile(.{
-        .src_path = .{
-            .owner = b,
-            .sub_path = gba_crt0_asm,
-        },
-    });
-    exe.addAssemblyFile(.{
-        .src_path = .{
-            .owner = b,
-            .sub_path = gba_isr_asm,
-        },
-    });
-    exe.addAssemblyFile(.{
-        .src_path = .{
-            .owner = b,
-            .sub_path = gba_mem_asm,
-        },
-    });
-    if (use_gdb) {
-        b.installArtifact(exe);
-    } else {
+        };
+    }
+    
+    /// Get an `std.Build.Step.Options` object corresponding to some given
+    /// `BuildOptions`.
+    fn getBuildOptions(
+        b: *std.Build,
+        build_options: BuildOptions,
+    ) *std.Build.Step.Options {
+        const b_options = b.addOptions();
+        inline for(font.charsets) |charset| {
+            b_options.addOption(
+                bool,
+                "text_charset_" ++ charset.name,
+                @field(build_options.text_charsets, charset.name),
+            );
+        }
+        return b_options;
+    }
+    
+    /// Add font-related imports to a module.
+    /// These files contain glyph data bitmaps used by `gba.text`.
+    pub fn addFontImports(
+        self: GbaBuild,
+        module: *std.Build.Module,
+        build_options: BuildOptions,
+    ) void {
+        inline for(font.charsets) |charset| {
+            if(@field(build_options.text_charsets, charset.name)) {
+                const png_path = comptime(
+                    "assets/font_" ++ charset.name ++ ".bin"
+                );
+                module.addAnonymousImport(
+                    "ziggba_font_" ++ charset.name ++ ".bin",
+                    .{ .root_source_file = self.ziggbaPath(png_path) },
+                );
+            }
+        }
+    }
+    
+    /// Add `ziggba_build_options` import to a module.
+    pub fn addBuildOptions(
+        self: GbaBuild,
+        module: *std.Build.Module,
+        build_options: BuildOptions,
+    ) void {
+        const b_options = GbaBuild.getBuildOptions(self.b, build_options);
+        module.addOptions("ziggba_build_options", b_options);
+    }
+    
+    /// Add a build step to compile a module.
+    pub fn addModule(
+        self: GbaBuild,
+        name: []const u8,
+        root_source_file: std.Build.LazyPath,
+        build_options: BuildOptions,
+    ) *std.Build.Module {
+        const module = self.b.addModule(name, .{
+            .target = self.thumb_target,
+            .optimize = self.optimize_mode,
+            .root_source_file = root_source_file,
+        });
+        self.addFontImports(module, build_options);
+        self.addBuildOptions(module, build_options);
+        return module;
+    }
+    
+    /// Add a build step to compile a static library.
+    pub fn addStaticLibrary(
+        self: GbaBuild,
+        library_name: []const u8,
+        root_module: *std.Build.Module,
+        build_options: BuildOptions,
+    ) *std.Build.Step.Compile {
+        const lib = self.b.addLibrary(.{
+            .linkage = .static,
+            .name = library_name,
+            .root_module = root_module,
+        });
+        lib.setLinkerScript(self.ziggbaPath(gba_linker_script_path));
+        self.addFontImports(lib.root_module, build_options);
+        self.addBuildOptions(lib.root_module, build_options);
+        return lib;
+    }
+    
+    pub fn addObject(
+        self: GbaBuild,
+        object_name: []const u8,
+        root_source_file: std.Build.LazyPath,
+        build_options: BuildOptions,
+    ) *std.Build.Step.Compile {
+        const object = self.b.addObject(.{
+            .name = object_name,
+            .target = self.thumb_target,
+            .optimize = self.optimize_mode,
+            .root_source_file = root_source_file,
+        });
+        self.addFontImports(object.root_module, build_options);
+        self.addBuildOptions(object.root_module, build_options);
+        return object;
+    }
+    
+    pub const ExecutableOptions = struct {
+        name: []const u8,
+        root_source_file: std.Build.LazyPath,
+        build_options: BuildOptions = .{},
+    };
+    
+    /// Add a build step to compile an executable, i.e. a GBA ROM.
+    pub fn addExecutable(
+        self: *GbaBuild,
+        options: ExecutableOptions,
+    ) *GbaExecutable {
+        const exe = self.b.addExecutable(.{
+            .name = options.name,
+            .target = self.thumb_target,
+            .optimize = self.optimize_mode,
+            .root_source_file = options.root_source_file,
+        });
+        self.addFontImports(exe.root_module, options.build_options);
+        self.addBuildOptions(exe.root_module, options.build_options);
+        self.b.default_step.dependOn(&exe.step);
+        // Zig entry point and startup routine
+        exe.addObject(self.addObject(
+            "gba_start",
+            self.ziggbaPath(gba_start_zig_file_path),
+            options.build_options,
+        ));
+        // ZigGBA as a static library
+        const gba_module = self.addModule(
+            "gba",
+            self.ziggbaPath(gba_lib_file_path),
+            options.build_options,
+        );
+        exe.linkLibrary(self.addStaticLibrary(
+            "ziggba",
+            gba_module,
+            options.build_options,
+        ));
+        exe.root_module.addImport("gba", gba_module);
+        // Linker script
+        exe.setLinkerScript(self.ziggbaPath(gba_linker_script_path));
+        // Assembly modules
+        for(asm_file_paths) |asm_path| {
+            exe.addAssemblyFile(self.ziggbaPath(asm_path));
+        }
+        // Optionally generate ELF file with debug symbols
+        if (self.gdb) {
+            _ = self.b.addInstallArtifact(exe, .{
+                .dest_sub_path = self.b.fmt("{s}.elf", .{ options.name }),
+            });
+        }
+        // Generate GBA ROM
         const objcopy_step = exe.addObjCopy(.{
             .format = .bin,
         });
-
-        const install_bin_step = b.addInstallBinFile(
+        const install_bin_step = self.b.addInstallBinFile(
             objcopy_step.getOutput(),
-            b.fmt("{s}.gba", .{rom_name}),
+            self.b.fmt("{s}.gba", .{ options.name }),
         );
         install_bin_step.step.dependOn(&objcopy_step.step);
-
-        b.default_step.dependOn(&install_bin_step.step);
+        self.b.default_step.dependOn(&install_bin_step.step);
+        // Fin
+        return .create(self, exe);
     }
-
-    const gba_module = addGBAModule(
-        b,
-        "gba",
-        gba_lib_file,
-        debug,
-        build_options,
-    );
-    const gba_lib = addGBAStaticLibrary(
-        b,
-        "ziggba",
-        build_options,
-        gba_module,
-    );
-    exe.linkLibrary(gba_lib);
-    exe.root_module.addImport("gba", gba_module);
-    exe.root_module.addOptions("ziggba_build_options", build_options);
-
-    b.default_step.dependOn(&exe.step);
-
-    return exe;
-}
-
-const Mode4ConvertStep = struct {
-    step: std.Build.Step,
-    images: []const ImageSourceTarget,
-    target_palette_path: []const u8,
-
-    pub fn init(b: *std.Build, images: []const ImageSourceTarget, target_palette_path: []const u8) Mode4ConvertStep {
-        return Mode4ConvertStep{
-            .step = std.Build.Step.init(.{
-                .id = .custom,
-                .name = b.fmt("ConvertMode4Image {s}", .{target_palette_path}),
-                .owner = b,
-                .makeFn = make,
-            }),
-            .images = images,
-            .target_palette_path = target_palette_path,
-        };
+    
+    /// Add a build step for building font data for `gba.text`, converting
+    /// PNG images to bitmap data in a compact binary format.
+    pub fn addBuildFontsStep(
+        self: *GbaBuild,
+    ) *font.BuildFontsStep {
+        return font.BuildFontsStep.create(self);
     }
-
-    fn make(step: *std.Build.Step, options: std.Build.Step.MakeOptions) anyerror!void {
-        const self: *Mode4ConvertStep = @fieldParentPtr("step", step);
-        const ImageSourceTargetList = std.ArrayList(ImageSourceTarget);
-
-        var full_images = ImageSourceTargetList.init(step.owner.allocator);
-        defer full_images.deinit();
-
-        var node = options.progress_node.start("Converting mode4 images", 1);
-        defer node.end();
-
-        for (self.images) |image| {
-            try full_images.append(ImageSourceTarget{
-                .source = self.step.owner.pathFromRoot(image.source),
-                .target = self.step.owner.pathFromRoot(image.target),
-            });
-        }
-
-        const full_target_palette_path = self.step.owner.pathFromRoot(self.target_palette_path);
-        try ImageConverter.convertMode4Image(self.step.owner.allocator, full_images.items, full_target_palette_path);
+    
+    pub fn addConvertImageTiles4BppStep(
+        self: GbaBuild,
+        options: image.ConvertImageTiles4BppStep.Options,
+    ) *image.ConvertImageTiles4BppStep {
+        return image.ConvertImageTiles4BppStep.create(self.b, options);
+    }
+    
+    pub fn addConvertImageTiles8BppStep(
+        self: GbaBuild,
+        options: image.ConvertImageTiles8BppStep.Options,
+    ) *image.ConvertImageTiles8BppStep {
+        return image.ConvertImageTiles8BppStep.create(self.b, options);
+    }
+    
+    pub fn addConvertImageBitmap8BppStep(
+        self: GbaBuild,
+        options: image.ConvertImageBitmap8BppStep.Options,
+    ) *image.ConvertImageBitmap8BppStep {
+        return image.ConvertImageBitmap8BppStep.create(self.b, options);
+    }
+    
+    pub fn addConvertImageBitmap16BppStep(
+        self: GbaBuild,
+        options: image.ConvertImageBitmap16BppStep.Options,
+    ) *image.ConvertImageBitmap16BppStep {
+        return image.ConvertImageBitmap16BppStep.create(self.b, options);
+    }
+    
+    pub fn addSavePaletteStep(
+        self: GbaBuild,
+        options: color.SavePaletteStep.Options,
+    ) *color.SavePaletteStep {
+        return color.SavePaletteStep.create(self.b, options);
+    }
+    
+    pub fn addSaveQuantizedPalettizerPaletteStep(
+        self: GbaBuild,
+        options: color.SaveQuantizedPalettizerPaletteStep.Options,
+    ) *color.SaveQuantizedPalettizerPaletteStep {
+        return color.SaveQuantizedPalettizerPaletteStep.create(self.b, options);
     }
 };
 
-pub fn convertMode4Images(compile_step: *std.Build.Step.Compile, images: []const ImageSourceTarget, target_palette_path: []const u8) void {
-    const convert_image_step = compile_step.step.owner.allocator.create(Mode4ConvertStep) catch unreachable;
-    convert_image_step.* = Mode4ConvertStep.init(compile_step.step.owner, images, target_palette_path);
-    compile_step.step.dependOn(&convert_image_step.step);
-}
-
-pub fn buildFonts() !void {
-    const alloc = std.heap.page_allocator;
-    try font.packSaveFontPath("assets/font_latin.png", "assets/font_latin.bin", .init(8, 12), .init(0, 24, 128, 72), alloc);
-    try font.packSaveFontPath("assets/font_latin.png", "assets/font_latin_supplement.bin", .init(8, 12), .init(0, 120, 128, 72), alloc);
-    try font.packSaveFontPath("assets/font_greek.png", "assets/font_greek.bin", .init(8, 12), .init(0, 0, 128, 108), alloc);
-    try font.packSaveFontPath("assets/font_cyrillic.png", "assets/font_cyrillic.bin", .init(9, 12), .init(0, 0, 144, 192), alloc);
-    try font.packSaveFontPath("assets/font_arrows.png", "assets/font_arrows.bin", .init(10, 12), .init(0, 0, 160, 72), alloc);
-    try font.packSaveFontPath("assets/font_cjk_symbols.png", "assets/font_cjk_symbols.bin", .init(10, 12), .init(0, 0, 160, 48), alloc);
-    try font.packSaveFontPath("assets/font_kana.png", "assets/font_kana.bin", .init(10, 12), .init(0, 0, 160, 144), alloc);
-    try font.packSaveFontPath("assets/font_fullwidth.png", "assets/font_fullwidth_punctuation.bin", .init(10, 12), .init(0, 0, 160, 24), alloc);
-    try font.packSaveFontPath("assets/font_fullwidth.png", "assets/font_fullwidth_latin.bin", .init(10, 12), .init(0, 24, 160, 48), alloc);
-}
-
-pub fn buildFontsStep(_: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
-    try buildFonts();
-}
+pub const GbaExecutable = struct {
+    b: *GbaBuild,
+    step: *std.Build.Step.Compile,
+    
+    pub fn init(b: *GbaBuild, step: *std.Build.Step.Compile) GbaExecutable {
+        return .{ .b = b, .step = step };
+    }
+    
+    pub fn create(b: *GbaBuild, step: *std.Build.Step.Compile) *GbaExecutable {
+        const exe = b.allocator().create(GbaExecutable) catch @panic("OOM");
+        exe.* = .init(b, step);
+        return exe;
+    }
+    
+    pub fn getOwner(self: GbaExecutable) *std.Build {
+        return self.step.step.owner;
+    }
+    
+    pub fn dependOn(self: *GbaExecutable, step: *std.Build.Step) void {
+        self.step.step.dependOn(step);
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addBuildFontsStep(
+        self: *GbaExecutable,
+    ) *font.BuildFontsStep {
+        const step = font.BuildFontsStep.create(self.b);
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addConvertImageTiles4BppStep(
+        self: *GbaExecutable,
+        options: image.ConvertImageTiles4BppStep.Options,
+    ) *image.ConvertImageTiles4BppStep {
+        const step = image.ConvertImageTiles4BppStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addConvertImageTiles8BppStep(
+        self: *GbaExecutable,
+        options: image.ConvertImageTiles8BppStep.Options,
+    ) *image.ConvertImageTiles8BppStep {
+        const step = image.ConvertImageTiles8BppStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addConvertImageBitmap8BppStep(
+        self: *GbaExecutable,
+        options: image.ConvertImageBitmap8BppStep.Options,
+    ) *image.ConvertImageBitmap8BppStep {
+        const step = image.ConvertImageBitmap8BppStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addConvertImageBitmap16BppStep(
+        self: *GbaExecutable,
+        options: image.ConvertImageBitmap16BppStep.Options,
+    ) *image.ConvertImageBitmap16BppStep {
+        const step = image.ConvertImageBitmap16BppStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addSavePaletteStep(
+        self: *GbaExecutable,
+        options: color.SavePaletteStep.Options,
+    ) *color.SavePaletteStep {
+        const step = color.SavePaletteStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+    
+    /// Add a step that the executable depends on.
+    pub fn addSaveQuantizedPalettizerPaletteStep(
+        self: *GbaExecutable,
+        options: color.SaveQuantizedPalettizerPaletteStep.Options,
+    ) *color.SaveQuantizedPalettizerPaletteStep {
+        const step = color.SaveQuantizedPalettizerPaletteStep.create(
+            self.getOwner(),
+            options,
+        );
+        self.dependOn(&step.step);
+        return step;
+    }
+};

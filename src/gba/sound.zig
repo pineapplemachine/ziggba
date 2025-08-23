@@ -1,12 +1,22 @@
-const std = @import("std");
+//! This module provides an interface for dealing with the GBA's sound-related
+//! features.
+
 const gba = @import("gba.zig");
 
-// References:
-// https://problemkaputt.de/gbatek.htm#gbasoundcontroller
-// https://gbadev.net/tonc/sndsqr.html
-// https://wiki.nycresistor.com/wiki/GB101:Sound
-// https://www.gamedev.net/articles/programming/general-and-gameplay-programming/audio-programming-on-the-gameboy-advance-part-1-r1823/
-// https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware
+/// Contains a flag corresponding to each of the PSG audio channels.
+pub const ChannelFlags = packed struct(u4) {
+    pub const all: ChannelFlags = @bitCast(0xf);
+    pub const none: ChannelFlags = .{};
+    
+    /// PSG channel 1.
+    pulse_1: bool = false,
+    /// PSG channel 2.
+    pulse_2: bool = false,
+    /// PSG channel 3.
+    wave: bool = false,
+    /// PSG channel 4.
+    noise: bool = false,
+};
 
 /// Enumeration of direction options for channel volume envelopes.
 /// This is used by both the pulse and noise channel control registers.
@@ -81,7 +91,9 @@ pub const PulseChannelControl = packed struct(u16) {
 /// Represents the contents of REG_SND1FREQ, REG_SND2FREQ, and
 /// REG_SND3FREQ registers.
 /// This includes frequency control for the pulse and wave channels.
-pub const ChannelFrequency = packed struct(u16) {
+/// Differs from and does not accurately represent the contents of
+/// REG_SND4FREQ. For REG_SND4FREQ, see `NoiseChannelFrequency`.
+pub const PsgChannelFrequency = packed struct(u16) {
     /// Initial sound rate. Write-only. Frequency is 2^17/(2048-rate).
     rate: u11 = 0,
     /// Unused bits.
@@ -97,7 +109,7 @@ pub const ChannelFrequency = packed struct(u16) {
 
 /// Frequency control for the pulse channels.
 /// Represents the contents of REG_SND1FREQ and REG_SND2FREQ registers.
-pub const PulseChannelFrequency = ChannelFrequency;
+pub const PulseChannelFrequency = PsgChannelFrequency;
 
 /// Represents the contents of the REG_SND3SEL register.
 pub const WaveChannelSelect = packed struct(u16) {
@@ -156,7 +168,7 @@ pub const WaveChannelControl = packed struct(u16) {
 /// Represents the contents of the REG_SND3FREQ register.
 /// The rate value determines sample rate, measured in sample
 /// digits per second.
-pub const WaveChannelFrequency = ChannelFrequency;
+pub const WaveChannelFrequency = PsgChannelFrequency;
 
 /// Represents the contents of the REG_SND4CNT register.
 /// Same as PulseChannelControl except that the duty bits are unused.
@@ -226,100 +238,145 @@ pub const NoiseChannelFrequency = packed struct(u16) {
     reset: bool = false,
 };
 
-/// Represents the contents of the REG_SNDDMGCNT sound control register.
-pub const Dmg = packed struct(u16) {
-    /// Master volume for left speaker.
-    volume_left: u3 = 0,
-    /// Unused bits.
-    _1: u1 = 0,
-    /// Master volume for right speaker.
-    volume_right: u3 = 0,
-    /// Unused bits.
-    _2: u1 = 0,
-    /// Enable pulse 1 channel for left speaker.
-    left_pulse_1: bool = false,
-    /// Enable pulse 2 channel for left speaker.
-    left_pulse_2: bool = false,
-    /// Enable wave channel for left speaker.
-    left_wave: bool = false,
-    /// Enable noise channel for left speaker.
-    left_noise: bool = false,
-    /// Enable pulse 1 channel for right speaker.
-    right_pulse_1: bool = false,
-    /// Enable pulse 2 channel for right speaker.
-    right_pulse_2: bool = false,
-    /// Enable wave channel for right speaker.
-    right_wave: bool = false,
-    /// Enable noise channel for right speaker.
-    right_noise: bool = false,
-};
-
-/// Represents the contents of the DirectSound control register.
-pub const DirectSound = packed struct(u16) {
-    /// Enumeration of volume options for DMG channels.
-    pub const DmgVolume = enum(u2) {
-        /// 25% DMG volume ratio
-        percent_25 = 0b00,
-        /// 50% DMG volume ratio
-        percent_50 = 0b01,
-        /// 100% DMG volume ratio
-        percent_100 = 0b10,
+/// Represents the contents of REG_SNDCNT, which contains REG_SNDDMGCNT and
+/// REG_SNDDSCNT.
+pub const Control = packed struct(u32) {
+    /// Represents the contents of the REG_SNDDMGCNT sound control register.
+    pub const Dmg = packed struct(u16) {
+        /// Master volume for left speaker.
+        volume_left: u3 = 0,
+        /// Unused bits.
+        _1: u1 = 0,
+        /// Master volume for right speaker.
+        volume_right: u3 = 0,
+        /// Unused bits.
+        _2: u1 = 0,
+        /// Enable pulse 1 channel for left speaker.
+        left_pulse_1: bool = false,
+        /// Enable pulse 2 channel for left speaker.
+        left_pulse_2: bool = false,
+        /// Enable wave channel for left speaker.
+        left_wave: bool = false,
+        /// Enable noise channel for left speaker.
+        left_noise: bool = false,
+        /// Enable pulse 1 channel for right speaker.
+        right_pulse_1: bool = false,
+        /// Enable pulse 2 channel for right speaker.
+        right_pulse_2: bool = false,
+        /// Enable wave channel for right speaker.
+        right_wave: bool = false,
+        /// Enable noise channel for right speaker.
+        right_noise: bool = false,
+        
+        pub fn init(
+            volume_left: u3,
+            volume_right: u3,
+            enable_left: ChannelFlags,
+            enable_right: ChannelFlags,
+        ) Dmg {
+            return .{
+                .volume_left = volume_left,
+                .volume_right = volume_right,
+                .left_pulse_1 = enable_left.pulse_1,
+                .left_pulse_2 = enable_left.pulse_2,
+                .left_wave = enable_left.wave,
+                .left_noise = enable_left.noise,
+                .right_pulse_1 = enable_right.pulse_1,
+                .right_pulse_2 = enable_right.pulse_2,
+                .right_wave = enable_right.wave,
+                .right_noise = enable_right.noise,
+            };
+        }
     };
 
-    /// Enumeration of volume options for DirectSound channels.
-    pub const DirectSoundVolume = enum(u1) {
-        /// 50% DirectSound A/B volume ratio
-        percent_50 = 0,
-        /// 100% DirectSound A/B volume ratio
-        percent_100 = 1,
-    };
+    /// Represents the contents of the DirectSound control register
+    /// REG_SNDDSCNT.
+    pub const DirectSound = packed struct(u16) {
+        /// Enumeration of volume options for DMG channels.
+        pub const DmgVolume = enum(u2) {
+            /// 25% DMG volume ratio
+            percent_25 = 0b00,
+            /// 50% DMG volume ratio
+            percent_50 = 0b01,
+            /// 100% DMG volume ratio
+            percent_100 = 0b10,
+        };
 
-    /// Relative volume of DMG channels.
-    volume_dmg: DmgVolume = .percent_25,
-    /// Relative volume of DirectSound channel A.
-    volume_a: DirectSoundVolume = .percent_50,
-    /// Relative volume of DirectSound channel B.
-    volume_b: DirectSoundVolume = .percent_50,
-    /// Unused bits.
-    _: u4 = 0,
-    /// Enable DirectSound A on left speaker.
-    left_a: bool = false,
-    /// Enable DirectSound A on right speaker.
-    right_a: bool = false,
-    /// Indicates which timer should be used for DirectSound A.
-    timer_a: u1 = 0,
-    /// FIFO reset for DirectSound A. When using DMA for DirectSound,
-    /// this will cause DMA to reset the FIFO buffer after it's used.
-    reset_a: bool = false,
-    /// Enable DirectSound B on left speaker.
-    left_b: bool = false,
-    /// Enable DirectSound B on right speaker.
-    right_b: bool = false,
-    /// Indicates which timer should be used for DirectSound B.
-    timer_b: u1 = 0,
-    /// FIFO reset for DirectSound B. When using DMA for DirectSound,
-    /// this will cause DMA to reset the FIFO buffer after it's used.
-    reset_b: bool = false,
+        /// Enumeration of volume options for DirectSound channels.
+        pub const DirectSoundVolume = enum(u1) {
+            /// 50% DirectSound A/B volume ratio
+            percent_50 = 0,
+            /// 100% DirectSound A/B volume ratio
+            percent_100 = 1,
+        };
+
+        /// Relative volume of DMG channels.
+        volume_dmg: DmgVolume = .percent_25,
+        /// Relative volume of DirectSound channel A.
+        volume_a: DirectSoundVolume = .percent_50,
+        /// Relative volume of DirectSound channel B.
+        volume_b: DirectSoundVolume = .percent_50,
+        /// Unused bits.
+        _: u4 = 0,
+        /// Enable DirectSound A on left speaker.
+        left_a: bool = false,
+        /// Enable DirectSound A on right speaker.
+        right_a: bool = false,
+        /// Indicates which timer should be used for DirectSound A.
+        timer_a: u1 = 0,
+        /// FIFO reset for DirectSound A. When using DMA for DirectSound,
+        /// this will cause DMA to reset the FIFO buffer after it's used.
+        reset_a: bool = false,
+        /// Enable DirectSound B on left speaker.
+        left_b: bool = false,
+        /// Enable DirectSound B on right speaker.
+        right_b: bool = false,
+        /// Indicates which timer should be used for DirectSound B.
+        timer_b: u1 = 0,
+        /// FIFO reset for DirectSound B. When using DMA for DirectSound,
+        /// this will cause DMA to reset the FIFO buffer after it's used.
+        reset_b: bool = false,
+    };
+    
+    /// Corresponds to REG_SNDDMGCNT.
+    dmg: Dmg = .{},
+    /// Corresponds to REG_SNDDSCNT.
+    dsound: DirectSound = .{},
 };
 
+/// Represents the contents of REG_SNDSTAT.
 pub const Status = packed struct(u16) {
-    /// Whether the Pulse 1 channel should be currently playing.
+    /// Indicates whether any note is currently paying on the Pulse 1 channel.
+    /// Counts length, but not volume envelope, in deciding when a note ends.
+    /// This is read-only in REG_SNDSTAT.
     pulse_1: bool = false,
-    /// Whether the Pulse 2 channel should be currently playing.
+    /// Indicates whether any note is currently paying on the Pulse 2 channel.
+    /// Counts length, but not volume envelope, in deciding when a note ends.
+    /// This is read-only in REG_SNDSTAT.
     pulse_2: bool = false,
-    /// Whether the Wave channel should be currently playing.
+    /// Indicates whether any note is currently paying on the Wave channel.
+    /// This is read-only in REG_SNDSTAT.
     wave: bool = false,
-    /// Whether the Noise channel should be currently playing.
+    /// Indicates whether any note is currently paying on the Noise channel.
+    /// Counts length, but not volume envelope, in deciding when a note ends.
+    /// This is read-only in REG_SNDSTAT.
     noise: bool = false,
     /// Unused bits.
     _1: u3 = 0,
     /// Master sound enable. Must be set if any sound is to be
     /// heard at all.
-    master: bool,
+    master: bool = false,
     /// Unused bits.
     _2: u8 = 0,
+    
+    /// Initialize a `Status value with a given value for the master audio
+    /// enabled/disabled flag.
+    pub fn init(master: bool) Status {
+        return .{ .master = master };
+    }
 };
 
+/// Represents the contents of REG_SNDBIAS.
 pub const Bias = packed struct(u16) {
     pub const Cycle = enum(u2) {
         /// 32.768 kHz. (Default, best for DMA channels A, B.)
@@ -344,57 +401,58 @@ pub const Bias = packed struct(u16) {
 
 /// Control pitch sweep in channel 1 (Pulse 1).
 /// Corresponds to tonc REG_SND1SWEEP.
-pub const pulse_1_sweep: *volatile PulseChannelSweep = @ptrFromInt(gba.mem.io + 0x60);
+pub const pulse_1_sweep: *volatile PulseChannelSweep = @ptrCast(gba.mem.io.reg_snd1sweep);
 
 /// Control length, duty, and envelope in channel 1 (Pulse 1).
 /// Corresponds to tonc REG_SND1CNT.
-pub const pulse_1_ctrl: *volatile PulseChannelControl = @ptrFromInt(gba.mem.io + 0x62);
+pub const pulse_1_ctrl: *volatile PulseChannelControl = @ptrCast(gba.mem.io.reg_snd1cnt);
 
 /// Control rate (determines pitch/frequency) in channel 1 (Pulse 1).
 /// Corresponds to tonc REG_SND1FREQ.
-pub const pulse_1_freq: *volatile PulseChannelFrequency = @ptrFromInt(gba.mem.io + 0x64);
+pub const pulse_1_freq: *volatile PulseChannelFrequency = @ptrCast(gba.mem.io.reg_snd1freq);
 
 /// Control length, duty, and envelope in channel 2 (Pulse 2).
 /// Corresponds to tonc REG_SND2CNT.
-pub const pulse_2_ctrl: *volatile PulseChannelControl = @ptrFromInt(gba.mem.io + 0x68);
+pub const pulse_2_ctrl: *volatile PulseChannelControl = @ptrCast(gba.mem.io.reg_snd2cnt);
 
 /// Control rate (determines pitch/frequency) in channel 2 (Pulse 2).
 /// Corresponds to tonc REG_SND2FREQ.
-pub const pulse_2_freq: *volatile PulseChannelFrequency = @ptrFromInt(gba.mem.io + 0x6c);
+pub const pulse_2_freq: *volatile PulseChannelFrequency = @ptrCast(gba.mem.io.reg_snd2freq);
 
 /// Waveform select for channel 3 (Wave).
 /// Corresponds to REG_SND3SEL.
-pub const wave_select: *volatile WaveChannelSelect = @ptrFromInt(gba.mem.io + 0x70);
+pub const wave_select: *volatile WaveChannelSelect = @ptrCast(gba.mem.io.reg_snd3sel);
 
+/// Control length and volume in channel 3 (Wave).
 /// Corresponds to tonc REG_SND3CNT.
-pub const wave_ctrl: *volatile WaveChannelControl = @ptrFromInt(gba.mem.io + 0x72);
+pub const wave_ctrl: *volatile WaveChannelControl = @ptrCast(gba.mem.io.reg_snd3cnt);
 
+/// Control rate (determines pitch/frequency) in channel 3 (Wave).
 /// Corresponds to tonc REG_SND3FREQ.
-pub const wave_freq: *volatile WaveChannelFrequency = @ptrFromInt(gba.mem.io + 0x74);
+pub const wave_freq: *volatile WaveChannelFrequency = @ptrCast(gba.mem.io.reg_snd3freq);
 
+/// Control length and envelope in channel 4 (Noise).
 /// Corresponds to tonc REG_SND4CNT.
-pub const noise_ctrl: *volatile NoiseChannelControl = @ptrFromInt(gba.mem.io + 0x78);
+pub const noise_ctrl: *volatile NoiseChannelControl = @ptrCast(gba.mem.io.reg_snd4cnt);
 
+/// Control the frequency and quality of noise in channel 4 (Noise).
 /// Corresponds to tonc REG_SND4FREQ.
-pub const noise_freq: *volatile NoiseChannelFrequency = @ptrFromInt(gba.mem.io + 0x7c);
+pub const noise_freq: *volatile NoiseChannelFrequency = @ptrCast(gba.mem.io.reg_snd4freq);
 
-/// Corresponds to tonc REG_SNDDMGCNT.
-pub const dmg: *volatile Dmg = @ptrFromInt(gba.mem.io + 0x80);
-
-/// Corresponds to tonc REG_SNDDSCNT.
-pub const dsound: *volatile DirectSound = @ptrFromInt(gba.mem.io + 0x82);
+/// Corresponds to tonc REG_SNDCNT.
+pub const ctrl: *volatile Control = @ptrCast(gba.mem.io.reg_sndcnt);
 
 /// Corresponds to tonc REG_SNDSTAT.
-pub const status: *volatile Status = @ptrFromInt(gba.mem.io + 0x84);
+pub const status: *volatile Status = @ptrCast(gba.mem.io.reg_sndstat);
 
 /// Corresponds to tonc REG_SNDBIAS.
-pub const bias: *volatile Bias = @ptrFromInt(gba.mem.io + 0x88);
+pub const bias: *volatile Bias = @ptrCast(gba.mem.io.reg_sndbias);
 
 /// Corresponds to tonc REG_WAVE_RAMx.
-pub const wave_ram: *volatile [4]u32 = @ptrFromInt(gba.mem.io + 0x90);
+pub const wave_ram: *volatile [4]u32 = @ptrCast(gba.mem.io.reg_wave_ramx);
 
 /// Corresponds to tonc REG_FIFO_A.
-pub const fifo_a: *volatile [4]u8 = @ptrFromInt(gba.mem.io + 0xa0);
+pub const fifo_a: *volatile [4]u8 = @ptrCast(gba.mem.io.reg_fifo_a);
 
 /// Corresponds to tonc REG_FIFO_B.
-pub const fifo_b: *volatile [4]u8 = @ptrFromInt(gba.mem.io + 0xa4);
+pub const fifo_b: *volatile [4]u8 = @ptrCast(gba.mem.io.reg_fifo_b);

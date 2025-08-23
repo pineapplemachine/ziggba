@@ -19,17 +19,17 @@ pub export fn main() void {
     gba.display.memcpyBackgroundTiles8Bpp(0, @ptrCast(&tiles_data));
     
     // Initialize a color palette.
-    gba.display.bg_palette.banks[0][0] = gba.Color.black;
-    gba.display.bg_palette.banks[0][1] = gba.Color.rgb(26, 26, 26);
-    gba.display.bg_palette.banks[0][2] = gba.Color.rgb(31, 0, 0);
-    gba.display.bg_palette.banks[0][3] = gba.Color.rgb(6, 31, 6);
-    gba.display.bg_palette.banks[0][4] = gba.Color.rgb(9, 22, 31);
-    gba.display.bg_palette.banks[0][15] = gba.Color.white;
+    gba.display.bg_palette.banks[0][0] = .black;
+    gba.display.bg_palette.banks[0][1] = .rgb(26, 26, 26);
+    gba.display.bg_palette.banks[0][2] = .rgb(31, 0, 0);
+    gba.display.bg_palette.banks[0][3] = .rgb(6, 31, 6);
+    gba.display.bg_palette.banks[0][4] = .rgb(9, 22, 31);
+    gba.display.bg_palette.banks[0][15] = .white;
     
     // Initialize a regular background. This will be used to display text.
     gba.bg.ctrl[0] = .{
-        .screen_base_block = 4,
-        .tile_map_size = .{ .normal = .size_32x32 },
+        .base_screenblock = 4,
+        .size = .normal_32x32,
     };
     const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
     normal_bg_map.getBaseScreenblock().fillRect(.{ .tile = 128 }, 0, 0, 32, 16);
@@ -37,8 +37,8 @@ pub export fn main() void {
     
     // Initialize an affine background layer.
     gba.bg.ctrl[2] = .{
-        .screen_base_block = 5,
-        .tile_map_size = .{ .affine = .size_16 },
+        .base_screenblock = 5,
+        .size = .affine_16,
     };
     const affine_bg_map = gba.display.AffineBackgroundMap.initCtrl(gba.bg.ctrl[2]);
     for(0..affine_bg_map.width()) |x| {
@@ -65,14 +65,13 @@ pub export fn main() void {
     });
     
     // Initialize the display.
-    gba.display.ctrl.* = gba.display.Control{
-        .mode = .mode1,
-        .bg0 = true, // Normal
-        .bg2 = true, // Affine
-    };
+    gba.display.ctrl.* = .initMode1(.{
+        .bg0 = true, // Normal background
+        .bg2 = true, // Affine background
+    });
     
     // Initialize some important variables.
-    var angle: gba.FixedU16R16 = .{};
+    var angle: gba.math.FixedU16R16 = .{};
     var input: gba.input.KeysState = .{};
     
     // Enable VBlank interrupts.
@@ -100,9 +99,9 @@ pub export fn main() void {
         // Set affine transform values.
         // Rotate the background by the current angle around its center,
         // showing it near the center of the screen.
-        gba.bg.bg_2_affine.* = .initRotScaleFast(.{
-            .bg_origin = .{ .x = .initInt(64), .y = .initInt(64) },
-            .screen_origin = .{ .x = .initInt(120), .y = .initInt(68) },
+        gba.bg.bg_2_affine.* = .initRotScale(.{
+            .bg_origin = .init(.fromInt(64), .fromInt(64)),
+            .screen_origin = .init(.fromInt(120), .fromInt(68)),
             .angle = angle,
         });
         
@@ -114,7 +113,7 @@ pub export fn main() void {
         );
         
         // Draw an up-to-date value for the angle, converted to degrees.
-        const angle_display = angle.toI32R16().mul(.initInt(360)).toI32R8();
+        const angle_display = angle.toDegrees().to(gba.math.FixedI32R8);
         const fmt_len = angle_display.formatDecimal(&text_buffer, .{
             .min_fraction_digits = 2,
             .max_fraction_digits = 2,

@@ -56,36 +56,36 @@ fn trigTest(
 fn sinExpected(radians: f64) f64 {
     return @sin(radians);
 }
-fn sinFastActual(i: u16) i32 {
-    return gba.FixedU16R16.initRaw(i).sinFast().value;
+fn sinActual(i: u16) i32 {
+    return gba.math.FixedU16R16.initRaw(i).sin().value;
 }
 fn sinLerpActual(i: u16) i32 {
-    return gba.FixedU16R16.initRaw(i).sinLerp().value;
+    return gba.math.FixedU16R16.initRaw(i).sinLerp().value;
 }
 
 fn cosExpected(radians: f64) f64 {
     return @cos(radians);
 }
-fn cosFastActual(i: u16) i32 {
-    return gba.FixedU16R16.initRaw(i).cosFast().value;
+fn cosActual(i: u16) i32 {
+    return gba.math.FixedU16R16.initRaw(i).cos().value;
 }
 fn cosLerpActual(i: u16) i32 {
-    return gba.FixedU16R16.initRaw(i).cosLerp().value;
+    return gba.math.FixedU16R16.initRaw(i).cosLerp().value;
 }
 
-test "gba.FixedU16R16.sinFast" {
+test "gba.math.FixedU16R16.sin" {
     const err_tracker = try trigTest(
-        "gba.FixedU16R16.sinFast",
+        "gba.math.FixedU16R16.sin",
         sinExpected,
-        sinFastActual,
+        sinActual,
     );
     try std.testing.expect(err_tracker.max < 0.01);
     try std.testing.expect(err_tracker.average() < 0.002);
 }
 
-test "gba.FixedU16R16.sinLerp" {
+test "gba.math.FixedU16R16.sinLerp" {
     const err_tracker = try trigTest(
-        "gba.FixedU16R16.sinLerp",
+        "gba.math.FixedU16R16.sinLerp",
         sinExpected,
         sinLerpActual,
     );
@@ -93,19 +93,19 @@ test "gba.FixedU16R16.sinLerp" {
     try std.testing.expect(err_tracker.average() < 0.00001);
 }
 
-test "gba.FixedU16R16.cosFast" {
+test "gba.math.FixedU16R16.cos" {
     const err_tracker = try trigTest(
-        "gba.FixedU16R16.cosFast",
+        "gba.math.FixedU16R16.cos",
         cosExpected,
-        cosFastActual,
+        cosActual,
     );
     try std.testing.expect(err_tracker.max < 0.01);
     try std.testing.expect(err_tracker.average() < 0.002);
 }
 
-test "gba.FixedU16R16.cosLerp" {
+test "gba.math.FixedU16R16.cosLerp" {
     const err_tracker = try trigTest(
-        "gba.FixedU16R16.cosLerp",
+        "gba.math.FixedU16R16.cosLerp",
         cosExpected,
         cosLerpActual,
     );

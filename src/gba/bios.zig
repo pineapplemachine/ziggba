@@ -124,7 +124,7 @@ pub const Swi = enum(u8) {
     /// Accepts a signed 16-bit fixed point value in `r0` with radix 2^14. 
     /// Produces an unsigned 16-bit fixed point value in `r0` with radix 2^16
     /// measuring an angle result in revolutions.
-    /// See `gba.FixedI16R14` and `gba.FixedU16R16`.
+    /// See `gba.math.FixedI16R14` and `gba.math.FixedU16R16`.
     /// This implementation may produce inaccurate values. In most situations,
     /// you should prefer to use the `arctan2` SWI instead.
     /// Named `ArcTan` in both Tonc and GBATEK documentation.
@@ -133,7 +133,7 @@ pub const Swi = enum(u8) {
     /// Accepts two signed 16-bit values representing a Y/X ratio, X in `r0`
     /// and Y in `r1`.
     /// Produces an unsigned 16-bit fixed point value in `r0` with radix 2^16
-    /// measuring an angle result in revolutions. (See `gba.FixedU16R16`.)
+    /// measuring an angle result in revolutions. (See `gba.math.FixedU16R16`.)
     /// Named `ArcTan2` in both Tonc and GBATEK documentation.
     arctan2 = 0x0a,
     /// Named `CpuSet` in both Tonc and GBATEK documentation.

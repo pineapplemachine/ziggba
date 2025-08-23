@@ -15,6 +15,7 @@ pub const Timer = packed struct(u32) {
     };
 
     /// Enumeration of recognized timer tick frequencies.
+    /// There are 0x1000000 or 16777216 clock cycles in one second.
     pub const Frequency = enum(u2) {
         /// One timer tick per clock cycle.
         /// Equivalent to 1/16777216th second, or approximately 0.06
@@ -31,37 +32,44 @@ pub const Timer = packed struct(u32) {
         cycles_1024 = 3,
     };
 
-    /// Represents the data of a REG_TMxCNT timer control register.
-    pub const Control = packed struct(u8) {
+    /// Represents the structure of a REG_TMxCNT timer control register.
+    pub const Control = packed struct(u16) {
         /// Timer frequency.
         /// One second is equivalent to 1024 * 0x4000 clock cycles.
         /// This field is only used when the mode is not "cascade".
-        freq: Timer.Frequency = .cycles_1,
+        freq: Frequency = .cycles_1,
         /// Indicate under what circumstances the timer counter should
         /// increment.
         /// In cascade mode, the freq field is ignored, and the timer
         /// is incremented as the previous timer overflows.
         /// (The timer must also be enabled for this to happen.)
-        mode: Timer.Mode = .freq,
+        mode: Mode = .freq,
         /// Unused bits.
-        _: u3 = 0,
+        _1: u3 = 0,
         /// Raise an interrupt upon overflow.
         interrupt: bool = false,
         /// Enable the timer.
         enable: bool = false,
+        /// Unused bits.
+        _2: u8 = 0,
     };
 
-    /// Corresponds to tonc REG_TMxD.
+    /// Corresponds to REG_TMxD.
     /// Reading this register gives a timer's current elapsed intervals.
     /// Writing to this register does NOT set the current timer value.
     /// It sets the INITIAL timer value for the next timer run.
     counter: u16 = 0,
-
-    /// Corresponds to tonc REG_TMxCNT.
-    ctrl: Timer.Control = .{},
-
-    /// Unused high bits of REG_TMxCNT.
-    _: u8 = 0,
+    /// Corresponds to REG_TMxCNT.
+    ctrl: Control = .{},
+    
+    /// Initialize a `Timer`.
+    pub fn init(counter: u16, ctrl: Control) Timer {
+        return .{ .counter = counter, .ctrl = ctrl };
+    }
 };
 
-pub const timers: *volatile [4]Timer align(4) = @ptrFromInt(gba.mem.io + 0x100);
+/// Provides access to the GBA's timers, which count in increments
+/// of clock cycles.
+/// (There are 0x1000000 or 16777216 clock cycles in one second.)
+/// Corresponds to REG_TM.
+pub const timers: *volatile [4]Timer align(4) = @ptrCast(gba.mem.io.reg_tm);

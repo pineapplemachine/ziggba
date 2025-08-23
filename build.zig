@@ -1,105 +1,154 @@
 const std = @import("std");
-const gba = @import("src/build/build.zig");
 
-pub fn build(b: *std.Build) void {
+pub const gba = @import("src/build/build.zig");
+
+/// Build example ROMs.
+pub fn build(std_b: *std.Build) void {
+    const b = gba.GbaBuild.create(std_b);
+    
     // TODO: Use tile and palette data created by the build system for demos
     
-    // Options
+    // Build font data with `zig build font`.
     
-    const text_options: gba.Options = .{
-        .text_charset_latin = true,
-        .text_charset_latin_supplement = true,
-        .text_charset_greek = true,
-        .text_charset_cyrillic = true,
-        .text_charset_arrows = true,
-        .text_charset_kana = true,
-        .text_charset_fullwidth_punctuation = true,
-        .text_charset_fullwidth_latin = true,
-        .text_charset_cjk_symbols = true,
-    };
+    const font_step = std_b.step("font", "Build fonts for gba.text");
+    font_step.dependOn(&b.addBuildFontsStep().step);
     
-    // Build font data
+    // Build examples.
     
-    const build_font_step = b.step("font", "Build font data for gba.text");
-    build_font_step.makeFn = gba.buildFontsStep;
+    _ = b.addExecutable(.{
+        .name = "charBlock",
+        .root_source_file = b.path("examples/charBlock/charBlock.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "debugPrint",
+        .root_source_file = b.path("examples/debugPrint/debugPrint.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "first",
+        .root_source_file = b.path("examples/first/first.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "helloWorld",
+        .root_source_file = b.path("examples/helloWorld/helloWorld.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
+    _ = b.addExecutable(.{
+        .name = "interrupts",
+        .root_source_file = b.path("examples/interrupts/interrupts.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
+    _ = b.addExecutable(.{
+        .name = "keydemo",
+        .root_source_file = b.path("examples/keydemo/keydemo.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "memory",
+        .root_source_file = b.path("examples/memory/memory.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
+    _ = b.addExecutable(.{
+        .name = "mode3draw",
+        .root_source_file = b.path("examples/mode3draw/mode3draw.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "mode4draw",
+        .root_source_file = b.path("examples/mode4draw/mode4draw.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "objAffine",
+        .root_source_file = b.path("examples/objAffine/objAffine.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "objDemo",
+        .root_source_file = b.path("examples/objDemo/objDemo.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "secondsTimer",
+        .root_source_file = b.path("examples/secondsTimer/secondsTimer.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "screenBlock",
+        .root_source_file = b.path("examples/screenBlock/screenBlock.zig"),
+    });
+    _ = b.addExecutable(.{
+        .name = "tileDemo",
+        .root_source_file = b.path("examples/tileDemo/tileDemo.zig"),
+    });
     
-    // Examples
-    
-    _ = gba.addGBAExecutable(b, "charBlock", "examples/charBlock/charBlock.zig", .{});
-    _ = gba.addGBAExecutable(b, "debugPrint", "examples/debugPrint/debugPrint.zig", .{});
-    _ = gba.addGBAExecutable(b, "first", "examples/first/first.zig", .{});
-    _ = gba.addGBAExecutable(b, "helloWorld", "examples/helloWorld/helloWorld.zig", text_options);
-    _ = gba.addGBAExecutable(b, "interrupts", "examples/interrupts/interrupts.zig", text_options);
-    _ = gba.addGBAExecutable(b, "keydemo", "examples/keydemo/keydemo.zig", .{});
-    _ = gba.addGBAExecutable(b, "memory", "examples/memory/memory.zig", text_options);
-    _ = gba.addGBAExecutable(b, "mode3draw", "examples/mode3draw/mode3draw.zig", .{});
-    _ = gba.addGBAExecutable(b, "mode4draw", "examples/mode4draw/mode4draw.zig", .{});
-    _ = gba.addGBAExecutable(b, "objAffine", "examples/objAffine/objAffine.zig", .{});
-    _ = gba.addGBAExecutable(b, "objDemo", "examples/objDemo/objDemo.zig", .{});
-    _ = gba.addGBAExecutable(b, "secondsTimer", "examples/secondsTimer/secondsTimer.zig", .{});
-    _ = gba.addGBAExecutable(b, "screenBlock", "examples/screenBlock/screenBlock.zig", .{});
-    _ = gba.addGBAExecutable(b, "tileDemo", "examples/tileDemo/tileDemo.zig", .{});
-    
-    var bgAffine_palette = [_]gba.tiles.ColorRgb24 {
-        .{ .r = 0, .g = 0, .b = 0 }, // Transparency
-        .{ .r = 255, .g = 255, .b = 255 },
-        .{ .r = 255, .g = 0, .b = 0 },
-        .{ .r = 0, .g = 255, .b = 0 },
-        .{ .r = 0, .g = 128, .b = 255 },
-    };
-    _ = gba.addGBAExecutable(b, "bgAffine", "examples/bgAffine/bgAffine.zig", text_options);
-    gba.tiles.convertSaveImagePath(
-        []gba.tiles.ColorRgb24,
-        "examples/bgAffine/tiles.png",
-        "examples/bgAffine/tiles.bin",
-        .{
-            .allocator = std.heap.page_allocator,
-            .bpp = .bpp_8, // Affine backgrounds require 8bpp tile data
-            .palette_fn = gba.tiles.getNearestPaletteColor,
-            .palette_ctx = bgAffine_palette[0..],
+    var bgAffine = b.addExecutable(.{
+        .name = "bgAffine",
+        .root_source_file = b.path("examples/bgAffine/bgAffine.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
+    const bgAffine_pal = gba.color.PalettizerNearest.create(
+        b.allocator(),
+        &[_]gba.color.ColorRgba32 {
+            .transparent,
+            .white,
+            .red,
+            .green,
+            .aqua,
         },
-    ) catch {};
+    ) catch @panic("OOM");
+    _ = bgAffine.addConvertImageTiles8BppStep(.{
+        .image_path = "examples/bgAffine/tiles.png",
+        .output_path = "examples/bgAffine/tiles.bin",
+        .options = .{ .palettizer = bgAffine_pal.pal() },
+    });
     
-    var jesuMusic_palette = [_]gba.tiles.ColorRgb24 {
-        .{ .r = 0, .g = 0, .b = 0 }, // Transparency
-        .{ .r = 255, .g = 255, .b = 255 },
-        .{ .r = 0, .g = 0, .b = 0 },
-    };
-    _ = gba.addGBAExecutable(b, "jesuMusic", "examples/jesuMusic/jesuMusic.zig", .{});
-    gba.tiles.convertSaveImagePath(
-        []gba.tiles.ColorRgb24,
-        "examples/jesuMusic/charset.png",
-        "examples/jesuMusic/charset.bin",
-        .{
-            .allocator = std.heap.page_allocator,
-            .bpp = .bpp_4,
-            .palette_fn = gba.tiles.getNearestPaletteColor,
-            .palette_ctx = jesuMusic_palette[0..],
+    var jesuMusic = b.addExecutable(.{
+        .name = "jesuMusic",
+        .root_source_file = b.path("examples/jesuMusic/jesuMusic.zig"),
+    });
+    const jesuMusic_pal = gba.color.PalettizerNearest.create(
+        b.allocator(),
+        &[_]gba.color.ColorRgba32 {
+            .transparent,
+            .white,
+            .black,
         },
-    ) catch {};
+    ) catch @panic("OOM");
+    _ = jesuMusic.addConvertImageTiles4BppStep(.{
+        .image_path = "examples/jesuMusic/charset.png",
+        .output_path = "examples/jesuMusic/charset.bin",
+        .options = .{ .palettizer = jesuMusic_pal.pal() },
+    });
 
-    const mode4flip = gba.addGBAExecutable(b, "mode4flip", "examples/mode4flip/mode4flip.zig", .{});
-    gba.convertMode4Images(mode4flip, &[_]gba.ImageSourceTarget{
-        .{
-            .source = "examples/mode4flip/front.bmp",
-            .target = "examples/mode4flip/front.agi",
-        },
-        .{
-            .source = "examples/mode4flip/back.bmp",
-            .target = "examples/mode4flip/back.agi",
-        },
-    }, "examples/mode4flip/mode4flip.agp");
+    var mode4flip = b.addExecutable(.{
+        .name = "mode4flip",
+        .root_source_file = b.path("examples/mode4flip/mode4flip.zig"),
+    });
+    const mode4flip_pal = gba.color.PalettizerNaive.create(
+        b.allocator(),
+        256,
+    ) catch @panic("OOM");
+    var mode4flip_pal_step = mode4flip.addSaveQuantizedPalettizerPaletteStep(.{
+        .palettizer = mode4flip_pal.pal(),
+        .output_path = "examples/mode4flip/mode4flip.agp",
+    });
+    const mode4flip_front_step = mode4flip.addConvertImageBitmap8BppStep(.{
+        .image_path = "examples/mode4flip/front.bmp",
+        .output_path = "examples/mode4flip/front.agi",
+        .options = .{ .palettizer = mode4flip_pal.pal() },
+    });
+    const mode4flip_back_step = mode4flip.addConvertImageBitmap8BppStep(.{
+        .image_path = "examples/mode4flip/back.bmp",
+        .output_path = "examples/mode4flip/back.agi",
+        .options = .{ .palettizer = mode4flip_pal.pal() },
+    });
+    mode4flip_pal_step.step.dependOn(&mode4flip_front_step.step);
+    mode4flip_pal_step.step.dependOn(&mode4flip_back_step.step);
     
-    // Tests
+    // Run tests with `zig build test`.
     
-    const test_fixed = b.addRunArtifact(b.addTest(.{
-        .root_source_file = b.path("src/gba/fixed.zig"),
+    const test_math = std_b.addRunArtifact(std_b.addTest(.{
+        .root_source_file = std_b.path("src/gba/math.zig"),
     }));
-    const test_format = b.addRunArtifact(b.addTest(.{
-        .root_source_file = b.path("src/gba/format.zig"),
+    const test_format = std_b.addRunArtifact(std_b.addTest(.{
+        .root_source_file = std_b.path("src/gba/format.zig"),
     }));
 
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&test_fixed.step);
+    const test_step = std_b.step("test", "Run unit tests");
+    test_step.dependOn(&test_math.step);
     test_step.dependOn(&test_format.step);
 }

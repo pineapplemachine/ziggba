@@ -8,7 +8,7 @@ const gba = @import("gba.zig");
 /// ZigGBA initializes this at startup to point to `isr_default`.
 /// Don't change this unless you're sure you know what you're doing!
 pub const isr_ptr: *volatile *const fn() callconv(.c) void = (
-    @ptrFromInt(gba.mem.iwram + 0x7ffc)
+    @ptrCast(gba.mem.io.reg_isr_main)
 );
 
 /// Default interrupt service routine, implemented in assembly.
@@ -49,6 +49,7 @@ pub const Interrupt = enum(u4) {
     gamepak = 0xd,
 };
 
+/// Contains a flag for each hardware interrupt type.
 pub const InterruptFlags = packed struct(u16) {
     /// LCD VBlank interrupt.
     /// Interrupts occur according to settings specified in REG_DISPSTAT.
@@ -168,7 +169,7 @@ pub const InterruptFlags = packed struct(u16) {
     }
 };
 
-/// Represents the content of REG_IME.
+/// Represents the contents of REG_IME.
 pub const Master = packed struct(u32) {
     /// Master interrupt enable flag.
     ///
@@ -195,7 +196,7 @@ pub fn acknowledge(interrupt: Interrupt) void {
 /// to avoid spurious interrupts.
 ///
 /// Corresponds to REG_IE.
-pub const enable: *volatile InterruptFlags = @ptrFromInt(gba.mem.io + 0x200);
+pub const enable: *volatile InterruptFlags = @ptrCast(gba.mem.io.reg_ie);
 
 /// Interrupt request and IRQ acknowledge flags.
 /// Active interrupt requests can be read from this register.
@@ -206,13 +207,12 @@ pub const enable: *volatile InterruptFlags = @ptrFromInt(gba.mem.io + 0x200);
 /// The `acknowledge` function can help with this.
 ///
 /// Corresponds to REG_IF.
-pub const irq_ack: *volatile InterruptFlags = @ptrFromInt(gba.mem.io + 0x202);
+pub const irq_ack: *volatile InterruptFlags = @ptrCast(gba.mem.io.reg_if);
 
 /// Additional IRQ acknowledge flags, to be used with BIOS calls which
 /// require interrupts.
-///
 /// Corresponds to REG_IFBIOS.
-pub const irq_ack_bios: *volatile InterruptFlags = @ptrFromInt(gba.mem.iwram + 0x7ff8);
+pub const irq_ack_bios: *volatile InterruptFlags = @ptrCast(gba.mem.io.reg_ifbios);
 
 /// Corresponds to REG_IME.
-pub const master: *volatile Master = @ptrFromInt(gba.mem.io + 0x208);
+pub const master: *volatile Master = @ptrCast(gba.mem.io.reg_ime);

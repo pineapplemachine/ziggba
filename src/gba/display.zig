@@ -1,11 +1,24 @@
-const std = @import("std");
 const gba = @import("gba.zig");
-const Color = gba.Color;
-const display = @This();
 
-pub const window = @import("display_window.zig");
+// Blending-related imports.
+pub const Blend = @import("display_blend.zig").Blend;
+pub const blend = @import("display_blend.zig").blend;
 
-pub const vram = @import("display_vram.zig").vram;
+// Imports related to REG_DISPCNT.
+pub const Mode = @import("display_ctrl.zig").Mode;
+pub const Control = @import("display_ctrl.zig").Control;
+pub const ctrl = @import("display_ctrl.zig").ctrl;
+
+// Palette-related imports.
+pub const Palette = @import("display_palette.zig").Palette;
+pub const bg_palette = @import("display_palette.zig").bg_palette;
+pub const obj_palette = @import("display_palette.zig").obj_palette;
+pub const memcpyBackgroundPalette = @import("display_palette.zig").memcpyBackgroundPalette;
+pub const memcpyBackgroundPaletteBank = @import("display_palette.zig").memcpyBackgroundPaletteBank;
+pub const memcpyObjectPalette = @import("display_palette.zig").memcpyObjectPalette;
+pub const memcpyObjectPaletteBank = @import("display_palette.zig").memcpyObjectPaletteBank;
+
+// Imports for types and definitions related to VRAM.
 pub const Screenblock = @import("display_vram.zig").Screenblock;
 pub const BackgroundMap = @import("display_vram.zig").BackgroundMap;
 pub const AffineBackgroundMap = @import("display_vram.zig").AffineBackgroundMap;
@@ -20,6 +33,7 @@ pub const bg_charblocks = @import("display_vram.zig").bg_charblocks;
 pub const bg_charblock_tiles = @import("display_vram.zig").bg_charblock_tiles;
 pub const obj_charblocks = @import("display_vram.zig").obj_charblocks;
 pub const obj_charblock_tiles = @import("display_vram.zig").obj_charblock_tiles;
+pub const TileBpp = @import("display_vram.zig").TileBpp;
 pub const Tile4Bpp = @import("display_vram.zig").Tile4Bpp;
 pub const Tile8Bpp = @import("display_vram.zig").Tile8Bpp;
 pub const memcpyTiles4Bpp = @import("display_vram.zig").memcpyTiles4Bpp;
@@ -29,28 +43,46 @@ pub const memcpyBackgroundTiles8Bpp = @import("display_vram.zig").memcpyBackgrou
 pub const memcpyObjectTiles4Bpp = @import("display_vram.zig").memcpyObjectTiles4Bpp;
 pub const memcpyObjectTiles8Bpp = @import("display_vram.zig").memcpyObjectTiles8Bpp;
 
-pub const Palette = @import("display_palette.zig").Palette;
-pub const bg_palette = @import("display_palette.zig").bg_palette;
-pub const obj_palette = @import("display_palette.zig").obj_palette;
-pub const memcpyBackgroundPalette = @import("display_palette.zig").memcpyBackgroundPalette;
-pub const memcpyBackgroundPaletteBank = @import("display_palette.zig").memcpyBackgroundPaletteBank;
-pub const memcpyObjectPalette = @import("display_palette.zig").memcpyObjectPalette;
-pub const memcpyObjectPaletteBank = @import("display_palette.zig").memcpyObjectPaletteBank;
+// Window-related imports.
+pub const Window = @import("display_window.zig").Window;
+pub const window = @import("display_window.zig").window;
 
-var current_page_addr: u32 = gba.mem.vram;
+/// Width of GBA video output, in pixels.
+pub const screen_width = 240;
 
-pub const back_page: [*]volatile u16 = @ptrFromInt(gba.mem.vram + 0xA000);
+/// Height of GBA video output, in pixels.
+pub const screen_height = 160;
 
-pub const Flip = packed struct(u2) {
-    h: bool = false,
-    v: bool = false,
-};
+/// Size of GBA video output in pixels, represented as a vector.
+pub const screen_size: gba.math.Vec2U8 = (
+    .init(screen_width, screen_height)
+);
 
+/// Width of GBA video output, in 8x8 pixel tiles.
+pub const screen_width_tiles = 30;
+
+/// Height of GBA video output, in 8x8 pixel tiles.
+pub const screen_height_tiles = 20;
+
+/// Size of GBA video output in tiles, represented as a vector.
+pub const screen_size_tiles: gba.math.Vec2U8 = (
+    .init(screen_width_tiles, screen_height_tiles)
+);
+
+// TODO: Relocate this
+var current_page_addr: u32 = gba.mem.vram_address;
+
+// TODO: Relocate this
+pub const back_page: [*]volatile u16 = (
+    @ptrFromInt(gba.mem.vram_address + 0xa000)
+);
+
+// TODO: Relocate this
 fn pageSize() u17 {
     return switch (ctrl.mode) {
-        .mode3 => gba.bitmap.Mode3.page_size,
-        .mode4 => gba.bitmap.Mode4.page_size,
-        .mode5 => gba.bitmap.Mode5.page_size,
+        .mode_3 => gba.bitmap.Mode3.page_size,
+        .mode_4 => gba.bitmap.Mode4.page_size,
+        .mode_5 => gba.bitmap.Mode5.page_size,
         else => 0,
     };
 }
@@ -63,7 +95,7 @@ pub fn currentPage() []volatile u16 {
 // TODO: This might make more sense elsewhere
 pub fn pageFlip() void {
     switch (ctrl.mode) {
-        .mode4, .mode5 => {
+        .mode_4, .mode_5 => {
             current_page_addr ^= 0xA000;
             ctrl.page_select ^= 1;
         },
@@ -71,72 +103,15 @@ pub fn pageFlip() void {
     }
 }
 
-pub const ObjMapping = enum(u1) {
-    /// Tiles are stored in rows of 32 * 64 bytes
-    two_dimensions,
-    /// Tiles are stored sequentially
-    one_dimension,
-};
-
+// TODO: Document this
 pub const Priority = enum(u2) {
-    highest,
-    high,
-    low,
-    lowest,
+    highest = 0,
+    high = 1,
+    low = 2,
+    lowest = 3,
 };
 
-pub const Control = packed struct(u16) {
-    /// Controls the capabilities of background layers
-    ///
-    /// Modes 0-2 are tile modes, modes 3-5 are bitmap modes
-    pub const Mode = enum(u3) {
-        /// Tiled mode
-        ///
-        /// Provides 4 normal background layers (0-3)
-        mode0,
-        /// Tiled mode
-        ///
-        /// Provides 2 normal (0, 1) and one affine (2) background layer
-        mode1,
-        /// Tiled mode
-        ///
-        /// Provides 2 affine (2, 3) background layers
-        mode2,
-        /// Bitmap mode
-        ///
-        /// Provides a 16bpp full screen bitmap frame
-        mode3,
-        /// Bitmap mode
-        ///
-        /// Provides two 8bpp (256 color palette) frames
-        mode4,
-        /// Bitmap mode
-        ///
-        /// Provides two 16bpp 160x128 pixel frames
-        mode5,
-    };
-    
-    mode: Mode = .mode0,
-    /// Read only, should stay false
-    gbc_mode: bool = false,
-    page_select: u1 = 0,
-    oam_access_in_hblank: bool = false,
-    obj_mapping: ObjMapping = .two_dimensions,
-    force_blank: bool = false,
-    bg0: bool = false,
-    bg1: bool = false,
-    bg2: bool = false,
-    bg3: bool = false,
-    obj: bool = false,
-    window_0: bool = false,
-    window_1: bool = false,
-    window_obj: bool = false,
-};
-
-/// Display control register. Corresponds to REG_DISPCNT.
-pub const ctrl: *volatile display.Control = @ptrFromInt(gba.mem.io);
-
-/// Represents the contents of REG_DISPSTAT.
+/// Represents the structure of the display status register REG_DISPSTAT.
 pub const Status = packed struct(u16) {
     /// Enumeration of possible states for VBlank and HBlank, per the
     /// `vblank` and `hblank` status flags.
@@ -172,88 +147,35 @@ pub const Status = packed struct(u16) {
     vcount_select: u8 = 0,
 };
 
-/// Display Status Register
-///
-/// (`REG_DISPSTAT`)
-pub const status: *volatile display.Status = @ptrFromInt(gba.mem.io + 0x04);
+/// Display status register. Corresponds to REG_DISPSTAT.
+pub const status: *volatile Status = @ptrCast(gba.mem.io.reg_dispstat);
 
-/// Current y location of the LCD hardware
-///
-/// (`REG_VCOUNT`)
-pub const vcount: *align(2) const volatile u8 = @ptrFromInt(gba.mem.io + 0x06);
+/// Indicates the currently drawn scanline. Read-only.
+/// Corresponds to REG_VCOUNT.
+/// Values range from 0 through 227. Values 160 through 227 indicate hidden
+/// scanlines within the VBlank area.
+pub const vcount: *align(2) const volatile u8 = @ptrCast(gba.mem.io.reg_vcount);
 
-/// Wait until VBlank.
-/// You probably want to use `gba.bios.vblankIntrWait` instead of this.
+/// This function runs in a loop until the next VBlank starts.
+/// You probably want to enable interrupts and use
+/// `gba.bios.vblankIntrWait` instead of this.
 pub fn naiveVSync() void {
-    while (vcount.* >= 160) {} // wait till VDraw
-    while (vcount.* < 160) {} // wait till VBlank
+    while(vcount.* >= 160) {} // wait for VDraw
+    while(vcount.* < 160) {} // wait for VBlank
 }
 
-/// Describes a mosaic effect
+/// Describes a mosaic effect.
+/// Represents the structure of REG_MOSAIC.
 pub const Mosaic = packed struct(u16) {
-    pub const Size = packed struct(u8) {
-        x: u4 = 0,
-        y: u4 = 0,
-    };
-
-    bg: Mosaic.Size = .{},
-    sprite: Mosaic.Size = .{},
+    /// Mosaic pixel size for backgrounds.
+    /// The actual size in pixels will be `bg_size + 1`.
+    bg_size: gba.math.Vec2(u4) = .zero,
+    /// Mosaic pixel size for objects/sprites.
+    /// The actual size in pixels will be `obj_size + 1`.
+    obj_size: gba.math.Vec2(u4) = .zero,
 };
 
-/// Controls size of mosaic effects for backgrounds and sprites where it is active
-///
-/// (`REG_MOSAIC`)
-pub const mosaic: *volatile Mosaic = @ptrFromInt(gba.mem.io + 0x4C);
-
-// TODO: One struct per hardware register
-/// Represents the contents of REG_BLDCNT, REG_BLDALPHA, and REG_BLDY.
-pub const Blend = packed struct(u48) {
-    pub const Layers = packed struct(u6) {
-        bg0: bool = false,
-        bg1: bool = false,
-        bg2: bool = false,
-        bg3: bool = false,
-        obj: bool = false,
-        backdrop: bool = false,
-    };
-
-    /// Enumeration of blending modes.
-    pub const Mode = enum(u2) {
-        /// No blending. Blending effects are disabled.
-        none,
-        /// Blend A and B layers.
-        blend,
-        /// Blend A with white.
-        white,
-        /// Blend A with black.
-        black,
-    };
-
-    /// Select target layers for blend A.
-    a: Blend.Layers,
-    /// Determines blending behavior.
-    mode: Blend.Mode,
-    /// Select target layers for blend B.
-    b: Blend.Layers,
-    /// Blend weight for blend A. Clamped to a maximum of 16.
-    ev_a: u5,
-    /// Unused bits.
-    _0: u3,
-    /// Blend weight for blend B. Clamped to a maximum of 16.
-    /// Used as a ratio with `ev_a` when `mode` is `Mode.blend`.
-    ev_b: u5,
-    /// Unused bits.
-    _1: u3,
-    /// Blend weight for white or black. Clamped to a maximum of 16.
-    /// Used as a ratio with `ev_a` when `mode` is `Mode.white` or
-    /// `Mode.black`.
-    ///
-    /// Write-only.
-    ev_y: u5,
-    /// Unused bits.
-    _2: u27,
-};
-
-/// Controls for alpha blending.
-/// Corresponds to REG_BLDCNT, REG_BLDALPHA, and REG_BLDY.
-pub const blend: *volatile Blend = @ptrFromInt(gba.mem.io + 0x50);
+/// Controls size of mosaic effects for backgrounds and sprites,
+/// where they are active. Write-only.
+/// Corresponds to REG_MOSAIC.
+pub const mosaic: *volatile Mosaic = @ptrCast(gba.mem.io.reg_mosaic);

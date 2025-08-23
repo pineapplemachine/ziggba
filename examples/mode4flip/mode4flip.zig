@@ -7,16 +7,13 @@ const back_image_data align(4) = @embedFile("back.agi").*;
 const palette_data align(4) = @embedFile("mode4flip.agp").*;
 
 fn loadImageData() void {
-    gba.mem.memcpy(gba.display.vram, &front_image_data, front_image_data.len);
+    gba.mem.memcpy(gba.mem.vram, &front_image_data, front_image_data.len);
     gba.mem.memcpy(gba.display.back_page, &back_image_data, back_image_data.len);
     gba.mem.memcpy(gba.display.bg_palette, &palette_data, palette_data.len);
 }
 
 pub export fn main() void {
-    gba.display.ctrl.* = .{
-        .mode = .mode4,
-        .bg2 = true,
-    };
+    gba.display.ctrl.* = .initMode4(.{});
 
     loadImageData();
 

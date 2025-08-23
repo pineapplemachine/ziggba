@@ -55,14 +55,14 @@ fn handleInterrupt(flags: gba.interrupt.InterruptFlags) callconv(.c) void {
 
 pub export fn main() void {
     // Initialize a color palette.
-    gba.display.bg_palette.banks[0][0] = gba.Color.black;
-    gba.display.bg_palette.banks[0][1] = gba.Color.white;
-    gba.display.bg_palette.banks[0][2] = gba.Color.rgb(20, 20, 22);
+    gba.display.bg_palette.banks[0][0] = .black;
+    gba.display.bg_palette.banks[0][1] = .white;
+    gba.display.bg_palette.banks[0][2] = .rgb(20, 20, 22);
     
     // Initialize a background, to be used for displaying text.
     gba.bg.ctrl[0] = .{
-        .screen_base_block = 31,
-        .tile_map_size = .{ .normal = .size_32x32 },
+        .base_screenblock = 31,
+        .size = .normal_32x32,
     };
     const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
     normal_bg_map.getBaseScreenblock().fillLinear(.{});
@@ -115,13 +115,13 @@ pub export fn main() void {
     gba.interrupt.enable.serial = true;
     // DMA
     gba.interrupt.enable.dma_0 = true;
-    gba.dma[0].ctrl.interrupt = true;
+    gba.mem.dma[0].ctrl.interrupt = true;
     gba.interrupt.enable.dma_1 = true;
-    gba.dma[1].ctrl.interrupt = true;
+    gba.mem.dma[1].ctrl.interrupt = true;
     gba.interrupt.enable.dma_2 = true;
-    gba.dma[2].ctrl.interrupt = true;
+    gba.mem.dma[2].ctrl.interrupt = true;
     gba.interrupt.enable.dma_3 = true;
-    gba.dma[3].ctrl.interrupt = true;
+    gba.mem.dma[3].ctrl.interrupt = true;
     // Keypad
     gba.interrupt.enable.keypad = true;
     gba.input.interrupt.* = gba.input.InterruptControl{

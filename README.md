@@ -20,8 +20,6 @@ With `git` and `zig` installed, follow these steps to download ZigGBA and build 
 git clone https://github.com/pineapplemachine/ziggba.git
 # Navigate to the downloaded directory
 cd ziggba
-# Download submodule dependencies
-git submodule update --init
 # Build `gba.text` font data used by examples
 zig build font
 # Compile example ROMs, outputted to `zig-out/bin/`
@@ -29,6 +27,10 @@ zig build
 ```
 
 ZigGBA's `zig build` will write example ROMs to `zig-out/bin/`. These are files with a `*.gba` extension which can be run on a GBA using special hardware, or which can run in emulators such as [mGBA](https://github.com/mgba-emu/mgba), [Mesen](https://github.com/SourMesen/Mesen2/), [no$gba](https://problemkaputt.de/gba.htm), and [NanoBoyAdvance](https://github.com/nba-emu/NanoBoyAdvance).
+
+Pass the `-Dgdb` flag to `zig build` to also output an `*.elf` file containing debug symbols.
+
+See the [ziggba-example](github.com/pineapplemachine/ziggba-example) repository for an example of a project which uses ZigGBA as a dependency.
 
 ## Showcase
 

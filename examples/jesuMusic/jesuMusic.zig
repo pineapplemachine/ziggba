@@ -763,13 +763,8 @@ pub export fn main() void {
     };
 
     // Initialize sound registers to allow playback.
-    gba.sound.status.* = gba.sound.Status{
-        .pulse_1 = true,
-        .pulse_2 = true,
-        .noise = true,
-        .master = true,
-    };
-    gba.sound.dmg.* = gba.sound.Dmg{
+    gba.sound.status.* = .init(true);
+    gba.sound.ctrl.dmg = gba.sound.Control.Dmg{
         .volume_left = 0x7,
         .volume_right = 0x7,
         .left_pulse_1 = true,
@@ -785,12 +780,12 @@ pub export fn main() void {
 
     // Initialize graphics.
     const bg0_ctrl = gba.bg.Control{
-        .screen_base_block = 24,
-        .tile_map_size = .{ .normal = .size_32x32 },
+        .base_screenblock = 24,
+        .size = .normal_32x32,
     };
     var map = gba.display.BackgroundMap.initCtrl(bg0_ctrl);
     gba.bg.ctrl[0] = bg0_ctrl;
-    gba.bg.scroll[0].set(0, 0);
+    gba.bg.scroll[0] = .zero;
     gba.display.bg_palette.banks[0][1] = .rgb(31, 31, 31);
     gba.display.bg_palette.banks[0][2] = .rgb(0, 0, 0);
     gba.display.bg_palette.banks[1][1] = .rgb(31, 31, 31);

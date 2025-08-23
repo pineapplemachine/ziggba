@@ -9,6 +9,11 @@ const assert = @import("std").debug.assert;
 
 const build_options = @import("ziggba_build_options");
 
+// Import Unicode-related helpers.
+pub const CodePointAlignment = @import("text_unicode.zig").CodePointAlignment;
+pub const getCodePointAlignment = @import("text_unicode.zig").getCodePointAlignment;
+pub const CodePointIterator = @import("text_unicode.zig").CodePointIterator;
+
 // The seemingly obvious solution of using an optional pointer for a
 // `Charset` without data causes the compiler to crash in 0.14.1.
 // https://github.com/ziglang/zig/issues/24593
@@ -173,36 +178,22 @@ pub const charset_kana = Charset{
     .data = &charset_kana_data,
 };
 
-const charset_fullwidth_punctuation_data align(2) = blk: {
-    if (build_options.text_charset_fullwidth_punctuation) {
-        break :blk @embedFile("ziggba_font_fullwidth_punctuation.bin").*;
+const charset_fullwidth_data align(2) = blk: {
+    if (build_options.text_charset_fullwidth) {
+        break :blk @embedFile("ziggba_font_fullwidth.bin").*;
     }
     else {
         break :blk charset_data_empty;
     }
 };
-pub const charset_fullwidth_punctuation = Charset{
-    .enabled = build_options.text_charset_fullwidth_punctuation,
+pub const charset_fullwidth = Charset{
+    .enabled = build_options.text_charset_fullwidth,
     .code_point_min = 0xff00,
-    .code_point_max = 0xff1f,
-    .data = &charset_fullwidth_punctuation_data,
-};
-
-const charset_fullwidth_latin_data align(2) = blk: {
-    if (build_options.text_charset_fullwidth_latin) {
-        break :blk @embedFile("ziggba_font_fullwidth_latin.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_fullwidth_latin = Charset{
-    .enabled = build_options.text_charset_fullwidth_latin,
-    .code_point_min = 0xff20,
     .code_point_max = 0xff60,
-    .data = &charset_fullwidth_latin_data,
+    .data = &charset_fullwidth_data,
 };
 
+/// List of all supported charsets.
 pub const all_charsets = [_]Charset{
     charset_latin,
     charset_latin_supplement,
@@ -211,8 +202,7 @@ pub const all_charsets = [_]Charset{
     charset_arrows,
     charset_cjk_symbols,
     charset_kana,
-    charset_fullwidth_punctuation,
-    charset_fullwidth_latin,
+    charset_fullwidth,
 };
 
 const num_enabled_charsets: u8 = blk: {
@@ -223,6 +213,8 @@ const num_enabled_charsets: u8 = blk: {
     break :blk count;
 };
 
+/// List of all supported charsets whose font image data has been embedded
+/// based on ZigGBA's build options.
 pub const enabled_charsets = blk: {
     var array: [num_enabled_charsets]Charset = @splat(.none);
     var array_index: u8 = 0;
@@ -234,71 +226,6 @@ pub const enabled_charsets = blk: {
     }
     assert(array_index == array.len);
     break :blk array;
-};
-
-/// This type can be used to decode and iterator Unicode code points in
-/// a UTF-8 encoded string.
-///
-/// This implementation does not validate that the input is well-formed
-/// UTF-8 text. The output may be unpredictable when the iterator attempts
-/// to decode invalid UTF-8.
-const CodePointIterator = struct {
-    /// UTF-8 encoded text.
-    text: []const u8,
-    /// Current byte index within the encoded text.
-    index: u32 = 0,
-    
-    pub fn init(text: []const u8) CodePointIterator {
-        return CodePointIterator{ .text = text };
-    }
-    
-    /// Decode and return the next Unicode code point.
-    /// Returns -1 upon reaching the end of the encoded text.
-    /// Return value is undefined when the input is not valid UTF-8.
-    pub fn next(self: *CodePointIterator) i32 {
-        if(self.index >= self.text.len) {
-            return -1;
-        }
-        const ch0: i32 = self.text[self.index];
-        self.index += 1;
-        if((ch0 & 0x80) == 0) {
-            return ch0;
-        }
-        if((ch0 & 0xe0) == 0xc0) {
-            const ch1: i32 = self.continuation();
-            return ((ch0 & 0x1f) << 6) | ch1;
-        }
-        if((ch0 & 0xf0) == 0xe0) {
-            const ch1: i32 = self.continuation();
-            const ch2: i32 = self.continuation();
-            return ((ch0 & 0x0f) << 12) | (ch1 << 6) | ch2;
-        }
-        if((ch0 & 0xf8) == 0xf0) {
-            const ch1: i32 = self.continuation();
-            const ch2: i32 = self.continuation();
-            const ch3: i32 = self.continuation();
-            return ((ch0 & 0x07) << 18) | (ch1 << 12) | (ch2 << 6) | ch3;
-        }
-        return 0;
-    }
-    
-    /// Decode the next code point without advancing the position of
-    /// the iterator.
-    pub fn peek(self: CodePointIterator) i32 {
-        const iter = CodePointIterator{ .text = self.text, .index = self.index };
-        return iter.next();
-    }
-    
-    /// Helper function used by `CodePointIterator.next` to fetch the
-    /// next continuation byte.
-    fn continuation(self: *CodePointIterator) u8 {
-        if(self.index >= self.text.len) {
-            return 0;
-        }
-        const unit = self.text[self.index];
-        self.index += 1;
-        return unit & 0x3f;
-    }
 };
 
 const GlyphLayoutIterator = struct {
@@ -341,47 +268,6 @@ const GlyphLayoutIterator = struct {
             return self.data == null;
         }
     };
-    
-    pub const GlyphAlignment = enum {
-        /// Normal character alignment.
-        /// Reserves as much horizontal space as it needs and no more.
-        normal,
-        /// Fullwidth character, aligned to the left side of its reserved space.
-        fullwidth_left,
-        /// Fullwidth character, aligned to the right side of its reserved space.
-        fullwidth_right,
-        /// Fullwidth character, horizontally centered within its reserved space.
-        fullwidth_center,
-    };
-    
-    /// Get alignment for the glyph corresponding to a given code point.
-    pub inline fn getGlyphAlignment(point: i32) GlyphAlignment {
-        return switch(point) {
-            // CJK Symbols and Punctuation
-            0x3000 => .fullwidth_center,
-            0x3001, 0x3002 => .fullwidth_left, // '、' '。'
-            0x3003...0x3007 => .fullwidth_center,
-            0x3008, 0x300a, 0x300c, 0x300e, 0x3010 => .fullwidth_right, // brackets
-            0x3009, 0x300b, 0x300d, 0x300f, 0x3011 => .fullwidth_left, // brackets
-            0x3012, 0x3013 => .fullwidth_center,
-            0x3014, 0x3016, 0x3018, 0x301a => .fullwidth_right, // more brackets
-            0x3015, 0x3017, 0x3019, 0x301b => .fullwidth_left, // more brackets
-            0x301c => .fullwidth_center,
-            0x301d => .fullwidth_right, // quotation mark
-            0x301e, 0x301f => .fullwidth_left, // quotation marks
-            0x3020...0x3029 => .fullwidth_center,
-            0x302a, 0x302b => .fullwidth_left, // tone marks
-            0x302c, 0x302d => .fullwidth_right, // tone marks
-            0x302e, 0x302f => .fullwidth_left, // more tone marks
-            0x3030...0x303f => .fullwidth_center,
-            // Hiragana, Katakana
-            0x3040...0x30ff => .fullwidth_center,
-            // Fullwidth Forms
-            0xff00...0xff60 => .fullwidth_center,
-            // Everything else...
-            else => .normal,
-        };
-    }
     
     pub const InitOptions = struct {
         text: []const u8,
@@ -482,7 +368,7 @@ const GlyphLayoutIterator = struct {
         return .unknown;
     }
     
-    /// Helper called by `GlyphLayoutIterator.next` for a matching charset.bdg
+    /// Helper called by `GlyphLayoutIterator.next` for a matching charset.
     fn layoutGlyph(
         self: *GlyphLayoutIterator,
         charset: Charset,
@@ -490,7 +376,7 @@ const GlyphLayoutIterator = struct {
     ) Glyph {
         assert(point >= 0);
         assert(charset.hasData());
-        const glyph_align = getGlyphAlignment(point);
+        const glyph_align = getCodePointAlignment(point);
         const header = charset.getHeader(
             @as(u16, @intCast(point)) - charset.code_point_min
         );
