@@ -250,11 +250,14 @@ pub const BackgroundMap = struct {
         screenblock.set(@truncate(x), @truncate(y), entry);
     }
     
+    /// Get the `Screeblock` at a given offset from this background's
+    /// `base_screenblock` index.
     pub fn getScreenblock(self: BackgroundMap, i: u2) *volatile Screenblock {
         assert(i < self.getScreenblockCount());
         return &screenblocks[self.base_screenblock + i];
     }
     
+    /// Get the first `Screenblock` used by this background.
     pub fn getBaseScreenblock(self: BackgroundMap) *volatile Screenblock {
         return &screenblocks[self.base_screenblock];
     }

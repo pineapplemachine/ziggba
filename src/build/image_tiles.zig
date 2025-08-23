@@ -27,7 +27,7 @@ const ConvertImageTilesOutput = struct {
     count: u16,
 };
 
-const ConvertImageTilesError = error{
+const ConvertImageTilesError = error {
     /// The image width and height were not both multiples of 8 pixels,
     /// and the "pad_tiles" option was not used.
     UnexpectedImageSize,
@@ -42,7 +42,7 @@ const ConvertImageTilesError = error{
 
 
 /// Errors that may be produced by `convertImageTiles4Bpp`.
-pub const ConvertImageTiles4BppError = ConvertImageTilesError || error{
+pub const ConvertImageTiles4BppError = ConvertImageTilesError || error {
     /// Palettizer returned a color index greater than 15.
     UnexpectedPaletteIndex,
 };
