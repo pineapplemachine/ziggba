@@ -10,14 +10,14 @@ const assert = @import("std").debug.assert;
 
 // Imports for math-related BIOS calls.
 pub const DivResult = @import("bios_math.zig").DivResult;
-pub const BgAffineSource = @import("bios_math.zig").BgAffineSource;
-pub const ObjAffineSource = @import("bios_math.zig").ObjAffineSource;
 pub const div = @import("bios_math.zig").div;
 pub const divArm = @import("bios_math.zig").divArm;
 pub const sqrt = @import("bios_math.zig").sqrt;
 pub const arctan = @import("bios_math.zig").arctan;
 pub const arctan2 = @import("bios_math.zig").arctan2;
+pub const BgAffineSetOptions = @import("bios_math.zig").BgAffineSetOptions;
 pub const bgAffineSet = @import("bios_math.zig").bgAffineSet;
+pub const ObjAffineSetOptions = @import("bios_math.zig").ObjAffineSetOptions;
 pub const objAffineSetOam = @import("bios_math.zig").objAffineSetOam;
 pub const objAffineSetStruct = @import("bios_math.zig").objAffineSetStruct;
 pub const objAffineSet = @import("bios_math.zig").objAffineSet;
