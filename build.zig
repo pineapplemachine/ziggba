@@ -123,20 +123,22 @@ pub fn build(std_b: *std.Build) void {
         b.allocator(),
         256,
     ) catch @panic("OOM");
-    _ = mode4flip.addConvertImageBitmap8BppStep(.{
+    var mode4flip_pal_step = mode4flip.addSaveQuantizedPalettizerPaletteStep(.{
+        .palettizer = mode4flip_pal.pal(),
+        .output_path = "examples/mode4flip/mode4flip.agp",
+    });
+    const mode4flip_front_step = mode4flip.addConvertImageBitmap8BppStep(.{
         .image_path = "examples/mode4flip/front.bmp",
         .output_path = "examples/mode4flip/front.agi",
         .options = .{ .palettizer = mode4flip_pal.pal() },
     });
-    _ = mode4flip.addConvertImageBitmap8BppStep(.{
+    const mode4flip_back_step = mode4flip.addConvertImageBitmap8BppStep(.{
         .image_path = "examples/mode4flip/back.bmp",
         .output_path = "examples/mode4flip/back.agi",
         .options = .{ .palettizer = mode4flip_pal.pal() },
     });
-    _ = mode4flip.addSaveQuantizedPalettizerPaletteStep(.{
-        .palettizer = mode4flip_pal.pal(),
-        .output_path = "examples/mode4flip/mode4flip.agp",
-    });
+    mode4flip_pal_step.step.dependOn(&mode4flip_front_step.step);
+    mode4flip_pal_step.step.dependOn(&mode4flip_back_step.step);
     
     // Tests
     
