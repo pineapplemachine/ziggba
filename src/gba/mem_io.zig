@@ -34,46 +34,46 @@ pub const reg_dispstat: *align(4) volatile u16 = @ptrFromInt(io_address + 0x0004
 /// REG_VCOUNT. See `gba.display.vcount`.
 pub const reg_vcount: *volatile u16 = @ptrFromInt(io_address + 0x0006);
 
-/// REG_BGCNT. See also `gba.bg.ctrl`.
+/// REG_BGCNT. See also `gba.display.bg_ctrl`.
 pub const reg_bgcnt: *align(4) volatile [4]u16 = @ptrFromInt(io_address + 0x0008);
 
-/// REG_BG0CNT. See also `gba.bg.ctrl[0]`.
+/// REG_BG0CNT. See also `gba.display.bg_ctrl[0]`.
 pub const reg_bg0cnt: *align(4) volatile u16 = @ptrFromInt(io_address + 0x0008);
 
-/// REG_BG1CNT. See also `gba.bg.ctrl[1]`.
+/// REG_BG1CNT. See also `gba.display.bg_ctrl[1]`.
 pub const reg_bg1cnt: *volatile u16 = @ptrFromInt(io_address + 0x000a);
 
-/// REG_BG2CNT. See also `gba.bg.ctrl[2]`.
+/// REG_BG2CNT. See also `gba.display.bg_ctrl[2]`.
 pub const reg_bg2cnt: *align(4) volatile u16 = @ptrFromInt(io_address + 0x000c);
 
-/// REG_BG3CNT. See also `gba.bg.ctrl[3]`.
+/// REG_BG3CNT. See also `gba.display.bg_ctrl[3]`.
 pub const reg_bg3cnt: *volatile u16 = @ptrFromInt(io_address + 0x000e);
 
-/// REG_BG_OFS. See also `gba.bg.scroll`.
+/// REG_BG_OFS. See also `gba.display.bg_scroll`.
 pub const reg_bg_ofs: *align(4) volatile [4][2]u16 = @ptrFromInt(io_address + 0x0010);
 
-/// REG_BG0HOFS. See also `gba.bg.scroll[0].x`.
+/// REG_BG0HOFS. See also `gba.display.bg_scroll[0].x`.
 pub const reg_bg0hofs: *align(4) volatile u16 = @ptrFromInt(io_address + 0x0010);
 
-/// REG_BG0VOFS. See also `gba.bg.scroll[0].y`.
+/// REG_BG0VOFS. See also `gba.display.bg_scroll[0].y`.
 pub const reg_bg0vofs: *volatile u16 = @ptrFromInt(io_address + 0x0012);
 
-/// REG_BG1HOFS. See also `gba.bg.scroll[1].x`.
+/// REG_BG1HOFS. See also `gba.display.bg_scroll[1].x`.
 pub const reg_bg1hofs: *align(4) volatile u16 = @ptrFromInt(io_address + 0x0014);
 
-/// REG_BG1VOFS. See also `gba.bg.scroll[1].y`.
+/// REG_BG1VOFS. See also `gba.display.bg_scroll[1].y`.
 pub const reg_bg1vofs: *volatile u16 = @ptrFromInt(io_address + 0x0016);
 
-/// REG_BG2HOFS. See also `gba.bg.scroll[2].x`.
+/// REG_BG2HOFS. See also `gba.display.bg_scroll[2].x`.
 pub const reg_bg2hofs: *align(4) volatile u16 = @ptrFromInt(io_address + 0x0018);
 
-/// REG_BG2VOFS. See also `gba.bg.scroll[2].y`.
+/// REG_BG2VOFS. See also `gba.display.bg_scroll[2].y`.
 pub const reg_bg2vofs: *volatile u16 = @ptrFromInt(io_address + 0x001a);
 
-/// REG_BG3HOFS. See also `gba.bg.scroll[3].x`.
+/// REG_BG3HOFS. See also `gba.display.bg_scroll[3].x`.
 pub const reg_bg3hofs: *align(4) volatile u16 = @ptrFromInt(io_address + 0x001c);
 
-/// REG_BG3VOFS. See also `gba.bg.scroll[3].y`.
+/// REG_BG3VOFS. See also `gba.display.bg_scroll[3].y`.
 pub const reg_bg3vofs: *volatile u16 = @ptrFromInt(io_address + 0x001e);
 
 /// Represents the memory layout of `reg_bg_affine` items.

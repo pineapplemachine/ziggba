@@ -27,20 +27,20 @@ pub export fn main() void {
     gba.display.bg_palette.banks[0][15] = .white;
     
     // Initialize a regular background. This will be used to display text.
-    gba.bg.ctrl[0] = .{
+    gba.display.bg_ctrl[0] = .{
         .base_screenblock = 4,
         .size = .normal_32x32,
     };
-    const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
+    const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.display.bg_ctrl[0]);
     normal_bg_map.getBaseScreenblock().fillRect(.{ .tile = 128 }, 0, 0, 32, 16);
     normal_bg_map.getBaseScreenblock().fillRectLinear(.{ .tile = 128 }, 0, 16, 32, 4);
     
     // Initialize an affine background layer.
-    gba.bg.ctrl[2] = .{
+    gba.display.bg_ctrl[2] = .{
         .base_screenblock = 5,
         .size = .affine_16,
     };
-    const affine_bg_map = gba.display.AffineBackgroundMap.initCtrl(gba.bg.ctrl[2]);
+    const affine_bg_map = gba.display.AffineBackgroundMap.initCtrl(gba.display.bg_ctrl[2]);
     for(0..affine_bg_map.width()) |x| {
         for(0..affine_bg_map.height()) |y| {
             const tile_i = (x & 0xf) | ((y & 0x3) << 4);
@@ -99,7 +99,7 @@ pub export fn main() void {
         // Set affine transform values.
         // Rotate the background by the current angle around its center,
         // showing it near the center of the screen.
-        gba.bg.bg_2_affine.* = .initRotScale(.{
+        gba.display.bg_2_affine.* = .initRotScale(.{
             .bg_origin = .init(.fromInt(64), .fromInt(64)),
             .screen_origin = .init(.fromInt(120), .fromInt(68)),
             .angle = angle,

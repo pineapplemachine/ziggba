@@ -1,5 +1,14 @@
 const gba = @import("gba.zig");
 
+// Background-related imports.
+pub const BackgroundSize = @import("display_bg.zig").BackgroundSize;
+pub const BackgroundControl = @import("display_bg.zig").BackgroundControl;
+pub const bg_ctrl = @import("display_bg.zig").bg_ctrl;
+pub const bg_scroll = @import("display_bg.zig").bg_scroll;
+pub const bg_affine = @import("display_bg.zig").bg_affine;
+pub const bg_2_affine = @import("display_bg.zig").bg_2_affine;
+pub const bg_3_affine = @import("display_bg.zig").bg_3_affine;
+
 // Blending-related imports.
 pub const Blend = @import("display_blend.zig").Blend;
 pub const blend = @import("display_blend.zig").blend;

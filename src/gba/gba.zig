@@ -2,7 +2,6 @@
 
 const gba = @This();
 
-pub const bg = @import("bg.zig");
 pub const bios = @import("bios.zig");
 pub const bitmap = @import("bitmap.zig");
 pub const ColorRgb555 = @import("color.zig").ColorRgb555;

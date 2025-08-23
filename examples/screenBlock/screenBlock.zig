@@ -82,7 +82,7 @@ pub export fn main() void {
         cross_pos_prev_tile = cross_pos_current_tile;
         
         // Keep the cross centered via background scrolling.
-        gba.bg.scroll[0] = cross_pos_current.sub(
+        gba.display.bg_scroll[0] = cross_pos_current.sub(
             gba.display.screen_size.lsr(1).toVec2(i16)
         );
     }

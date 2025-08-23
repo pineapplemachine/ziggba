@@ -1,17 +1,25 @@
 const gba = @import("gba.zig");
 
 /// Background size, in 8x8 tiles.
-pub const Size = packed union {
+pub const BackgroundSize = packed union {
     /// Represents possible sizes for normal (non-affine) backgrounds.
     pub const Normal = packed struct(u2) {
         /// 32 tiles wide and 32 tiles tall. Uses one screenblock.
-        pub const size_32x32 = Size.Normal{ .x = .size_32, .y = .size_32 };
+        pub const size_32x32 = (
+            BackgroundSize.Normal{ .x = .size_32, .y = .size_32 }
+        );
         /// 64 tiles wide and 32 tiles tall. Uses two screenblocks.
-        pub const size_64x32 = Size.Normal{ .x = .size_64, .y = .size_32 };
+        pub const size_64x32 = (
+            BackgroundSize.Normal{ .x = .size_64, .y = .size_32 }
+        );
         /// 32 tiles wide and 64 tiles tall. Uses two screenblocks.
-        pub const size_32x64 = Size.Normal{ .x = .size_32, .y = .size_64 };
+        pub const size_32x64 = (
+            BackgroundSize.Normal{ .x = .size_32, .y = .size_64 }
+        );
         /// 64 tiles wide and 64 tiles tall. Uses four screenblocks.
-        pub const size_64x64 = Size.Normal{ .x = .size_64, .y = .size_64 };
+        pub const size_64x64 = (
+            BackgroundSize.Normal{ .x = .size_64, .y = .size_64 }
+        );
         
         pub const Value = enum(u1) {
             size_32 = 0,
@@ -60,42 +68,42 @@ pub const Size = packed union {
     
     /// Size option for normal (non-affine) backgrounds.
     /// 32 tiles wide and 32 tiles tall. Uses one screenblock.
-    pub const normal_32x32: Size = .{ .normal = Normal.size_32x32 };
+    pub const normal_32x32: BackgroundSize = .{ .normal = Normal.size_32x32 };
     /// Size option for normal (non-affine) backgrounds.
     /// 64 tiles wide and 32 tiles tall. Uses two screenblocks.
-    pub const normal_64x32: Size = .{ .normal = Normal.size_64x32 };
+    pub const normal_64x32: BackgroundSize = .{ .normal = Normal.size_64x32 };
     /// Size option for normal (non-affine) backgrounds.
     /// 32 tiles wide and 64 tiles tall. Uses two screenblocks.
-    pub const normal_32x64: Size = .{ .normal = Normal.size_32x64 };
+    pub const normal_32x64: BackgroundSize = .{ .normal = Normal.size_32x64 };
     /// Size option for normal (non-affine) backgrounds.
     /// 64 tiles wide and 64 tiles tall. Uses four screenblocks.
-    pub const normal_64x64: Size = .{ .normal = Normal.size_64x64 };
+    pub const normal_64x64: BackgroundSize = .{ .normal = Normal.size_64x64 };
     /// Size option for affine backgrounds.
     /// 16 tiles wide and tall. Uses 256 bytes of one screenblock.
-    pub const affine_16: Size = .{ .affine = .size_16 };
+    pub const affine_16: BackgroundSize = .{ .affine = .size_16 };
     /// Size option for affine backgrounds.
     /// 32 tiles wide and tall. Uses 1024 bytes (i.e. half) of one screenblock.
-    pub const affine_32: Size = .{ .affine = .size_32 };
+    pub const affine_32: BackgroundSize = .{ .affine = .size_32 };
     /// Size option for affine backgrounds.
     /// 64 tiles wide and tall. Uses two screenblocks.
-    pub const affine_64: Size = .{ .affine = .size_64 };
+    pub const affine_64: BackgroundSize = .{ .affine = .size_64 };
     /// Size option for affine backgrounds.
     /// 128 tiles wide and tall. Uses eight screenblocks.
-    pub const affine_128: Size = .{ .affine = .size_128 };
+    pub const affine_128: BackgroundSize = .{ .affine = .size_128 };
 
     /// Determines size for non-affine backgrounds.
-    normal: Size.Normal,
+    normal: Normal,
     /// Determines size for affine backgrounds.
     /// Affine backgrounds are always square.
-    affine: Size.Affine,
+    affine: Affine,
     
     /// Initialize for a normal (non-affine) background.
-    pub fn initNormal(size_normal: Size.Normal) Size {
+    pub fn init(size_normal: Normal) BackgroundSize {
         return .{ .normal = size_normal };
     }
     
     /// Initialize for an affine background.
-    pub fn initAffine(size_affine: Size.Affine) Size {
+    pub fn initAffine(size_affine: Affine) BackgroundSize {
         return .{ .affine = size_affine };
     }
 };
@@ -110,7 +118,7 @@ pub const Size = packed union {
 /// screenblocks 8-15 as charblock 1,
 /// screenblocks 16-23 as charblock 2, and
 /// screenblocks 24-31 as charblock 3.
-pub const Control = packed struct(u16) {
+pub const BackgroundControl = packed struct(u16) {
     /// Determines drawing order relative to objects/sprites and other
     /// backgrounds.
     priority: gba.display.Priority = .highest,
@@ -140,11 +148,58 @@ pub const Control = packed struct(u16) {
     /// Determines the size of the background.
     /// Size values differ depending on whether the background is affine or not.
     /// Larger sizes use more screenblocks.
-    size: Size = .normal_32x32,
+    size: BackgroundSize = .normal_32x32,
+    
+    /// Options relevant to initializing for a normal (non-affine) background.
+    /// These options are accepted by the `init` function.
+    pub const InitOptions = struct {
+        priority: gba.display.Priority = .highest,
+        base_charblock: u2 = 0,
+        mosaic: bool = false,
+        bpp: gba.display.TileBpp = .bpp_4,
+        base_screenblock: u5 = 0,
+        size: BackgroundSize.Normal = .size_32x32,
+    };
+    
+    /// Options relevant to initializing for an affine background.
+    /// These options are accepted by the `initAffine` function.
+    pub const InitAffineOptions = struct {
+        priority: gba.display.Priority = .highest,
+        base_charblock: u2 = 0,
+        mosaic: bool = false,
+        base_screenblock: u5 = 0,
+        affine_wrap: bool = false,
+        size: BackgroundSize.Affine = .size_16,
+    };
+    
+    /// Initialize for a normal (non-affine) background.
+    pub fn init(options: InitOptions) BackgroundControl {
+        return .{
+            .priority = options.priority,
+            .base_charblock = options.base_charblock,
+            .mosaic = options.mosaic,
+            .bpp = options.bpp,
+            .base_screenblock = options.base_screenblock,
+            .size = .init(options.size),
+        };
+    }
+    
+    /// Initialize for an affine background.
+    pub fn initAffine(options: InitAffineOptions) BackgroundControl {
+        return .{
+            .priority = options.priority,
+            .base_charblock = options.base_charblock,
+            .mosaic = options.mosaic,
+            .bpp = .bpp_8,
+            .base_screenblock = options.base_screenblock,
+            .affine_wrap = options.affine_wrap,
+            .size = .initAffine(options.size),
+        };
+    }
 };
 
 /// Background control registers. Corresponds to REG_BGCNT.
-pub const ctrl: *volatile [4]Control = @ptrCast(gba.mem.io.reg_bgcnt);
+pub const bg_ctrl: *volatile [4]BackgroundControl = @ptrCast(gba.mem.io.reg_bgcnt);
 
 /// Controls scrolling for normal (non-affine) backgrounds. Write-only.
 /// Corresponds to REG_BG_OFS.
@@ -152,7 +207,7 @@ pub const ctrl: *volatile [4]Control = @ptrCast(gba.mem.io.reg_bgcnt);
 /// GBATEK documents that only the low nine bits of X and Y are used.
 /// However, since normal backgrounds wrap and their width and height are
 /// always evenly divisible into 512 pixels, there is not really a distinction.
-pub const scroll: *volatile [4]gba.math.Vec2I16 = @ptrCast(gba.mem.io.reg_bg_ofs);
+pub const bg_scroll: *volatile [4]gba.math.Vec2I16 = @ptrCast(gba.mem.io.reg_bg_ofs);
 
 /// Corresponds to REG_BG_AFFINE.
 /// See `bg_2_affine` and `bg_3_affine`.

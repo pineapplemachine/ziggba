@@ -222,7 +222,7 @@ pub fn bgAffineSet(
     /// to be computed.
     options: []const volatile BgAffineSetOptions,
     /// Write the computed affine transformations and displacements here.
-    destination: [*]volatile gba.bg.Affine,
+    destination: [*]volatile gba.math.Affine3x2,
 ) void {
     if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios

@@ -333,11 +333,11 @@ pub export fn main() void {
     gba.display.bg_palette.banks[0][2] = .red;
     
     // Initialize a background, to be used for displaying text.
-    gba.bg.ctrl[0] = .{
+    gba.display.bg_ctrl[0] = .{
         .base_screenblock = 31,
         .size = .normal_32x32,
     };
-    const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.bg.ctrl[0]);
+    const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.display.bg_ctrl[0]);
     normal_bg_map.getBaseScreenblock().fillLinear(.{});
     
     // Run memory performance and correctness tests.
