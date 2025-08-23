@@ -154,21 +154,6 @@ pub const ctrl: *volatile [4]Control = @ptrCast(gba.mem.io.reg_bgcnt);
 /// always evenly divisible into 512 pixels, there is not really a distinction.
 pub const scroll: *volatile [4]gba.math.Vec2I16 = @ptrCast(gba.mem.io.reg_bg_ofs);
 
-// TODO: Cleanup TextScreenEntry etc.
-
-pub const TextScreenEntry = packed struct(u16) {
-    tile_index: u10 = 0,
-    flip: gba.display.Flip = .{},
-    palette_index: u4 = 0,
-};
-
-pub const TextScreenBlock = [1024]TextScreenEntry;
-pub const screen_block_ram: [*]volatile TextScreenBlock = @ptrCast(gba.mem.vram);
-
-pub inline fn screenBlockMap(block: u5) [*]volatile TextScreenEntry {
-    return @ptrCast(&screen_block_ram[block]);
-}
-
 /// Corresponds to REG_BG_AFFINE.
 /// See `bg_2_affine` and `bg_3_affine`.
 pub const bg_affine: *volatile [2]gba.math.Affine3x2 = (

@@ -12,6 +12,10 @@ pub const Mode = enum(u3) {
         normal = 0,
         /// Indicates that a background uses affine display in a given mode.
         affine = 1,
+        /// Indicates that a background is not used normally, but must be
+        /// enabled in order for bitmap graphics to display, i.e. in
+        /// modes 3, 4, and 5.
+        bitmap = 2,
     };
     
     /// Type for each background in each graphics mode.
@@ -19,9 +23,9 @@ pub const Mode = enum(u3) {
         @splat(.normal),
         .{ .normal, .normal, .affine, .unavailable },
         .{ .unavailable, .unavailable, .affine, .affine },
-        @splat(.unavailable),
-        @splat(.unavailable),
-        @splat(.unavailable),
+        .{ .unavailable, .unavailable, .bitmap, .unavailable },
+        .{ .unavailable, .unavailable, .bitmap, .unavailable },
+        .{ .unavailable, .unavailable, .bitmap, .unavailable },
     };
     
     /// Tiled mode.
@@ -58,7 +62,10 @@ pub const Mode = enum(u3) {
                 2, 3 => .affine,
                 else => .unavailable,
             },
-            else => .unavailable,
+            else => switch(bg_index) {
+                2 => .bitmap,
+                else => .unavailable,
+            },
         };
     }
     
@@ -101,7 +108,9 @@ pub const Control = packed struct(u16) {
     bg0: bool = false,
     /// Enable background 1. Only relevant to graphics modes 0 and 1.
     bg1: bool = false,
-    /// Enable background 2. Only relevant to graphics modes 0, 1, and 2.
+    /// Enable background 2. Primarily relevant to graphics modes 0, 1, and 2,
+    /// for enabling as a normal or affine background, but this flag must also
+    /// be set in order for anything to be visible in modes 3, 4, and 5.
     bg2: bool = false,
     /// Enable background 3. Only relevant to graphics modes 0 and 2.
     bg3: bool = false,
@@ -290,6 +299,7 @@ pub const Control = packed struct(u16) {
     }
     
     /// Initialize with options related specifically to graphics mode 3.
+    /// Sets the `bg2` flag to true, to enable bitmap display.
     /// See `gba.display.Mode.mode_3`.
     pub fn initMode3(options: InitMode3Options) Control {
         return .{
@@ -297,6 +307,7 @@ pub const Control = packed struct(u16) {
             .hblank_oam = options.hblank_oam,
             .obj_mapping = options.obj_mapping,
             .force_blank = options.force_blank,
+            .bg2 = true,
             .obj = options.obj,
             .window_0 = options.window_0,
             .window_1 = options.window_1,
@@ -305,6 +316,7 @@ pub const Control = packed struct(u16) {
     }
     
     /// Initialize with options related specifically to graphics mode 4.
+    /// Sets the `bg2` flag to true, to enable bitmap display.
     /// See `gba.display.Mode.mode_4`.
     pub fn initMode4(options: InitMode4Options) Control {
         return .{
@@ -313,6 +325,7 @@ pub const Control = packed struct(u16) {
             .hblank_oam = options.hblank_oam,
             .obj_mapping = options.obj_mapping,
             .force_blank = options.force_blank,
+            .bg2 = true,
             .obj = options.obj,
             .window_0 = options.window_0,
             .window_1 = options.window_1,
@@ -321,6 +334,7 @@ pub const Control = packed struct(u16) {
     }
     
     /// Initialize with options related specifically to graphics mode 5.
+    /// Sets the `bg2` flag to true, to enable bitmap display.
     /// See `gba.display.Mode.mode_5`.
     pub fn initMode5(options: InitMode5Options) Control {
         return .{
@@ -329,6 +343,7 @@ pub const Control = packed struct(u16) {
             .hblank_oam = options.hblank_oam,
             .obj_mapping = options.obj_mapping,
             .force_blank = options.force_blank,
+            .bg2 = true,
             .obj = options.obj,
             .window_0 = options.window_0,
             .window_1 = options.window_1,

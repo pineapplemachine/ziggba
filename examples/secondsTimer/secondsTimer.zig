@@ -62,8 +62,8 @@ pub export fn main() void {
     // Initialize the map to all blank tiles (index 10).
     bg0_map.fill(.{ .tile = 10 });
     
-    /// Initialize the display.
-    gba.display.ctrl.* = .initMode0({ .bg0 = true });
+    // Initialize the display.
+    gba.display.ctrl.* = .initMode0(.{ .bg0 = true });
 
     // Based on the example here: https://gbadev.net/tonc/timers.html
     // Timer 1 will overflow every 0x4000 * 1024 clock cycles,

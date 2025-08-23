@@ -77,12 +77,6 @@ pub const back_page: [*]volatile u16 = (
     @ptrFromInt(gba.mem.vram_address + 0xa000)
 );
 
-// TODO: Remove this (only `TextScreenBlock` is using this currently)
-pub const Flip = packed struct(u2) {
-    h: bool = false,
-    v: bool = false,
-};
-
 // TODO: Relocate this
 fn pageSize() u17 {
     return switch (ctrl.mode) {

@@ -288,7 +288,7 @@ pub const BackgroundMap = struct {
     pub fn fill(self: BackgroundMap, entry: Screenblock.Entry) void {
         const screenblock_count = self.size.getScreenblockCount();
         const entry_count: u32 = @as(u32, screenblock_count) << 10;
-        const entries: [*]Screenblock.Entry = (
+        const entries: [*]volatile Screenblock.Entry = (
             @ptrCast(&screenblocks[self.base_screenblock].entries)
         );
         for(0..entry_count) |i| {
