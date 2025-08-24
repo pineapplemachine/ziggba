@@ -17,7 +17,7 @@ pub const memsetDma16 = @import("mem_dma.zig").memsetDma16;
 pub const memsetDma32 = @import("mem_dma.zig").memsetDma32;
 
 // Allocator-related imports.
-pub const getUnreservedEWRAM = @import("mem_alloc.zig").getUnreservedEWRAM;
+pub const getUnreservedEwram = @import("mem_alloc.zig").getUnreservedEwram;
 pub const StackAllocator = @import("mem_alloc.zig").StackAllocator;
 
 // Imports related to wait state control (memory access timings).

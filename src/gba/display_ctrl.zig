@@ -77,7 +77,7 @@ pub const Mode = enum(u3) {
 
 /// Represents the structure of the display control register REG_DISPCNT.
 pub const Control = packed struct(u16) {
-    /// Object mapping relates to how `gba.obj.Obj.base_tile` determines the
+    /// Object mapping relates to how `gba.display.Object.base_tile` determines the
     /// appearance of an object/sprite.
     pub const ObjMapping = enum(u1) {
         /// Object charblock data is interpreted as a series of 32-tile rows
@@ -98,7 +98,7 @@ pub const Control = packed struct(u16) {
     /// per line.
     hblank_oam: bool = false,
     /// Indicates how object/sprite tiles are laid out in VRAM.
-    /// See `gba.obj.Obj.base_tile`.
+    /// See `gba.display.Object.base_tile`.
     obj_mapping: ObjMapping = .map_2d,
     /// Forces the system to behave as though it was in a VBlank/HBlank.
     /// The system's video controller displays only white lines, but
@@ -121,7 +121,7 @@ pub const Control = packed struct(u16) {
     /// Enable window 1. See `gba.display.window`.
     window_1: bool = false,
     /// Enable the object window.
-    /// See `gba.display.window` and `gba.obj.Obj.effect`.
+    /// See `gba.display.window` and `gba.display.Object.effect`.
     window_obj: bool = false,
     
     /// Options related specifically to graphics mode 0.

@@ -6,7 +6,7 @@ const gba = @import("gba.zig");
 /// Affine transformation matrices are interleaved with object attributes.
 /// OAM should only be updated during VBlank, to avoid graphical glitches.
 /// (See `gba.bios.vblankIntrWait`.)
-pub const objects: *align(8) volatile [128]Obj = @ptrCast(gba.mem.oam);
+pub const objects: *align(8) volatile [128]Object = @ptrCast(gba.mem.oam);
 
 /// Set all objects to hidden.
 /// You likely want to do this upon initialization, if you're enabling objects.
@@ -19,7 +19,7 @@ pub fn hideAllObjects() void {
 }
 
 /// Refers to affine transformation matrix components in OAM.
-/// You probably want to use `gba.obj.setTransform` or
+/// You probably want to use `gba.display.setObjectTransform` or
 /// `gba.bios.objAffineSetOam` rather than accessing this directly, since
 /// affine transformation matrices are interleaved with object attributes.
 /// Should only be updated during VBlank, to avoid graphical glitches.
@@ -30,7 +30,7 @@ pub const oam_affine_values: [*]volatile gba.math.FixedI16R8 = @ptrCast(gba.mem.
 
 /// Write an affine transformation matrix to OAM, for use with objects.
 /// Should only be updated during VBlank, to avoid graphical glitches.
-pub fn setTransform(index: u5, transform: gba.math.Affine2x2) void {
+pub fn setObjectTransform(index: u5, transform: gba.math.Affine2x2) void {
     var value_index = 3 + (@as(u8, index) << 4);
     oam_affine_values[value_index] = transform.a;
     value_index += 4;
@@ -41,9 +41,9 @@ pub fn setTransform(index: u5, transform: gba.math.Affine2x2) void {
     oam_affine_values[value_index] = transform.d;
 }
 
-// TODO: probably rename to Object?
-pub const Obj = packed struct(u48) {
-    /// Enumeration of rendering modes for sprites.
+/// Represents the structure of an object/sprite entry in OAM.
+pub const Object = packed struct(u48) {
+    /// Enumeration of rendering modes for objects/sprites.
     const Mode = enum(u2) {
         /// Normal rendering.
         /// The sprite's `transform` field can be used to apply a horizontal
@@ -52,7 +52,7 @@ pub const Obj = packed struct(u48) {
         /// The sprite is rendered with an affine transformation.
         /// The sprite's `transform` field is used to specify which affine
         /// matrix in OAM should be used for the affine tranform.
-        /// See also `setTransform`.
+        /// See also `setObjectTransform`.
         affine = 1,
         /// Disables rendering, making the sprite not visible.
         hidden = 2,
@@ -65,6 +65,8 @@ pub const Obj = packed struct(u48) {
         affine_double = 3,
     };
     
+    /// Enumeration of supported special graphics effect options for
+    /// objects/sprites.
     pub const Effect = enum(u2) {
         /// Normal rendering, with no special effect.
         normal,
@@ -92,7 +94,7 @@ pub const Obj = packed struct(u48) {
     /// Enumeration of possible values for the `shape_size` attribute.
     /// Determines width and height in combination with `shape`.
     pub const ShapeSize = enum(u2) {
-        /// The sprite uses either 1 or 2 tiles, depending on `Obj.shape`.
+        /// The sprite uses either 1 or 2 tiles, depending on `Object.shape`.
         /// - 8x8 pixels (1x1 tiles) with `Shape.square`.
         /// - 16x8 pixels (2x1 tiles) with `Shape.wide`.
         /// - 8x16 pixels (1x2 tiles) with `Shape.tall`.
@@ -102,12 +104,12 @@ pub const Obj = packed struct(u48) {
         /// - 32x8 pixels (4x1 tiles) with `Shape.wide`.
         /// - 8x32 pixels (1x4 tiles) with `Shape.tall`.
         size_4 = 1,
-        /// The sprite uses a total of 8 or 16 tiles, depending on `Obj.shape`.
+        /// The sprite uses a total of 8 or 16 tiles, depending on `Object.shape`.
         /// - 32x32 pixels (4x4 tiles) with `Shape.square`.
         /// - 32x16 pixels (4x2 tiles) with `Shape.wide`.
         /// - 16x32 pixels (2x4 tiles) with `Shape.tall`.
         size_16 = 2,
-        /// The sprite uses a total of 32 or 64 tiles, depending on `Obj.shape`.
+        /// The sprite uses a total of 32 or 64 tiles, depending on `Object.shape`.
         /// - 64x64 pixels (8x8 tiles) with `Shape.square`.
         /// - 64x32 pixels (8x4 tiles) with `Shape.wide`.
         /// - 32x64 pixels (4x8 tiles) with `Shape.tall`.
@@ -164,7 +166,7 @@ pub const Obj = packed struct(u48) {
         flip: Flip,
         /// Index of an affine transformation matrix in OAM.
         /// Applies to affine objects.
-        /// See `setTransform`.
+        /// See `setObjectTransform`.
         affine_index: u5,
         
         /// Initialize horizontal and vertical flip.
@@ -200,7 +202,7 @@ pub const Obj = packed struct(u48) {
     /// When using 4-bit color, `palette` indicates the which 16-color
     /// palette bank to use.
     bpp: gba.display.TileBpp = .bpp_4,
-    /// Used in combination with size. See `Obj.setSize`.
+    /// Used in combination with size. See `Object.setSize`.
     shape: Shape = .square,
     /// Represents the X position of the object on the screen.
     /// For normal sprites, `x` and `y` indicate the object's top-left corner.
@@ -212,7 +214,7 @@ pub const Obj = packed struct(u48) {
     /// Contains a 5-bit index indicating which affine transformation matrix
     /// should be used for this object.
     transform: Transform = .{ .flip = .{} },
-    /// Used in combination with shape. See `Obj.setSize`.
+    /// Used in combination with shape. See `Object.setSize`.
     shape_size: ShapeSize = .size_2,
     /// Base tile index for the sprite.
     /// This is always multiplied by 32 bytes (the size of a 4bpp tile) to
@@ -292,7 +294,7 @@ pub const Obj = packed struct(u48) {
         /// Indicates the size of the object/sprite.
         size: Size = .size_8x8,
         /// Specify an affine transformation matrix in OAM.
-        /// See `setTransform`.
+        /// See `setObjectTransform`.
         affine_index: u5 = 0,
         /// Base tile index for the sprite.
         base_tile: u10 = 0,
@@ -303,7 +305,7 @@ pub const Obj = packed struct(u48) {
     };
     
     /// Helper to initialize a normal object.
-    pub fn init(options: InitOptions) Obj {
+    pub fn init(options: InitOptions) Object {
         return .{
             .y = options.y,
             .mode = .normal,
@@ -321,7 +323,7 @@ pub const Obj = packed struct(u48) {
     }
     
     /// Helper to initialize an affine object.
-    pub fn initAffine(options: InitAffineOptions) Obj {
+    pub fn initAffine(options: InitAffineOptions) Object {
         return .{
             .y = options.y,
             .mode = if(options.double) Mode.affine_double else Mode.affine,
@@ -341,19 +343,19 @@ pub const Obj = packed struct(u48) {
     /// Set the size of the object.
     /// This may be more convenient than separately assigning `shape`
     /// and `shape_size`.
-    pub fn setSize(self: *Obj, size: Size) void {
+    pub fn setSize(self: *Object, size: Size) void {
         self.shape = size.shape;
         self.shape_size = size.shape_size;
     }
 
     /// Assign the X and Y position of the object.
-    pub inline fn setPosition(self: *Obj, x: u9, y: u8) void {
+    pub inline fn setPosition(self: *Object, x: u9, y: u8) void {
         self.x = x;
         self.y = y;
     }
 
     /// Assign the X and Y position of the object using a vector.
-    pub inline fn setPositionVec(self: *Obj, vec: anytype) void {
+    pub inline fn setPositionVec(self: *Object, vec: anytype) void {
         if(comptime(!@hasField(vec, "x") or !@hasField(vec, "y"))) {
             @compileError("Position value is not a valid vector type.");
         }

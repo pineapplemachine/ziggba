@@ -517,7 +517,7 @@ const Track = struct {
     /// This function is called by the Tracker once per frame.
     pub fn update(self: *Track) void {
         var reset_note: bool = false;
-        if (self.hold_time != 0) {
+        if(self.hold_time != 0) {
             self.hold_time -= 1;
         }
         while (self.hold_time == 0) {
@@ -525,7 +525,7 @@ const Track = struct {
             const opcode = self.data[pos];
             const operand = self.data[pos + 1];
             self.position += 2;
-            if (self.position >= self.data.len) {
+            if(self.position >= self.data.len) {
                 self.position = 0;
             }
             switch (opcode) {
@@ -631,24 +631,27 @@ const Tracker = struct {
     }
 };
 
+/// Draw special space-intentionally-leftl-blank tiles to the background map.
 fn drawBlank(map: gba.display.BackgroundMap, x: u6, y: u6, pal: u4, len: u6) void {
-    for (0..len) |i| {
+    for(0..len) |i| {
         map.set(@intCast(x + i), y, .{ .tile = 0x7f, .palette = pal });
     }
 }
 
+/// Draw two hexadecimal digits to the background map.
 fn drawHex(map: gba.display.BackgroundMap, x: u6, y: u6, pal: u4, value: u8) void {
     map.set(x, y, .{ .tile = hex_digits[value >> 4], .palette = pal });
     map.set(x + 1, y, .{ .tile = hex_digits[value & 0xf], .palette = pal });
 }
 
+/// Draw an up to 3-digit decimal number to the background map.
 fn drawDecimal(map: gba.display.BackgroundMap, x: u6, y: u6, pal: u4, value: u8) void {
-    if (value < 10) {
+    if(value < 10) {
         map.set(x, y, .{ .tile = 0x7f, .palette = pal });
         map.set(x + 1, y, .{ .tile = 0x7f, .palette = pal });
         map.set(x + 2, y, .{ .tile = '0' + value, .palette = pal });
     }
-    else if (value < 100) {
+    else if(value < 100) {
         const div10 = gba.bios.div(value, 10);
         map.set(x, y, .{ .tile = 0x7f, .palette = pal });
         map.set(x + 1, y, .{
@@ -678,13 +681,14 @@ fn drawDecimal(map: gba.display.BackgroundMap, x: u6, y: u6, pal: u4, value: u8)
     }
 }
 
+/// Draw a note pitch string (e.g. "C-4") to the background map.
 fn drawPitch(map: gba.display.BackgroundMap, x: u6, y: u6, pal: u4, pitch: u8) void {
-    if (pitch > pitch_names.len) {
+    if(pitch > pitch_names.len) {
         map.set(x, y, .{ .tile = 'x', .palette = pal });
         drawHex(map, x + 1, y, pal, pitch);
     }
     else {
-        for (0..3) |i| {
+        for(0..3) |i| {
             map.set(@intCast(x + i), y, .{
                 .tile = pitch_names[pitch][i],
                 .palette = pal,
@@ -693,8 +697,9 @@ fn drawPitch(map: gba.display.BackgroundMap, x: u6, y: u6, pal: u4, pitch: u8) v
     }
 }
 
+/// Draw ASCII text to the background map.
 fn drawText(map: gba.display.BackgroundMap, x: u6, y: u6, pal: u4, text: []const u8) void {
-    for (0..text.len) |text_i| {
+    for(0..text.len) |text_i| {
         map.set(@truncate(x + text_i), y, .{
             .tile = text[text_i],
             .palette = pal,
@@ -702,24 +707,25 @@ fn drawText(map: gba.display.BackgroundMap, x: u6, y: u6, pal: u4, text: []const
     }
 }
 
+/// Draw playback information about each of the three tracks to the screen.
 fn updateDisplay(map: gba.display.BackgroundMap, x: u6, track: *Track) void {
     // Format: [2:address hex] [1:opcode icon] [3:operand]
     const offset_y: u16 = 7;
-    for (0..16) |row_i| {
+    for(0..16) |row_i| {
         const track_pos_row = track.last_note_position >> 1;
         const y: u6 = @intCast(row_i + 2);
-        if (track_pos_row + row_i < offset_y) {
+        if(track_pos_row + row_i < offset_y) {
             drawBlank(map, x, y, 1, 6);
             continue;
         }
         const track_row = track_pos_row + row_i - offset_y;
         const track_i = track_row << 1;
-        if (track_i + 1 >= track.data.len) {
+        if(track_i + 1 >= track.data.len) {
             drawBlank(map, x, y, 1, 6);
             continue;
         }
         const active = (row_i == offset_y);
-        const active_pal: u4 = if (active) 2 else 0;
+        const active_pal: u4 = if(active) 2 else 0;
         const opcode = track.data[track_i];
         const operand = track.data[track_i + 1];
         // Address (hex)
@@ -745,6 +751,7 @@ fn updateDisplay(map: gba.display.BackgroundMap, x: u6, track: *Track) void {
     }
 }
 
+/// Entry point.
 pub export fn main() void {
     // Initialize sound engine data.
     var tracker = Tracker{
@@ -793,41 +800,54 @@ pub export fn main() void {
     gba.display.ctrl.* = gba.display.Control{
         .bg0 = true,
     };
-
+    
+    // Enable VBlank interrupts.
+    // This will allow running the main loop once per frame.
+    gba.display.status.vblank_interrupt = true;
+    gba.interrupt.enable.vblank = true;
+    gba.interrupt.master.enable = true;
+    
+    // State variables relevant to the main loop.
     var input: gba.input.BufferedKeysState = .{};
     var playing: bool = false;
     var frame: u8 = 0;
-
+    
+    // Draw column headers for each track, and button prompts at the bottom.
     drawText(bg0_map, 4, 0, 2, "Pulse1");
     drawText(bg0_map, 12, 0, 2, "Pulse2");
     drawText(bg0_map, 20, 0, 2, "Noise ");
     drawText(bg0_map, 8, 19, 1, "A\x0e    B\x0c    R\x0f");
 
     // Main loop. Update the Tracker once per frame.
-    while (true) : (frame +%= 1) {
+    while(true) : (frame +%= 1) {
+        // Run this loop only once per frame.
         gba.display.naiveVSync();
+        
+        // Handle input
         input.poll();
         // Toggle paused/playing upon pressing A.
-        if (input.isJustPressed(.A)) {
+        if(input.isJustPressed(.A)) {
             playing = !playing;
         }
         // Stop playback upon pressing B.
-        if (input.isJustPressed(.B)) {
+        if(input.isJustPressed(.B)) {
             playing = false;
             tracker.reset();
         }
         // Fast-forward when holding R.
         const fast_forward = input.isPressed(.R);
+        
         // Play music, and flash the A button prompt if paused.
-        if (playing) {
+        if(playing) {
             tracker.update();
-            if (fast_forward) tracker.update();
+            if(fast_forward) tracker.update();
             drawText(bg0_map, 8, 19, 1, "A\x0d");
         }
         else {
-            const flashing_pal: u4 = if ((frame & 0x7f) < 0x40) 2 else 0;
+            const flashing_pal: u4 = if((frame & 0x7f) < 0x40) 2 else 0;
             drawText(bg0_map, 8, 19, flashing_pal, "A\x0e");
         }
+        
         // Draw tracker state.
         updateDisplay(bg0_map, 4, &tracker.pulse_1);
         updateDisplay(bg0_map, 12, &tracker.pulse_2);

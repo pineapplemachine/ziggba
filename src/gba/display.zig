@@ -1,3 +1,8 @@
+//! This module defines an interface for dealing with the system's VRAM, OAM,
+//! palette memory, and graphics-related hardware registers.
+//! These various things are used to control what should be displaying on
+//! the GBA's screen.
+
 const gba = @import("gba.zig");
 
 // Background-related imports.
@@ -17,6 +22,13 @@ pub const blend = @import("display_blend.zig").blend;
 pub const Mode = @import("display_ctrl.zig").Mode;
 pub const Control = @import("display_ctrl.zig").Control;
 pub const ctrl = @import("display_ctrl.zig").ctrl;
+
+// Imports related to objects/sprites and OAM.
+pub const objects = @import("display_object.zig").objects;
+pub const hideAllObjects = @import("display_object.zig").hideAllObjects;
+pub const oam_affine_values = @import("display_object.zig").oam_affine_values;
+pub const setObjectTransform = @import("display_object.zig").setObjectTransform;
+pub const Object = @import("display_object.zig").Object;
 
 // Palette-related imports.
 pub const Palette = @import("display_palette.zig").Palette;

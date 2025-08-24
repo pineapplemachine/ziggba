@@ -7,26 +7,26 @@ pub export fn main() void {
     gba.display.memcpyObjectTiles4Bpp(0, @ptrCast(&metr.box_tiles));
     gba.display.memcpyObjectPalette(0, @ptrCast(&metr.pal));
 
-    const metroid: gba.obj.Obj = .initAffine(.{
+    const metroid: gba.display.Object = .initAffine(.{
         .size = .size_64x64,
         .x = 96,
         .y = 32,
         .affine_index = 0,
     });
-    gba.obj.setTransform(metroid.transform.affine_index, .identity);
+    gba.display.setObjectTransform(metroid.transform.affine_index, .identity);
     
-    const shadow_metroid: gba.obj.Obj = .initAffine(.{
+    const shadow_metroid: gba.display.Object = .initAffine(.{
         .size = .size_64x64,
         .x = 96,
         .y = 32,
         .affine_index = 1,
         .palette = 1,
     });
-    gba.obj.setTransform(shadow_metroid.transform.affine_index, .identity);
+    gba.display.setObjectTransform(shadow_metroid.transform.affine_index, .identity);
 
-    gba.obj.hideAllObjects();
-    gba.obj.objects[0] = metroid;
-    gba.obj.objects[1] = shadow_metroid;
+    gba.display.hideAllObjects();
+    gba.display.objects[0] = metroid;
+    gba.display.objects[1] = shadow_metroid;
     
     gba.display.ctrl.* = gba.display.Control{
         .obj_mapping = .map_1d,
@@ -39,7 +39,7 @@ pub export fn main() void {
     while(true) : (frame +%= 1) {
         gba.display.naiveVSync();
         
-        gba.obj.setTransform(metroid.transform.affine_index, .initRotation(
+        gba.display.setObjectTransform(metroid.transform.affine_index, .initRotation(
             .initRaw(@truncate(frame << 8)),
         ));
     }
