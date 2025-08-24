@@ -1,4 +1,39 @@
+//! This module defines an interface for dealing with the system's VRAM, OAM,
+//! palette memory, and graphics-related hardware registers.
+//! These various things are used to control what should be displaying on
+//! the GBA's screen.
+
 const gba = @import("gba.zig");
+
+// Background-related imports.
+pub const BackgroundSize = @import("display_bg.zig").BackgroundSize;
+pub const BackgroundControl = @import("display_bg.zig").BackgroundControl;
+pub const bg_ctrl = @import("display_bg.zig").bg_ctrl;
+pub const bg_scroll = @import("display_bg.zig").bg_scroll;
+pub const bg_affine = @import("display_bg.zig").bg_affine;
+pub const bg_2_affine = @import("display_bg.zig").bg_2_affine;
+pub const bg_3_affine = @import("display_bg.zig").bg_3_affine;
+
+// Imports related to bitmap graphics modes 3, 4, and 5.
+pub const bitmap_buffers = @import("display_bitmap.zig").bitmap_buffers;
+pub const mode3_width = @import("display_bitmap.zig").mode3_width;
+pub const mode3_height = @import("display_bitmap.zig").mode3_height;
+pub const mode3_size = @import("display_bitmap.zig").mode3_size;
+pub const mode4_width = @import("display_bitmap.zig").mode4_width;
+pub const mode4_height = @import("display_bitmap.zig").mode4_height;
+pub const mode4_size = @import("display_bitmap.zig").mode4_size;
+pub const mode5_width = @import("display_bitmap.zig").mode5_width;
+pub const mode5_height = @import("display_bitmap.zig").mode5_height;
+pub const mode5_size = @import("display_bitmap.zig").mode5_size;
+pub const BitmapPair = @import("display_bitmap.zig").BitmapPair;
+pub const Mode3Bitmap = @import("display_bitmap.zig").Mode3Bitmap;
+pub const Mode4Bitmap = @import("display_bitmap.zig").Mode4Bitmap;
+pub const Mode5Bitmap = @import("display_bitmap.zig").Mode5Bitmap;
+pub const getMode3Bitmap = @import("display_bitmap.zig").getMode3Bitmap;
+pub const getMode4Bitmap = @import("display_bitmap.zig").getMode4Bitmap;
+pub const getMode5Bitmap = @import("display_bitmap.zig").getMode5Bitmap;
+pub const getMode4Bitmaps = @import("display_bitmap.zig").getMode4Bitmaps;
+pub const getMode5Bitmaps = @import("display_bitmap.zig").getMode5Bitmaps;
 
 // Blending-related imports.
 pub const Blend = @import("display_blend.zig").Blend;
@@ -8,6 +43,13 @@ pub const blend = @import("display_blend.zig").blend;
 pub const Mode = @import("display_ctrl.zig").Mode;
 pub const Control = @import("display_ctrl.zig").Control;
 pub const ctrl = @import("display_ctrl.zig").ctrl;
+
+// Imports related to objects/sprites and OAM.
+pub const objects = @import("display_object.zig").objects;
+pub const hideAllObjects = @import("display_object.zig").hideAllObjects;
+pub const oam_affine_values = @import("display_object.zig").oam_affine_values;
+pub const setObjectTransform = @import("display_object.zig").setObjectTransform;
+pub const Object = @import("display_object.zig").Object;
 
 // Palette-related imports.
 pub const Palette = @import("display_palette.zig").Palette;
@@ -68,48 +110,6 @@ pub const screen_height_tiles = 20;
 pub const screen_size_tiles: gba.math.Vec2U8 = (
     .init(screen_width_tiles, screen_height_tiles)
 );
-
-// TODO: Relocate this
-var current_page_addr: u32 = gba.mem.vram_address;
-
-// TODO: Relocate this
-pub const back_page: [*]volatile u16 = (
-    @ptrFromInt(gba.mem.vram_address + 0xa000)
-);
-
-// TODO: Relocate this
-fn pageSize() u17 {
-    return switch (ctrl.mode) {
-        .mode_3 => gba.bitmap.Mode3.page_size,
-        .mode_4 => gba.bitmap.Mode4.page_size,
-        .mode_5 => gba.bitmap.Mode5.page_size,
-        else => 0,
-    };
-}
-
-// TODO: This might make more sense elsewhere
-pub fn currentPage() []volatile u16 {
-    return @as([*]u16, @ptrFromInt(current_page_addr))[0..pageSize()];
-}
-
-// TODO: This might make more sense elsewhere
-pub fn pageFlip() void {
-    switch (ctrl.mode) {
-        .mode_4, .mode_5 => {
-            current_page_addr ^= 0xA000;
-            ctrl.page_select ^= 1;
-        },
-        else => {},
-    }
-}
-
-// TODO: Document this
-pub const Priority = enum(u2) {
-    highest = 0,
-    high = 1,
-    low = 2,
-    lowest = 3,
-};
 
 /// Represents the structure of the display status register REG_DISPSTAT.
 pub const Status = packed struct(u16) {

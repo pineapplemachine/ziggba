@@ -11,7 +11,7 @@ pub const Screenblock = extern union {
     pub const Entry = packed struct(u16) {
         /// Offset added to a background's `base_charblock` to determine the
         /// tile that should be displayed.
-        /// See `gba.bg.Control.base_charblock`.
+        /// See `gba.display.BackgroundControl.base_charblock`.
         tile: u10 = 0,
         /// Display the tile flipped horizontally.
         flip_x: bool = false,
@@ -160,15 +160,16 @@ pub const BackgroundMap = struct {
     /// Index of the first screenblock containing tilemap data for a background.
     /// Corresponds to `base_screenblock` in a REG_BGxCNT background control
     /// register.
-    /// See `gba.bg.Control.base_screenblock`.
+    /// See `gba.display.BackgroundControl.base_screenblock`.
     base_screenblock: u5,
     /// Size of the background map.
-    size: gba.bg.Size.Normal,
+    size: gba.display.BackgroundSize.Normal,
     
     /// Options accepted by `setup`.
     pub const SetupOptions = struct {
-        /// Determines drawing order.
-        priority: gba.display.Priority = .highest,
+        /// Determines drawing order relative to objects/sprites and other
+        /// backgrounds.
+        priority: u2 = 0,
         /// Sets the charblock that serves as the base for tile indexing.
         /// Each charblock contains 512 4bpp tiles or 256 8bpp tiles.
         base_charblock: u2 = 0,
@@ -180,28 +181,28 @@ pub const BackgroundMap = struct {
         /// Index of the first screenblock containing tilemap data.
         base_screenblock: u5,
         /// Determines the size of the background.
-        size: gba.bg.Size.Normal = .size_32x32,
+        size: gba.display.BackgroundSize.Normal = .size_32x32,
         /// Initial background scrolling.
         scroll: gba.math.Vec2I16 = .zero,
     };
     
     /// Initialize a background.
-    /// This function sets up `gba.bg.ctrl[bg_index]` and
-    /// `gba.bg.scroll[bg_index]` with the given options.
+    /// This function sets up `gba.display.bg_ctrl[bg_index]` and
+    /// `gba.display.bg_scroll[bg_index]` with the given options.
     /// It does _not_ modify `gba.display.ctrl`, which must be initialized
     /// separately.
     /// Note that `bg_index` may be 0-3 in graphics mode 0 or 0-1 in mode 1.
     /// In other graphics modes, no normal backgrounds are available at all.
     pub fn setup(bg_index: u2, options: SetupOptions) BackgroundMap {
-        gba.bg.scroll[bg_index] = options.scroll;
-        gba.bg.ctrl[bg_index] = gba.bg.Control {
+        gba.display.bg_scroll[bg_index] = options.scroll;
+        gba.display.bg_ctrl[bg_index] = .init(.{
             .priority = options.priority,
             .base_charblock = options.base_charblock,
             .mosaic = options.mosaic,
             .bpp = options.bpp,
             .base_screenblock = options.base_screenblock,
-            .size = .initNormal(options.size),
-        };
+            .size = options.size,
+        });
         return .{
             .base_screenblock = options.base_screenblock,
             .size = options.size,
@@ -211,7 +212,7 @@ pub const BackgroundMap = struct {
     /// Initialize a `BackgroundMap` object from the information in a
     /// REG_BGxCNT background control register.
     /// This function assumes that the background is normal (non-affine).
-    pub fn initCtrl(ctrl: gba.bg.Control) BackgroundMap {
+    pub fn initCtrl(ctrl: gba.display.BackgroundControl) BackgroundMap {
         return .{
             .base_screenblock = ctrl.base_screenblock,
             .size = ctrl.size.normal,
@@ -506,15 +507,15 @@ pub const AffineBackgroundMap = struct {
     /// Index of the first screenblock containing tilemap data for a background.
     /// Corresponds to `base_screenblock` in a REG_BGxCNT background control
     /// register.
-    /// See `gba.bg.Control.base_screenblock`.
+    /// See `gba.display.BackgroundControl.base_screenblock`.
     base_screenblock: u5,
     /// Size of the background map.
-    size: gba.bg.Size.Affine,
+    size: gba.display.BackgroundSize.Affine,
     
     /// Initialize an `AffineBackgroundMap` object from the information in a
     /// REG_BGxCNT background control register.
     /// This function assumes that the background is an affine background.
-    pub fn initCtrl(ctrl: gba.bg.Control) AffineBackgroundMap {
+    pub fn initCtrl(ctrl: gba.display.BackgroundControl) AffineBackgroundMap {
         return .{
             .base_screenblock = ctrl.base_screenblock,
             .size = ctrl.size.affine,

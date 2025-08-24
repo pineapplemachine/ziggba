@@ -268,6 +268,7 @@ pub const GbaBuild = struct {
         // Optionally generate ELF file with debug symbols
         if (self.gdb) {
             _ = self.b.addInstallArtifact(exe, .{
+                // TODO: Why are ELF files still emitting with no extension?
                 .dest_sub_path = self.b.fmt("{s}.elf", .{ options.name }),
             });
         }

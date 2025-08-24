@@ -17,7 +17,7 @@ pub export fn main() void {
 
     loadSpriteData();
 
-    var metroid: gba.obj.Obj = .init(.{
+    var metroid: gba.display.Object = .init(.{
         .size = .size_64x64,
         .x = 100,
         .y = 150,
@@ -55,6 +55,6 @@ pub export fn main() void {
         metroid.setPosition(@bitCast(x), @bitCast(y));
         metroid.base_tile = @bitCast(base_tile_index);
         
-        gba.obj.objects[0] = metroid;
+        gba.display.objects[0] = metroid;
     }
 }

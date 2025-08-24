@@ -17,7 +17,7 @@ pub const memsetDma16 = @import("mem_dma.zig").memsetDma16;
 pub const memsetDma32 = @import("mem_dma.zig").memsetDma32;
 
 // Allocator-related imports.
-pub const getUnreservedEWRAM = @import("mem_alloc.zig").getUnreservedEWRAM;
+pub const getUnreservedEwram = @import("mem_alloc.zig").getUnreservedEwram;
 pub const StackAllocator = @import("mem_alloc.zig").StackAllocator;
 
 // Imports related to wait state control (memory access timings).
@@ -248,7 +248,7 @@ pub fn memset32(
     }
 }
 
-/// Represents the contents of the internal memory control register.
+/// Represents the structure of the internal memory control register.
 pub const InternalMemoryControl = packed struct(u32) {
     /// Disable IWRAM and EWRAM. When off: Empty/prefetch.
     disable_wram: bool = false,
@@ -271,6 +271,7 @@ pub const InternalMemoryControl = packed struct(u32) {
 };
 
 /// Internal memory control.
+/// Corresponds to an undocumented hardware register.
 pub const internal_ctrl: *volatile InternalMemoryControl = (
     @ptrFromInt(io_address + 0x800)
 );

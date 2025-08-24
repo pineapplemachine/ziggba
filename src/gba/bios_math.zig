@@ -222,7 +222,7 @@ pub fn bgAffineSet(
     /// to be computed.
     options: []const volatile BgAffineSetOptions,
     /// Write the computed affine transformations and displacements here.
-    destination: [*]volatile gba.bg.Affine,
+    destination: [*]volatile gba.math.Affine3x2,
 ) void {
     if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios
@@ -309,7 +309,7 @@ pub const ObjAffineSetOptions = packed struct {
 };
 
 /// Wraps `objAffineSet` to write output values to OAM.
-/// See also `gba.obj.setTransform`.
+/// See also `gba.display.setObjectTransform`.
 pub fn objAffineSetOam(
     /// Parameters for the affine transformation matrices to be computed.
     options: []const volatile ObjAffineSetOptions,
@@ -318,7 +318,7 @@ pub fn objAffineSetOam(
 ) void {
     assert(options.len + @as(usize, oam_affine_index) <= 32);
     const value_index = 3 + (@as(u8, oam_affine_index) << 4);
-    objAffineSet(options, &gba.obj.oam_affine_values[value_index], 8);
+    objAffineSet(options, &gba.display.oam_affine_values[value_index], 8);
 }
 
 /// Wraps `objAffineSet` to write output values to `gba.math.Affine2x2`

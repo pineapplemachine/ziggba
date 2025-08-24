@@ -6,7 +6,7 @@ extern var __data_end__: u8;
 
 /// Get EWRAM not reserved at link time for the ROM's data section,
 /// i.e. EWRAM not reserved for global variables.
-pub fn getUnreservedEWRAM() []u8 {
+pub fn getUnreservedEwram() []u8 {
     const data_len: usize = (
         @intFromPtr(&__data_end__) - @intFromPtr(&__data_start__)
     );
@@ -87,7 +87,7 @@ pub const StackAllocator = struct {
     /// Helper to initialize an allocator which manages the entire heap,
     /// meaning all of EWRAM except for whatever was reserved for global vars.
     pub fn initHeap() StackAllocator {
-        return .{ .buffer = getUnreservedEWRAM() };
+        return .{ .buffer = getUnreservedEwram() };
     }
     
     /// Reclaim memory used by this allocator.

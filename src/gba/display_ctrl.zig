@@ -77,7 +77,7 @@ pub const Mode = enum(u3) {
 
 /// Represents the structure of the display control register REG_DISPCNT.
 pub const Control = packed struct(u16) {
-    /// Object mapping relates to how `gba.obj.Obj.base_tile` determines the
+    /// Object mapping relates to how `gba.display.Object.base_tile` determines the
     /// appearance of an object/sprite.
     pub const ObjMapping = enum(u1) {
         /// Object charblock data is interpreted as a series of 32-tile rows
@@ -91,14 +91,15 @@ pub const Control = packed struct(u16) {
     mode: Mode = .mode_0,
     /// Read-only. Should always be false.
     gbc_mode: bool = false,
-    /// Indicates which page or frame to display in modes 4 and 5.
-    page_select: u1 = 0,
+    /// Indicates which VRAM bitmap buffer to display in modes 4 and 5.
+    /// These buffers are sometimes called "pages" or "frames".
+    bitmap_select: u1 = 0,
     /// When true, the system allows access to OAM during HBlank.
     /// This feature reduces the number of sprites that can be displayed
     /// per line.
     hblank_oam: bool = false,
     /// Indicates how object/sprite tiles are laid out in VRAM.
-    /// See `gba.obj.Obj.base_tile`.
+    /// See `gba.display.Object.base_tile`.
     obj_mapping: ObjMapping = .map_2d,
     /// Forces the system to behave as though it was in a VBlank/HBlank.
     /// The system's video controller displays only white lines, but
@@ -121,7 +122,7 @@ pub const Control = packed struct(u16) {
     /// Enable window 1. See `gba.display.window`.
     window_1: bool = false,
     /// Enable the object window.
-    /// See `gba.display.window` and `gba.obj.Obj.effect`.
+    /// See `gba.display.window` and `gba.display.Object.effect`.
     window_obj: bool = false,
     
     /// Options related specifically to graphics mode 0.
@@ -222,7 +223,7 @@ pub const Control = packed struct(u16) {
     /// See `gba.display.Mode.mode_4`.
     pub const InitMode4Options = struct {
         /// Indicates which page or frame to display.
-        page_select: u1 = 0,
+        bitmap_select: u1 = 0,
         /// Allows access to OAM during HBlank.
         hblank_oam: bool = false,
         /// Indicates how object/sprite tiles are laid out in VRAM.
@@ -321,7 +322,7 @@ pub const Control = packed struct(u16) {
     pub fn initMode4(options: InitMode4Options) Control {
         return .{
             .mode = .mode_4,
-            .page_select = options.page_select,
+            .bitmap_select = options.bitmap_select,
             .hblank_oam = options.hblank_oam,
             .obj_mapping = options.obj_mapping,
             .force_blank = options.force_blank,
@@ -339,7 +340,7 @@ pub const Control = packed struct(u16) {
     pub fn initMode5(options: InitMode5Options) Control {
         return .{
             .mode = .mode_5,
-            .page_select = options.page_select,
+            .bitmap_select = options.bitmap_select,
             .hblank_oam = options.hblank_oam,
             .obj_mapping = options.obj_mapping,
             .force_blank = options.force_blank,
@@ -349,6 +350,13 @@ pub const Control = packed struct(u16) {
             .window_1 = options.window_1,
             .window_obj = options.window_obj,
         };
+    }
+    
+    /// Helper function relevant to graphics modes 4 and 5.
+    /// Flips the `bitmap_select` bit, thereby swapping the front and back
+    /// buffers in double-buffered bitmap display modes.
+    pub fn bitmapFlip(self: *volatile Control) void {
+        self.bitmap_select = ~self.bitmap_select;
     }
 };
 

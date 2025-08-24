@@ -71,12 +71,12 @@ pub export fn main() void {
         .bg1 = true,
     };
 
-    gba.bg.ctrl[0] = .{
+    gba.display.bg_ctrl[0] = .{
         .base_charblock = charblock_4bpp_index,
         .base_screenblock = screenblock_4bpp_index,
     };
 
-    gba.bg.ctrl[1] = .{
+    gba.display.bg_ctrl[1] = .{
         .base_charblock = charblock_8bpp_index,
         .base_screenblock = screenblock_8bpp_index,
         .bpp = .bpp_8,

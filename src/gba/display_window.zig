@@ -20,9 +20,11 @@ pub const Window = extern struct {
     /// Contains flags determining how layers are affected by a given
     /// window region.
     /// See `Inner.win0`, `Inner.win1`, `Other.outer`, and `Other.obj`.
-    pub const LayerFlags = packed struct(u6) {
-        pub const all: LayerFlags = @bitCast(0x3f);
-        pub const none: LayerFlags = .{};
+    pub const Layers = packed struct(u8) {
+        /// All flags set.
+        pub const all: Layers = @bitCast(0x3f);
+        /// No flags set.
+        pub const none: Layers = .{};
         
         /// Indicates whether a given window region should affect background 0.
         bg0: bool = false,
@@ -37,46 +39,8 @@ pub const Window = extern struct {
         /// Indicates whether blending may be used with the contents of
         /// a given window region.
         blend: bool = false,
-    };
-    
-    /// Represents the structure of REG_WININ.
-    pub const Inner = packed struct(u16) {
-        /// Indicates which layers should be affected by the window 0 region.
-        win0: LayerFlags = .none,
-        /// Unused bits.
-        _1: u2 = 0,
-        /// Indicates which layers should be affected by the window 1 region.
-        win1: LayerFlags = .none,
-        /// Unused bits.
-        _2: u2 = 0,
-        
-        pub fn init(win0: LayerFlags, win1: LayerFlags) Inner {
-            return @bitCast(
-                @as(u16, @bitCast(win0)) |
-                (@as(u16, @bitCast(win1)) << 8)
-            );
-        }
-    };
-    
-    /// Represents the structure of REG_WINOUT.
-    pub const Other = packed struct(u16) {
-        /// Indicates which layers should be affected by the region not
-        /// overlapping window 0, window 1, or any object set to window mode.
-        outer: LayerFlags = .none,
-        /// Unused bits.
-        _1: u2 = 0,
-        /// Indicates which layers should be affected by objects set to
-        /// window mode. See `gba.obj.Obj.effect`.
-        obj: LayerFlags = .none,
-        /// Unused bits.
-        _2: u2 = 0,
-        
-        pub fn init(outer: LayerFlags, obj: LayerFlags) Inner {
-            return @bitCast(
-                @as(u16, @bitCast(outer)) |
-                (@as(u16, @bitCast(obj)) << 8)
-            );
-        }
+        /// Padding bits.
+        _: u2 = 0,
     };
     
     /// Determines the rectangular bounds of windows 0 and 1.
@@ -87,14 +51,20 @@ pub const Window = extern struct {
     /// Corresponds to REG_WIN0V and REG_WIN1V.
     /// Note that REG_WIN0V and REG_WIN1V are write-only.
     bounds_y: [2]BoundsVertical,
-    /// Determines how layers should be affected by the window 0 and
-    /// window 1 regions.
-    /// Corresponds to REG_WININ.
-    inner: Inner,
-    /// Determines how layers should be affected by the object window region,
-    /// or by the region not included in any window.
-    /// Corresponds to REG_WINOUT.
-    other: Other,
+    /// Indicates which layers should be affected by the window 0 region.
+    /// Corresponds to REG_WIN0CNT.
+    win0: Layers = .none,
+    /// Indicates which layers should be affected by the window 1 region.
+    /// Corresponds to REG_WIN1CNT.
+    win1: Layers = .none,
+    /// Indicates which layers should be affected by the region not
+    /// overlapping window 0, window 1, or any object set to window mode.
+    /// Corresponds to REG_WINOUTCNT.
+    outer: Layers = .none,
+    /// Indicates which layers should be affected by objects set to
+    /// window mode. See `gba.display.Object.effect`.
+    /// Corresponds to REG_WINOBJCNT.
+    obj: Layers = .none,
 };
 
 /// Controls the system's window feature. This behaves like a mask or stencil

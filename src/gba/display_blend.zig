@@ -4,9 +4,9 @@
 
 const gba = @import("gba.zig");
 
-/// Represents the contents of REG_BLDCNT, REG_BLDALPHA, and REG_BLDY.
+/// Represents the structure of REG_BLDCNT, REG_BLDALPHA, and REG_BLDY.
 pub const Blend = extern struct {
-    /// Represents the contents of REG_BLDCNT.
+    /// Represents the structure of REG_BLDCNT.
     pub const Control = packed struct(u16) {
         /// Enumeration of blending modes.
         pub const Mode = enum(u2) {
@@ -22,7 +22,9 @@ pub const Blend = extern struct {
         
         /// Has a flag for each blend layer.
         pub const LayerFlags = packed struct(u6) {
+            /// All flags set.
             pub const all: LayerFlags = @bitCast(0x3f);
+            /// No flags set.
             pub const none: LayerFlags = .{};
             
             /// Background 0 layer.
@@ -40,32 +42,64 @@ pub const Blend = extern struct {
             backdrop: bool = false,
         };
         
-        /// Select layers for blend A.
-        a: LayerFlags = .none,
+        /// Select background 0 layer for blend A.
+        a_bg0: bool = false,
+        /// Select background 1 layer for blend A.
+        a_bg1: bool = false,
+        /// Select background 2 layer for blend A.
+        a_bg2: bool = false,
+        /// Select background 3 layer for blend A.
+        a_bg3: bool = false,
+        /// Select object/sprite layer for blend A.
+        a_obj: bool = false,
+        /// Select backdrop layer for blend A.
+        /// The backdrop is a solid-color layer filled with palette color 0.
+        a_backdrop: bool = false,
         /// Determines blending behavior.
         mode: Mode = .none,
-        /// Select layers for blend B.
-        b: LayerFlags = .none,
+        /// Select background 0 layer for blend B.
+        b_bg0: bool = false,
+        /// Select background 1 layer for blend B.
+        b_bg1: bool = false,
+        /// Select background 2 layer for blend B.
+        b_bg2: bool = false,
+        /// Select background 3 layer for blend B.
+        b_bg3: bool = false,
+        /// Select object/sprite layer for blend B.
+        b_obj: bool = false,
+        /// Select backdrop layer for blend B.
+        /// The backdrop is a solid-color layer filled with palette color 0.
+        b_backdrop: bool = false,
         /// Unused bits.
         _: u2 = 0,
         
         pub fn init(mode: Mode, a: LayerFlags, b: LayerFlags) Control {
-            return .{ .mode = mode, .a = a, .b = b };
+            return @bitCast(
+                @as(u16, @bitCast(a)) |
+                (@as(u16, @bitCast(mode)) << 6) |
+                (@as(u16, @bitCast(b)) << 8)
+            );
         }
         
         /// Initialize a `Control` value for use with `Mode.alpha`.
         pub fn initAlpha(a: LayerFlags, b: LayerFlags) Control {
-            return .{ .mode = .alpha, .a = a, .b = b };
+            return .init(.alpha, a, b);
         }
         
         /// Initialize a `Control` value for use with `Mode.white`.
         pub fn initWhite(a: LayerFlags) Control {
-            return .{ .mode = .white, .a = a };
+            return @bitCast(
+                @as(u16, @bitCast(a)) |
+                (@as(u16, @bitCast(Mode.white)) << 6)
+            );
         }
         
         /// Initialize a `Control` value for use with `Mode.black`.
         pub fn initBlack(a: LayerFlags) Control {
-            return .{ .mode = .black, .a = a };
+            return @bitCast(
+                @as(u16, @bitCast(a)) |
+                (@as(u16, @bitCast(Mode.black)) << 6)
+            );
         }
     };
     
@@ -121,10 +155,10 @@ pub const Blend = extern struct {
     
     /// Initialize with `Mode.alpha`.
     pub fn initAlpha(
-        a_flags: Control.LayerFlags,
-        b_flags: Control.LayerFlags,
         a_weight: u5,
         b_weight: u5,
+        a_flags: Control.LayerFlags,
+        b_flags: Control.LayerFlags,
     ) Blend {
         return .{
             .ctrl = .initAlpha(a_flags, b_flags),
@@ -135,9 +169,9 @@ pub const Blend = extern struct {
     
     /// Initialize with `Mode.white`.
     pub fn initWhite(
-        a_flags: Control.LayerFlags,
         a_weight: u5,
         y_weight: u5,
+        a_flags: Control.LayerFlags,
     ) Blend {
         return .{
             .ctrl = .initWhite(a_flags),
@@ -148,9 +182,9 @@ pub const Blend = extern struct {
     
     /// Initialize with `Mode.black`.
     pub fn initBlack(
-        a_flags: Control.LayerFlags,
         a_weight: u5,
         y_weight: u5,
+        a_flags: Control.LayerFlags,
     ) Blend {
         return .{
             .ctrl = .initBlack(a_flags),

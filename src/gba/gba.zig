@@ -2,7 +2,6 @@
 
 const gba = @This();
 
-pub const bg = @import("bg.zig");
 pub const bios = @import("bios.zig");
 pub const bitmap = @import("bitmap.zig");
 pub const ColorRgb555 = @import("color.zig").ColorRgb555;
@@ -14,7 +13,6 @@ pub const input = @import("input.zig");
 pub const interrupt = @import("interrupt.zig");
 pub const math = @import("math.zig");
 pub const mem = @import("mem.zig");
-pub const obj = @import("obj.zig");
 pub const sound = @import("sound.zig");
 pub const text = @import("text.zig");
 pub const Timer = @import("timer.zig").Timer;
