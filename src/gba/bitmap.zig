@@ -1,3 +1,5 @@
+//! This module implements a generalized type for dealing with bitmaps.
+
 const std = @import("std");
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
@@ -27,7 +29,7 @@ pub fn Bitmap(
         width: u32 = 0,
         /// Height of the bitmap, in pixels.
         height: u32 = 0,
-        /// Number of color entries in each row bitmap data.
+        /// Number of entries in each row of bitmap data.
         /// This allows for the possibility of padding.
         pitch: u32 = 0,
         /// Memory containing pixel data for this bitmap.
