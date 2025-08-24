@@ -81,7 +81,7 @@ pub export fn main() void {
     gba.interrupt.master.enable = true;
     
     // Main loop.
-    while (true) {
+    while(true) {
         // Run this loop only once per frame.
         gba.bios.vblankIntrWait();
         

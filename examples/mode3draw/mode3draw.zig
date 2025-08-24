@@ -1,42 +1,61 @@
 const gba = @import("gba");
 
-export var header linksection(".gbaheader") = gba.Header.init("MODE3DRAW", "AWJE", "00", 0);
+export var header linksection(".gbaheader") = gba.Header.init("MODE3DRAW", "AM3E", "00", 0);
 
 pub export fn main() void {
+    // Initialize graphics mode 3.
     gba.display.ctrl.* = .initMode3(.{});
+    const mode3 = gba.display.getMode3Bitmap();
 
-    // Fill screen with grey color
-    gba.bitmap.Mode3.fill(.rgb(12, 12, 12));
+    // Fill the buffer initially with gray.
+    mode3.fill(.rgb(12, 12, 12));
+    
+    // Draw solid rectangles.
+    mode3.fillRect(12, 8, 96, 64, .red);
+    mode3.fillRect(108, 72, 24, 16, .green);
+    mode3.fillRect(132, 88, 96, 64, .blue);
 
-    // Rectangles:
-    gba.bitmap.Mode3.rect(.{ 12, 8 }, .{ 109, 72 }, .red);
-    gba.bitmap.Mode3.rect(.{ 108, 72 }, .{ 132, 88 }, .green);
-    gba.bitmap.Mode3.rect(.{ 132, 88 }, .{ 228, 152 }, .blue);
-
-    // Rectangle frames
-    gba.bitmap.Mode3.frame(.{ 132, 8 }, .{ 228, 72 }, .cyan);
-    gba.bitmap.Mode3.frame(.{ 109, 73 }, .{ 131, 87 }, .black);
-    gba.bitmap.Mode3.frame(.{ 12, 88 }, .{ 108, 152 }, .yellow);
-
-    for (0..9) |i| {
+    // Draw rectangle frames.
+    mode3.drawRectOutline(132, 8, 96, 64, .cyan);
+    mode3.drawRectOutline(109, 73, 22, 14, .black);
+    mode3.drawRectOutline(12, 88, 96, 64, .yellow);
+    
+    // // Draw lines.
+    for(0..9) |i| {
         const m: u8 = @intCast(i);
         const n: u5 = @intCast(3 * m + 7);
-        // Lines in top right frame
-        gba.bitmap.Mode3.line(
-            .{ 132 + 11 * m, 9 },
-            .{ 226, 12 + 7 * m },
+        // Draw lines in the top right frame.
+        mode3.drawLine(
+            132 + 11 * m,
+            9,
+            226,
+            12 + 7 * m,
             .rgb(n, 0, n),
         );
-        gba.bitmap.Mode3.line(
-            .{ 226 - 11 * m, 70 },
-            .{ 133, 69 - 7 * m },
+        mode3.drawLine(
+            226 - 11 * m,
+            70,
+            133,
+            69 - 7 * m,
             .rgb(n, 0, n),
         );
-        // Lines in bottom left frame
-        gba.bitmap.Mode3.line(
-            .{ 15 + 11 * m, 88 },
-            .{ 104 - 11 * m, 150 },
+        // Draw lines in the bottom left frame.
+        mode3.drawLine(
+            15 + 11 * m,
+            88,
+            104 - 11 * m,
+            150,
             .rgb(0, n, n),
         );
+    }
+    
+    // Enable VBlank interrupts.
+    // This will allow running the main loop once per frame.
+    gba.display.status.vblank_interrupt = true;
+    gba.interrupt.enable.vblank = true;
+    gba.interrupt.master.enable = true;
+    
+    while(true) {
+        gba.bios.vblankIntrWait();
     }
 }

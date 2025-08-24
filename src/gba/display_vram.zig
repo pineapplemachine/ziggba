@@ -167,8 +167,9 @@ pub const BackgroundMap = struct {
     
     /// Options accepted by `setup`.
     pub const SetupOptions = struct {
-        /// Determines drawing order.
-        priority: gba.display.Priority = .highest,
+        /// Determines drawing order relative to objects/sprites and other
+        /// backgrounds.
+        priority: u2 = 0,
         /// Sets the charblock that serves as the base for tile indexing.
         /// Each charblock contains 512 4bpp tiles or 256 8bpp tiles.
         base_charblock: u2 = 0,

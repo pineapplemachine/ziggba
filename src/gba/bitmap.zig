@@ -1,149 +1,360 @@
+const std = @import("std");
 const gba = @import("gba.zig");
+const assert = @import("std").debug.assert;
 
-pub const Mode3 = Bitmap(gba.ColorRgb555, 240, 160);
-pub const Mode4 = Bitmap(u8, 240, 160);
-pub const Mode5 = Bitmap(gba.ColorRgb555, 160, 128);
-
-/// x, y coordinates
-const Point = [2]u8;
-
-fn Bitmap(comptime Color: type, comptime width: u8, comptime height: u8) type {
+/// Implements a generic helper for reading and drawing to a bitmap.
+pub fn Bitmap(
+    /// Type used for each entry in the bitmap, e.g. `u8` for an 8bpp bitmap
+    /// with palette indices for each pixel, or `gba.ColorRgb555` for a 16bpp
+    /// bitmap with a 16-bit color for each pixel.
+    comptime PixelT: type,
+    /// Expected byte alignment of bitmap data in memory.
+    comptime data_align: comptime_int,
+    /// All writes to the backing bitmap data must be at least 16-bit writes,
+    /// and not 8-bit writes. This is important if `PixelT` is less than
+    /// 16 bits, and if the bitmap data resides in the system's VRAM.
+    comptime vram: bool,
+) type {
+    if(vram and ((data_align & 1) != 0)) {
+        @compileError(
+            "If vram is true, then data_align must be a multiple of 2."
+        );
+    }
     return struct {
-        /// Page size of this bitmap type in bytes
-        pub const page_size: u17 = @as(u17, @intCast(@sizeOf(Color))) * width * height;
-
-        const HalfWordColor = if (@sizeOf(Color) == 2) Color else packed struct(u16) {
-            lo: u8,
-            hi: u8,
-
-            fn withLo(self: HalfWordColor, color: u8) HalfWordColor {
-                return .{
-                    .lo = color,
-                    .hi = self.hi,
-                };
-            }
-
-            fn withHi(self: HalfWordColor, color: u8) HalfWordColor {
-                return .{
-                    .lo = self.lo,
-                    .hi = color,
-                };
-            }
-        };
-
-        fn halfWordColor(color: Color) HalfWordColor {
-            return if (@sizeOf(Color) == 2) color else .{ .lo = color, .hi = color };
-        }
-
-        const FullWordColor = packed struct(u32) {
-            a: HalfWordColor,
-            b: HalfWordColor,
-        };
-
-        fn fullWordColor(color: Color) FullWordColor {
+        const Self = @This();
+        
+        /// Width of the bitmap, in pixels.
+        width: u32 = 0,
+        /// Height of the bitmap, in pixels.
+        height: u32 = 0,
+        /// Number of color entries in each row bitmap data.
+        /// This allows for the possibility of padding.
+        pitch: u32 = 0,
+        /// Memory containing pixel data for this bitmap.
+        data: [*]align(data_align) volatile PixelT,
+        
+        pub fn init(
+            width: u32,
+            height: u32,
+            pitch: u32,
+            data: [*]align(data_align) volatile PixelT,
+        ) Self {
+            assert(width <= pitch);
             return .{
-                .a = halfWordColor(color),
-                .b = halfWordColor(color),
+                .width = width,
+                .height = height,
+                .pitch = pitch,
+                .data = data,
             };
         }
-
-        const real_width = @divExact(width, 2) * @sizeOf(Color);
-
-        /// Pointer to the currently active screen VRAM as a 2D array
-        pub fn screen() *volatile [height][real_width]HalfWordColor {
-            return @ptrCast(gba.display.currentPage());
+        
+        /// Initialize a bitmap with its pixel data allocated using a
+        /// given allocator.
+        pub fn create(
+            allocator: std.mem.Allocator,
+            width: u32,
+            height: u32,
+            pitch: u32,
+        ) !Self {
+            const data = try allocator.alloc(PixelT, height * pitch);
+            return .init(width, height, pitch, data);
         }
-
-        pub fn setPixel(x: u8, y: u8, color: Color) void {
-            if (@sizeOf(Color) == 2) {
-                screen()[y][x] = color;
-            } else {
-                const cell = &screen()[y][x >> 1];
-                cell.* = if (x & 1 == 0) cell.withLo(color) else cell.withHi(color);
+        
+        /// Free pixel data belonging to a given allocator.
+        pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
+            allocator.free(self.data);
+        }
+        
+        /// Get a `data` index corresponding to a given pixel coordinate
+        /// within the bitmap.
+        pub fn getPixelIndex(self: Self, x: u32, y: u32) u32 {
+            return x + (y * self.pitch);
+        }
+        
+        /// Get the expected length of the bitmap's `data` buffer.
+        pub fn getDataLength(self: Self) u32 {
+            return self.height * self.pitch;
+        }
+        
+        /// Set the value associated with a pixel at a given coordinate
+        /// within the bitmap.
+        pub fn setPixel(self: Self, x: u32, y: u32, px: PixelT) void {
+            assert(x < self.width and y < self.height);
+            if(comptime(@sizeOf(PixelT) > 1 or !vram)) {
+                self.data[self.getPixelIndex(x, y)] = px;
+            }
+            else {
+                const data_16: [*]volatile u16 = @ptrCast(self.data);
+                const index_8 = self.getPixelIndex(x, y);
+                const index_16 = index_8 >> 1;
+                var px_16 = data_16[index_16];
+                if((index_8 & 1) == 0) {
+                    px_16 = (px_16 & 0xff00) | @as(u16, px);
+                }
+                else {
+                    px_16 = (px_16 & 0x00ff) | (@as(u16, px) << 8);
+                }
+                data_16[index_16] = px_16;
             }
         }
-
-        // TODO: Test using full word memcpy.
-        fn lineHorizontal(x1: u8, x2: u8, y: u8, color: Color) void {
-            if (@sizeOf(Color) == 2) {
-                for (screen()[y][x1 .. x2 + 1]) |*pixel| pixel.* = color;
-            } else {
-                // Have to do first and last separately because we could need both pixels
-                // or just one
-                const l = x1 >> 1;
-                const r = x2 >> 1;
-                const first = &screen()[y][l];
-                const last = &screen()[y][r];
-                const full = halfWordColor(color);
-                // Even = fill both, odd: only high byte
-                first.* = if (x1 & 1 == 0) full else first.withHi(color);
-                // Fill all the middle registers 2 at a time
-                for (screen()[y][l + 1 .. r]) |*x| x.* = full;
-                // Odd: fill both, even: only low byte
-                last.* = if (x2 & 1 == 0) last.withLo(color) else full;
+        
+        /// Retrieve the value associated with a pixel at a given coordinate
+        /// within the bitmap.
+        pub fn getPixel(self: Self, x: u32, y: u32) PixelT {
+            assert(x < self.width and y < self.height);
+            return self.data[self.getPixelIndex(x, y)];
+        }
+        
+        /// Fill the entire bitmap with a given pixel value.
+        pub fn fill(self: Self, px: PixelT) void {
+            for(0..self.height) |y| {
+                self.drawLineHorizontal(0, y, self.width, px);
             }
         }
-
-        pub fn line(start: Point, end: Point, color: Color) void {
-            // y always moves down
-            const p1, const p2 = if (start[1] < end[1])
-                .{ start, end }
-            else
-                .{ end, start };
-            const x1, const y1 = p1;
-            const x2, const y2 = p2;
-            //  Horizontal case
-            if (y1 == y2) {
-                lineHorizontal(@min(x1, x2), @max(x1, x2) + 1, y1, color);
-                //  Vertical case
-            } else if (x1 == x2) {
-                for (y1..y2 + 1) |y| setPixel(x1, @truncate(y), color);
-                // Diagonal case
-            } else {
-                var diff: i16 = 0;
-                var x, var y = p1;
-                const dx, const x_step: u8 = if (x1 < x2)
-                    .{ x2 - x1, 1 }
-                else
-                    .{ x1 - x2, @bitCast(@as(i8, @intCast(-1))) };
-                const dy = y2 - y1;
-                while (true) {
-                    setPixel(x, y, color);
-                    if (x == x2 and y == y2)
-                        break;
-                    if (diff < 0) {
-                        x +%= x_step;
-                        diff += dy;
-                    } else {
-                        y += 1;
-                        diff -= dx;
+        
+        /// Fill a rectangular region of the bitmap with a given pixel value.
+        pub fn fillRect(
+            self: Self,
+            x: u32,
+            y: u32,
+            width: u32,
+            height: u32,
+            px: PixelT,
+        ) void {
+            assert(x + width <= self.width and y + height <= self.height);
+            const y_max = y + height;
+            for(y..y_max) |y_i| {
+                self.drawLineHorizontal(x, @intCast(y_i), width, px);
+            }
+        }
+        
+        /// Draw a single-pixel-wide outline of a rectangle.
+        pub fn drawRectOutline(
+            self: Self,
+            x: u32,
+            y: u32,
+            width: u32,
+            height: u32,
+            px: PixelT,
+        ) void {
+            assert(x + width <= self.width and y + height <= self.height);
+            if(width == 0) {
+                if(height == 0) {
+                    self.setPixel(x, y, px);
+                }
+                else {
+                    self.drawLineVertical(x, y, height, px);
+                }
+            }
+            else {
+                self.drawLineHorizontal(x, y, width, px);
+                if(height > 0) {
+                    self.drawLineHorizontal(x, y + height - 1, width, px);
+                    if(height > 1) {
+                        const y1 = y + 1;
+                        const h2 = height - 2;
+                        self.drawLineVertical(x, y1, h2, px);
+                        self.drawLineVertical(x + width - 1, y1, h2, px);
                     }
                 }
             }
         }
-
-        pub fn rect(top_left: Point, bottom_right: Point, color: Color) void {
-            for (top_left[1]..bottom_right[1] + 1) |y| {
-                lineHorizontal(top_left[0], bottom_right[0], @truncate(y), color);
+        
+        /// Draw a strictly horizontal line, starting at the provided `x`, `y`
+        /// coordinates and extending to the right for `len` pixels.
+        pub fn drawLineHorizontal(
+            self: Self,
+            x: u32,
+            y: u32,
+            len: u32,
+            px: PixelT,
+        ) void {
+            assert(x + len <= self.width and y < self.height);
+            const i = self.getPixelIndex(x, y);
+            if(comptime(@sizeOf(PixelT) == 1)) {
+                if(comptime(vram)) {
+                    if((i & 1) == 0) {
+                        gba.mem.memset(&self.data[i], @bitCast(px), len);
+                    }
+                    else if(len > 0) {
+                        self.setPixel(x, y, px);
+                        gba.mem.memset(&self.data[i + 1], @bitCast(px), len - 1);
+                    }
+                }
+                else {
+                    gba.mem.memset(&self.data[i], @bitCast(px), len);
+                }
+            }
+            else if(comptime(@sizeOf(PixelT) == 2)) {
+                gba.mem.memset16(&self.data[i], @bitCast(px), len);
+            }
+            else if(comptime(@sizeOf(PixelT) == 4)) {
+                gba.mem.memset32(&self.data[i], @bitCast(px), len);
+            }
+            else {
+                const x_max = i + len;
+                var x_i = i;
+                while(x_i < x_max) : (x_i += 1) {
+                    self.data[x_i] = px;
+                }
             }
         }
-
-        pub fn frame(top_left: Point, bottom_right: Point, color: Color) void {
-            const left, const top = top_left;
-            const right, const bottom = bottom_right;
-            lineHorizontal(left, right, top, color);
-            line(.{ left, top + 1 }, .{ left, bottom - 1 }, color);
-            line(.{ right, top + 1 }, .{ right, bottom - 1 }, color);
-            lineHorizontal(left, right, bottom, color);
+        
+        /// Draw a strictly vertical line, starting at the provided `x`, `y`
+        /// coordinates and extending downward for `len` pixels.
+        pub fn drawLineVertical(
+            self: Self,
+            x: u32,
+            y: u32,
+            len: u32,
+            px: PixelT,
+        ) void {
+            assert(x < self.width and y + len <= self.height);
+            const y_max = y + len;
+            var y_i: u32 = y;
+            while(y_i < y_max) : (y_i += 1) {
+                self.setPixel(x, y_i, px);
+            }
         }
-
-        pub fn fill(color: Color) void {
-            // TODO: clean this up when zig allows @ptrCast on slices changing length
-            gba.bios.cpuFastSetFill(
-                @ptrCast(&fullWordColor(color)),
-                @ptrCast(@alignCast(gba.display.currentPage())),
-                page_size >> 2,
-            );
+        
+        /// Draw a line between two points.
+        /// Uses Bresenham's line drawing algorithm.
+        pub fn drawLine(
+            self: Self,
+            x0: u32,
+            y0: u32,
+            x1: u32,
+            y1: u32,
+            px: PixelT,
+        ) void {
+            assert(x0 < self.width and y0 < self.height);
+            assert(x1 < self.width and y1 < self.height);
+            // Optimized special case for horizontal lines
+            if(y0 == y1) {
+                if(x0 == x1) {
+                    self.setPixel(x0, y0, px);
+                }
+                else if(x0 < x1) {
+                    self.drawLineHorizontal(x0, y0, x1 - x0 + 1, px);
+                }
+                else {
+                    self.drawLineHorizontal(x1, y0, x0 - x1 + 1, px);
+                }
+            }
+            // Optimized special case for vertical lines
+            else if(x0 == x1) {
+                if(y0 < y1) {
+                    self.drawLineVertical(x0, y0, y1 - y0 + 1, px);
+                }
+                else {
+                    self.drawLineVertical(x0, y1, y0 - y1 + 1, px);
+                }
+            }
+            // General case
+            else {
+                const x0i: i32 = @intCast(x0);
+                const y0i: i32 = @intCast(y0);
+                const x1i: i32 = @intCast(x1);
+                const y1i: i32 = @intCast(y1);
+                if(@abs(y1i - y0i) < @abs(x1i - x0i)) {
+                    if(x0 > x1) {
+                        self.drawLineLow(x1i, y1i, x0i, y0i, px);
+                    }
+                    else {
+                        self.drawLineLow(x0i, y0i, x1i, y1i, px);
+                    }
+                }
+                else {
+                    if(y0 > y1) {
+                        self.drawLineHigh(x1i, y1i, x0i, y0i, px);
+                    }
+                    else {
+                        self.drawLineHigh(x0i, y0i, x1i, y1i, px);
+                    }
+                }
+            }
+        }
+        
+        /// Used internally by `drawLine` for a Y/X slope of less than 1.
+        fn drawLineLow(
+            self: Self,
+            x0: i32,
+            y0: i32,
+            x1: i32,
+            y1: i32,
+            px: PixelT,
+        ) void {
+            assert(x0 <= x1);
+            const dx = x1 - x0;
+            var dy = y1 - y0;
+            var yi: i32 = 1;
+            if(dy < 0) {
+                yi = -1;
+                dy = -dy;
+            }
+            var diff = (dy << 1) - dx;
+            var x = x0;
+            var y = y0;
+            while(x <= x1) : (x += 1) {
+                @setRuntimeSafety(false);
+                self.setPixel(@intCast(x), @intCast(y), px);
+                if(diff > 0) {
+                    y += yi;
+                    diff += ((dy - dx) << 1);
+                }
+                else {
+                    diff += (dy << 1);
+                }
+            }
+        }
+        
+        /// Used internally by `drawLine` for a Y/X slope of 1 or more.
+        fn drawLineHigh(
+            self: Self,
+            x0: i32,
+            y0: i32,
+            x1: i32,
+            y1: i32,
+            px: PixelT,
+        ) void {
+            assert(y0 <= y1);
+            const dy = y1 - y0;
+            var dx = x1 - x0;
+            var xi: i32 = 1;
+            if(dx < 0) {
+                xi = -1;
+                dx = -dx;
+            }
+            var diff = (dx << 1) - dy;
+            var x = x0;
+            var y = y0;
+            while(y <= y1) : (y += 1) {
+                @setRuntimeSafety(false);
+                self.setPixel(@intCast(x), @intCast(y), px);
+                if(diff > 0) {
+                    x += xi;
+                    diff += ((dx - dy) << 1);
+                }
+                else {
+                    diff += (dx << 1);
+                }
+            }
         }
     };
 }
+
+/// Represents a bitmap where each pixel is associated with a
+/// `gba.ColorRgb555` 16-bit color value.
+pub const Bitmap16Bpp = Bitmap(gba.ColorRgb555, 2, true);
+
+/// Represents a bitmap where each pixel is associated with an
+/// 8-bit palette index.
+/// Use `Bitmap8BppVram` instead for a bitmap located in VRAM,
+/// which does not support 8-bit writes.
+pub const Bitmap8Bpp = Bitmap(u8, 1, false);
+
+/// Represents a bitmap where each pixel is associated with an
+/// 8-bit palette index.
+/// Always writes 16 bits at a time, meaning it's safe to use
+/// for a bitmap located in the GBA's VRAM.
+pub const Bitmap8BppVram = Bitmap(u8, 2, true);

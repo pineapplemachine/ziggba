@@ -121,8 +121,15 @@ pub const BackgroundSize = packed union {
 pub const BackgroundControl = packed struct(u16) {
     /// Determines drawing order relative to objects/sprites and other
     /// backgrounds.
-    priority: gba.display.Priority = .highest,
-    /// Sets the charblock that serves as the base for tile indexing.
+    ///
+    /// Items with a greater priority value are drawn first, and items
+    /// with a lower value are then drawn on top.
+    /// When a background and an object have the same priority value,
+    /// the background is drawn first and the object is drawn on top.
+    /// When priority is equal, background 3 draws on top of background 2,
+    /// which draws on top of background 1, which draws on top of background 0.
+    priority: u2 = 0,
+    /// Determines the charblock that serves as the base for tile indexing.
     /// Each charblock contains 512 4bpp tiles or 256 8bpp tiles.
     /// Beware that charblock memory is shared with screenblock memory.
     ///
@@ -153,22 +160,37 @@ pub const BackgroundControl = packed struct(u16) {
     /// Options relevant to initializing for a normal (non-affine) background.
     /// These options are accepted by the `init` function.
     pub const InitOptions = struct {
-        priority: gba.display.Priority = .highest,
+        /// Determines drawing order relative to objects/sprites and other
+        /// backgrounds.
+        priority: u2 = 0,
+        /// Determines the charblock that serves as the base for tile indexing.
         base_charblock: u2 = 0,
+        /// Enables mosaic effect. (Makes things appear blocky.)
         mosaic: bool = false,
+        /// Which format to expect charblock tile data to be in, whether
+        /// 4bpp or 8bpp paletted.
         bpp: gba.display.TileBpp = .bpp_4,
+        /// Index of the first screenblock containing tilemap data for a background.
         base_screenblock: u5 = 0,
+        /// Determines the size of the background.
         size: BackgroundSize.Normal = .size_32x32,
     };
     
     /// Options relevant to initializing for an affine background.
     /// These options are accepted by the `initAffine` function.
     pub const InitAffineOptions = struct {
-        priority: gba.display.Priority = .highest,
+        /// Determines drawing order relative to objects/sprites and other
+        /// backgrounds.
+        priority: u2 = 0,
+        /// Determines the charblock that serves as the base for tile indexing.
         base_charblock: u2 = 0,
+        /// Enables mosaic effect. (Makes things appear blocky.)
         mosaic: bool = false,
+        /// Index of the first screenblock containing tilemap data for a background.
         base_screenblock: u5 = 0,
+        /// Whether affine backgrounds should wrap.
         affine_wrap: bool = false,
+        /// Determines the size of the background.
         size: BackgroundSize.Affine = .size_16,
     };
     

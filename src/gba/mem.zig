@@ -248,7 +248,7 @@ pub fn memset32(
     }
 }
 
-/// Represents the contents of the internal memory control register.
+/// Represents the structure of the internal memory control register.
 pub const InternalMemoryControl = packed struct(u32) {
     /// Disable IWRAM and EWRAM. When off: Empty/prefetch.
     disable_wram: bool = false,
@@ -271,6 +271,7 @@ pub const InternalMemoryControl = packed struct(u32) {
 };
 
 /// Internal memory control.
+/// Corresponds to an undocumented hardware register.
 pub const internal_ctrl: *volatile InternalMemoryControl = (
     @ptrFromInt(io_address + 0x800)
 );

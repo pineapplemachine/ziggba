@@ -13,7 +13,6 @@ pub const input = @import("input.zig");
 pub const interrupt = @import("interrupt.zig");
 pub const math = @import("math.zig");
 pub const mem = @import("mem.zig");
-pub const obj = @import("obj.zig");
 pub const sound = @import("sound.zig");
 pub const text = @import("text.zig");
 pub const Timer = @import("timer.zig").Timer;

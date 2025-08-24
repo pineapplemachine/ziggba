@@ -235,12 +235,17 @@ pub const Object = packed struct(u48) {
     /// This means that, in these modes, you probably want this value to be
     /// 512 or higher.
     base_tile: u10 = 0,
-    /// Higher priorities are drawn first, and therefore are covered up
-    /// by later sprites and backgrounds.
-    /// Sprites cover backgrounds of the same priority.
-    /// For sprites of the same priority, the higher-numbered objects are
-    /// drawn first.
-    priority: gba.display.Priority = .highest,
+    /// Determines drawing order relative to backgrounds and to other
+    /// objects/sprites.
+    ///
+    /// Items with a greater priority value are drawn first, and items
+    /// with a lower value are then drawn on top.
+    /// When a background and an object have the same priority value,
+    /// the background is drawn first and the object is drawn on top.
+    /// When priority between objects is equal, objects are drawn in the reverse
+    /// order as they appear in OAM, meaning that higher-numbered objects are
+    /// drawn first and lower-numbered objects are drawn on top.
+    priority: u2 = 0,
     /// When the object is using 4-bit color, this value indicates which
     /// 16-color sprite palette bank should be used.
     /// Otherwise, for 8-bit color, this value is ignored.
@@ -267,8 +272,9 @@ pub const Object = packed struct(u48) {
         flip: gba.math.Vec2B = .neither,
         /// Base tile index for the sprite.
         base_tile: u10 = 0,
-        /// Higher-priority objects render on top of lower-priority ones.
-        priority: gba.display.Priority = .highest,
+        /// Determines drawing order relative to backgrounds and to other
+        /// objects/sprites.
+        priority: u2 = 0,
         /// Palette bank index for 4bpp objects.
         palette: u4 = 0,
     };
@@ -298,8 +304,9 @@ pub const Object = packed struct(u48) {
         affine_index: u5 = 0,
         /// Base tile index for the sprite.
         base_tile: u10 = 0,
-        /// Higher-priority objects render on top of lower-priority ones.
-        priority: gba.display.Priority = .highest,
+        /// Determines drawing order relative to backgrounds and to other
+        /// objects/sprites.
+        priority: u2 = 0,
         /// Palette bank index for 4bpp objects.
         palette: u4 = 0,
     };
