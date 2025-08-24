@@ -232,14 +232,17 @@ pub const GbaBuild = struct {
         self: *GbaBuild,
         options: ExecutableOptions,
     ) *GbaExecutable {
-        const exe = self.b.addExecutable(.{
-            .name = options.name,
+        const exe_module = self.b.createModule(.{
             .target = self.thumb_target,
             .optimize = self.optimize_mode,
             .root_source_file = options.root_source_file,
         });
-        self.addFontImports(exe.root_module, options.build_options);
-        self.addBuildOptions(exe.root_module, options.build_options);
+        const exe = self.b.addExecutable(.{
+            .name = options.name,
+            .root_module = exe_module,
+        });
+        self.addFontImports(exe_module, options.build_options);
+        self.addBuildOptions(exe_module, options.build_options);
         self.b.default_step.dependOn(&exe.step);
         // Zig entry point and startup routine
         exe.addObject(self.addObject(
@@ -258,7 +261,7 @@ pub const GbaBuild = struct {
             gba_module,
             options.build_options,
         ));
-        exe.root_module.addImport("gba", gba_module);
+        exe_module.addImport("gba", gba_module);
         // Linker script
         exe.setLinkerScript(self.ziggbaPath(gba_linker_script_path));
         // Assembly modules
