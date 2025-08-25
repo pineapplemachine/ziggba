@@ -268,13 +268,6 @@ pub const GbaBuild = struct {
         for(asm_file_paths) |asm_path| {
             exe.addAssemblyFile(self.ziggbaPath(asm_path));
         }
-        // Optionally generate ELF file with debug symbols
-        if (self.gdb) {
-            _ = self.b.addInstallArtifact(exe, .{
-                // TODO: Why are ELF files still emitting with no extension?
-                .dest_sub_path = self.b.fmt("{s}.elf", .{ options.name }),
-            });
-        }
         // Generate GBA ROM
         const objcopy_step = exe.addObjCopy(.{
             .format = .bin,
@@ -285,6 +278,14 @@ pub const GbaBuild = struct {
         );
         install_bin_step.step.dependOn(&objcopy_step.step);
         self.b.default_step.dependOn(&install_bin_step.step);
+        // Optionally generate ELF file with debug symbols
+        if (self.gdb) {
+            const install_elf_step = self.b.addInstallArtifact(exe, .{
+                // TODO: Why are ELF files still emitting with no extension?
+                .dest_sub_path = self.b.fmt("{s}.elf", .{ options.name }),
+            });
+            self.b.getInstallStep().dependOn(&install_elf_step.step);
+        }
         // Fin
         return .create(self, exe);
     }
