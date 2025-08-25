@@ -20,6 +20,7 @@ const asm_file_paths = [_][]const u8{
 pub const GbaBuild = struct {
     pub const CliOptions = struct {
         debug: bool = false,
+        safe: bool = false,
         gdb: bool = false,
     };
     
@@ -66,11 +67,18 @@ pub const GbaBuild = struct {
                 break;
             }
         }
+        var optimize_mode: std.builtin.OptimizeMode = .ReleaseFast;
+        if(cli_options.debug) {
+            optimize_mode = .Debug;
+        }
+        else if(cli_options.safe) {
+            optimize_mode = .ReleaseSafe;
+        }
         return .{
             .b = b,
             .ziggba_dep = ziggba_dep,
             .thumb_target = b.resolveTargetQuery(GbaBuild.thumb_target_query),
-            .optimize_mode = if(cli_options.debug) .Debug else .ReleaseFast,
+            .optimize_mode = optimize_mode,
             .gdb = cli_options.gdb,
         };
     }
@@ -110,6 +118,13 @@ pub const GbaBuild = struct {
                     bool,
                     "debug",
                     "Build the GBA ROM in debug mode instead of release mode.",
+                ) orelse false;
+            },
+            .safe = blk: {
+                break :blk b.option(
+                    bool,
+                    "safe",
+                    "Build the GBA ROM in ReleaseSafe mode instead of ReleaseFast.",
                 ) orelse false;
             },
             .gdb = blk: {
