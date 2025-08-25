@@ -145,8 +145,8 @@ pub const KeysState = packed struct(u16) {
     }
     
     /// Returns true when any of the system's buttons were pressed down.
-    pub inline fn anyIsPressed(self: KeysState) bool {
-        return @as(u16, self) != 0x07ff;
+    pub inline fn isAnyPressed(self: KeysState) bool {
+        return @as(u16, @bitCast(self)) != 0x03ff;
     }
     
     /// Returns a signed integer representing the state of the system's
@@ -380,8 +380,13 @@ pub const BufferedKeysState = packed struct(u32) {
     }
     
     /// Returns true when any of the system's buttons are currently pressed down.
-    pub inline fn anyIsPressed(self: BufferedKeysState) bool {
-        return self.current.anyIsPressed();
+    pub inline fn isAnyPressed(self: BufferedKeysState) bool {
+        return self.current.isAnyPressed();
+    }
+    
+    /// Returns true when any of the system's buttons are currently pressed down.
+    pub inline fn isAnyJustPressed(self: BufferedKeysState) bool {
+        return self.current.isAnyPressed() and !self.previous.isAnyPressed();
     }
     
     /// Returns a signed integer representing the state of the system's
