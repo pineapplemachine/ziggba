@@ -6,6 +6,7 @@ pub const color = @import("color.zig");
 pub const font = @import("font.zig");
 pub const image = @import("image.zig");
 
+pub const LoggerInterface = @import("../gba/debug.zig").LoggerInterface;
 pub const CharsetFlags = font.CharsetFlags;
 
 const gba_linker_script_path = "src/gba/gba.ld";
@@ -28,6 +29,9 @@ pub const GbaBuild = struct {
     
     /// These build options control some aspects of how ZigGBA is compiled.
     pub const BuildOptions = struct {
+        /// Choose default logger for use with `gba.debug.print` and
+        /// `gba.debug.write`.
+        default_logger: LoggerInterface = .mgba,
         /// Options relating to `gba.text`.
         /// Each charset flag, e.g. `charset_latin`, controls whether `gba.text`
         /// will embed font data for a certain subset of Unicode code points
@@ -146,6 +150,7 @@ pub const GbaBuild = struct {
         build_options: BuildOptions,
     ) *std.Build.Step.Options {
         const b_options = b.addOptions();
+        b_options.addOption(LoggerInterface, "default_logger", build_options.default_logger);
         b_options.addOption(CharsetFlags, "text_charsets", build_options.text_charsets);
         return b_options;
     }

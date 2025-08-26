@@ -37,32 +37,40 @@ pub fn lenDecimalI32(n: i32) u4 {
     };
 }
 
-/// Get the number of digits in a number's hexadecimal representation.
+/// Get the number of digits in a signed integer's
+/// hexadecimal representation.
 /// Does not count the sign, only digits.
 pub fn lenHexI32(n: i32) u4 {
     if(n == -0x80000000) {
         return 8;
     }
-    const n_abs: u32 = @abs(n);
-    if((n_abs & 0xf0000000) != 0) {
+    else {
+        return lenHexU32(@abs(n));
+    }
+}
+
+/// Get the number of digits in an unsigned integer's
+/// hexadecimal representation.
+pub fn lenHexU32(n: u32) u4 {
+    if((n & 0xf0000000) != 0) {
         return 8;
     }
-    else if((n_abs & 0x0f000000) != 0) {
+    else if((n & 0x0f000000) != 0) {
         return 7;
     }
-    else if((n_abs & 0x00f00000) != 0) {
+    else if((n & 0x00f00000) != 0) {
         return 6;
     }
-    else if((n_abs & 0x000f0000) != 0) {
+    else if((n & 0x000f0000) != 0) {
         return 5;
     }
-    else if((n_abs & 0x0000f000) != 0) {
+    else if((n & 0x0000f000) != 0) {
         return 4;
     }
-    else if((n_abs & 0x00000f00) != 0) {
+    else if((n & 0x00000f00) != 0) {
         return 3;
     }
-    else if((n_abs & 0x000000f0) != 0) {
+    else if((n & 0x000000f0) != 0) {
         return 2;
     }
     else {
@@ -206,7 +214,7 @@ pub const FormatHexIntOptions = struct {
     digits_prefix: []const u8 = "",
 };
 
-/// Write a hexadecimal representation of an integer to a target buffer.
+/// Write a hexadecimal representation of a signed integer to a target buffer.
 /// Uses ASCII encoding by default.
 ///
 /// Normally, the longest string written to the buffer by this function will
@@ -256,6 +264,50 @@ pub fn formatHexI32(
     const value_abs = @abs(value);
     for(0..digits) |_| {
         buffer[i] = options.hex_digits[@intCast((value_abs >> shift) & 0xf)];
+        shift -= 4;
+        i += 1;
+    }
+    return i;
+}
+
+/// Write a hexadecimal representation of an unsigned integer to a target buffer.
+/// Uses ASCII encoding by default.
+pub fn formatHexU32(
+    buffer: [*]volatile u8,
+    value: u32,
+    options: FormatHexIntOptions,
+) u32 {
+    @setRuntimeSafety(false);
+    const digits = lenHexU32(value);
+    const len = (
+        options.digits_prefix.len +
+        @intFromBool(options.always_sign) +
+        @max(digits, options.pad_zero_len)
+    );
+    var shift: u5 = @as(u5, digits - 1) << 2;
+    var i: u32 = 0;
+    if(options.pad_left_len > len) {
+        for(0..options.pad_left_len - len) |_| {
+            buffer[i] = options.pad_left_char;
+            i += 1;
+        }
+    }
+    if(options.always_sign) {
+        buffer[i] = options.sign_positive_char;
+        i += 1;
+    }
+    for(options.digits_prefix) |prefix_char| {
+        buffer[i] = prefix_char;
+        i += 1;
+    }
+    if(options.pad_zero_len > digits) {
+        for(0..options.pad_zero_len - digits) |_| {
+            buffer[i] = options.hex_digits[0];
+            i += 1;
+        }
+    }
+    for(0..digits) |_| {
+        buffer[i] = options.hex_digits[@intCast((value >> shift) & 0xf)];
         shift -= 4;
         i += 1;
     }
