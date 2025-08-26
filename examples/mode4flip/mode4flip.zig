@@ -28,7 +28,7 @@ pub export fn main() void {
 
         // Flip every 120 frames, i.e. about every two seconds,
         // but pause this while the start button is held down.
-        if(!gba.input.state.startIsPressed()) {
+        if(!gba.input.state.isPressed(.start)) {
             i += 1;
             if (i >= 120) {
                 gba.display.ctrl.bitmapFlip();
