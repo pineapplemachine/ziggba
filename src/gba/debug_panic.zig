@@ -71,7 +71,12 @@ pub fn panic(location: ?[]const u8, message: []const u8) noreturn {
         .y = 20,
         .text = message,
     });
+    // Try to also print the error to a debugger.
+    gba.debug.init();
+    gba.debug.write("PANIC");
+    gba.debug.write(if(location) |loc| loc else "No location info");
+    gba.debug.write(message);
     // Hang forever.
-    gba.bios.halt(); // Hangs here.
-    @trap(); // Satisfy Zig's `noreturn`.
+    gba.bios.halt(); // Hang here in a low-power state.
+    @trap(); // Satisfy Zig's `noreturn`, and catch poorly-behaved emulators.
 }
