@@ -6,6 +6,8 @@ pub const color = @import("color.zig");
 pub const font = @import("font.zig");
 pub const image = @import("image.zig");
 
+pub const CharsetFlags = font.CharsetFlags;
+
 const gba_linker_script_path = "src/gba/gba.ld";
 const gba_start_zig_file_path = "src/gba/start.zig";
 const gba_lib_file_path = "src/gba/gba.zig";
@@ -30,7 +32,7 @@ pub const GbaBuild = struct {
         /// Each charset flag, e.g. `charset_latin`, controls whether `gba.text`
         /// will embed font data for a certain subset of Unicode code points
         /// into the compiled ROM.
-        text_charsets: font.CharsetFlags = .{},
+        text_charsets: CharsetFlags = .{},
     };
     
     /// `std.Target.Query` object for GBA thumb compilation target.
@@ -144,13 +146,7 @@ pub const GbaBuild = struct {
         build_options: BuildOptions,
     ) *std.Build.Step.Options {
         const b_options = b.addOptions();
-        inline for(font.charsets) |charset| {
-            b_options.addOption(
-                bool,
-                "text_charset_" ++ charset.name,
-                @field(build_options.text_charsets, charset.name),
-            );
-        }
+        b_options.addOption(CharsetFlags, "text_charsets", build_options.text_charsets);
         return b_options;
     }
     

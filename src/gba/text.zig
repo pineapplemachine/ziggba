@@ -7,228 +7,28 @@
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
-const build_options = @import("ziggba_build_options");
+// Imports related to supported character sets.
+pub const charset_latin = @import("text_charsets.zig").charset_latin;
+pub const charset_latin_supplement = @import("text_charsets.zig").charset_latin_supplement;
+pub const charset_greek = @import("text_charsets.zig").charset_greek;
+pub const charset_cyrillic = @import("text_charsets.zig").charset_cyrillic;
+pub const charset_arrows = @import("text_charsets.zig").charset_arrows;
+pub const charset_cjk_symbols = @import("text_charsets.zig").charset_cjk_symbols;
+pub const charset_kana = @import("text_charsets.zig").charset_kana;
+pub const charset_fullwidth = @import("text_charsets.zig").charset_fullwidth;
+pub const all_charsets = @import("text_charsets.zig").all_charsets;
+pub const CharsetFlags = @import("text_charsets.zig").CharsetFlags;
+pub const Charset = @import("text_charsets.zig").Charset;
+pub const enabled_charsets = @import("text_charsets.zig").enabled_charsets;
 
 // Import Unicode-related helpers.
 pub const CodePointAlignment = @import("text_unicode.zig").CodePointAlignment;
 pub const getCodePointAlignment = @import("text_unicode.zig").getCodePointAlignment;
 pub const CodePointIterator = @import("text_unicode.zig").CodePointIterator;
 
-// The seemingly obvious solution of using an optional pointer for a
-// `Charset` without data causes the compiler to crash in 0.14.1.
-// https://github.com/ziglang/zig/issues/24593
-const charset_data_empty: [0]u8 = .{};
-
-/// Contains data regarding supported character sets for text rendering.
-pub const Charset = struct {
-    pub const CharHeader = packed struct(u32) {
-        /// Width of character in pixels.
-        /// If this is 8 or less, then the character's bitmap data is stored
-        /// in 8-bit rows. Otherwise, it's stored in 16-bit rows.
-        size_x: u4 = 0,
-        /// Height of character in pixels.
-        /// Indicates the number of rows of bitmap data belonging to this
-        /// character.
-        size_y: u4 = 0,
-        /// A Y offset of this character, representing an amount of empty
-        /// space above the first populated row of the character.
-        offset_y: u4 = 0,
-        /// Unused padding bits.
-        _: u4 = 0,
-        /// Offset of character bitmap within the binary charset data.
-        data_offset: u16 = 0,
-    };
-    
-    pub const none: Charset = .{
-        .enabled = false,
-        .data = &charset_data_empty,
-        .code_point_min = 0,
-        .code_point_max = 0,
-    };
-    
-    /// Records whether support for this charset has been enabled in
-    /// build options.
-    enabled: bool,
-    /// Spacing and image data for this charset, if enabled,
-    /// or an empty array if not enabled.
-    data: []align(2) const u8,
-    /// Inclusive low bound of Unicode code point range represented by
-    /// this charset.
-    code_point_min: u16,
-    /// Inclusive high bound of Unicode code point range represented by
-    /// this charset.
-    code_point_max: u16,
-    
-    pub inline fn getHeader(self: Charset, index: u16) *align(2) const CharHeader {
-        const header_data: [*]align(2) const CharHeader = @ptrCast(self.data);
-        return &header_data[index];
-    }
-    
-    pub fn containsCodePoint(self: Charset, point: i32) bool {
-        return point >= self.code_point_min and point <= self.code_point_max;
-    }
-    
-    pub fn hasData(self: Charset) bool {
-        return self.data.len > 0;
-    }
-};
-
-const charset_latin_data align(2) = blk: {
-    if (build_options.text_charset_latin) {
-        break :blk @embedFile("ziggba_font_latin.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_latin = Charset{
-    .enabled = build_options.text_charset_latin,
-    .code_point_min = 0x20,
-    .code_point_max = 0x7f,
-    .data = &charset_latin_data,
-};
-
-const charset_latin_supplement_data align(2) = blk: {
-    if (build_options.text_charset_latin_supplement) {
-        break :blk @embedFile("ziggba_font_latin_supplement.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_latin_supplement = Charset{
-    .enabled = build_options.text_charset_latin_supplement,
-    .code_point_min = 0xa0,
-    .code_point_max = 0xff,
-    .data = &charset_latin_supplement_data,
-};
-
-const charset_greek_data align(2) = blk: {
-    if (build_options.text_charset_greek) {
-        break :blk @embedFile("ziggba_font_greek.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_greek = Charset{
-    .enabled = build_options.text_charset_greek,
-    .code_point_min = 0x0370,
-    .code_point_max = 0x03ff,
-    .data = &charset_greek_data,
-};
-
-const charset_cyrillic_data align(2) = blk: {
-    if (build_options.text_charset_cyrillic) {
-        break :blk @embedFile("ziggba_font_cyrillic.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_cyrillic = Charset{
-    .enabled = build_options.text_charset_cyrillic,
-    .code_point_min = 0x0400,
-    .code_point_max = 0x04ff,
-    .data = &charset_cyrillic_data,
-};
-
-const charset_arrows_data align(2) = blk: {
-    if (build_options.text_charset_arrows) {
-        break :blk @embedFile("ziggba_font_arrows.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_arrows = Charset{
-    .enabled = build_options.text_charset_arrows,
-    .code_point_min = 0x2190,
-    .code_point_max = 0x21ff,
-    .data = &charset_arrows_data,
-};
-
-const charset_cjk_symbols_data align(2) = blk: {
-    if (build_options.text_charset_cjk_symbols) {
-        break :blk @embedFile("ziggba_font_cjk_symbols.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_cjk_symbols = Charset{
-    .enabled = build_options.text_charset_cjk_symbols,
-    .code_point_min = 0x3000,
-    .code_point_max = 0x303f,
-    .data = &charset_cjk_symbols_data,
-};
-
-const charset_kana_data align(2) = blk: {
-    if (build_options.text_charset_kana) {
-        break :blk @embedFile("ziggba_font_kana.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_kana = Charset{
-    .enabled = build_options.text_charset_kana,
-    .code_point_min = 0x3040,
-    .code_point_max = 0x30ff,
-    .data = &charset_kana_data,
-};
-
-const charset_fullwidth_data align(2) = blk: {
-    if (build_options.text_charset_fullwidth) {
-        break :blk @embedFile("ziggba_font_fullwidth.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_fullwidth = Charset{
-    .enabled = build_options.text_charset_fullwidth,
-    .code_point_min = 0xff00,
-    .code_point_max = 0xff60,
-    .data = &charset_fullwidth_data,
-};
-
-/// List of all supported charsets.
-pub const all_charsets = [_]Charset{
-    charset_latin,
-    charset_latin_supplement,
-    charset_greek,
-    charset_cyrillic,
-    charset_arrows,
-    charset_cjk_symbols,
-    charset_kana,
-    charset_fullwidth,
-};
-
-const num_enabled_charsets: u8 = blk: {
-    var count: u8 = 0;
-    for(all_charsets) |charset| {
-        count += @intFromBool(charset.hasData());
-    }
-    break :blk count;
-};
-
-/// List of all supported charsets whose font image data has been embedded
-/// based on ZigGBA's build options.
-pub const enabled_charsets = blk: {
-    var array: [num_enabled_charsets]Charset = @splat(.none);
-    var array_index: u8 = 0;
-    for(all_charsets) |charset| {
-        if(charset.hasData()) {
-            array[array_index] = charset;
-            array_index += 1;
-        }
-    }
-    assert(array_index == array.len);
-    break :blk array;
-};
-
-const GlyphLayoutIterator = struct {
+/// Helper used for text-drawing functions.
+/// Provides a common interface for laying out text.
+pub const GlyphLayoutIterator = struct {
     // TODO: Might be helpful to support line wrapping
     // TODO: Support combining characters (e.g. 0x0300-0x036f)
     
@@ -429,7 +229,7 @@ const GlyphLayoutIterator = struct {
     }
 };
 
-/// Options type accepted by `drawToCharblock4Bpp`.
+/// Options accepted by `drawToCharblock4Bpp`.
 pub const DrawToCharblock4BppOptions = struct {
     /// Location in memory where the text should be drawn.
     /// This tile is treated as the top-left corner.

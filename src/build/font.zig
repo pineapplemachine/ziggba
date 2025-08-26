@@ -5,6 +5,8 @@ const Image = @import("image.zig").Image;
 const RectU16 = @import("../gba/math.zig").RectU16;
 const Vec2U16 = @import("../gba/math.zig").Vec2U16;
 
+pub const CharsetFlags = @import("../gba/text.zig").CharsetFlags;
+
 pub const Charset = struct {
     /// Represents an invalid or missing charset.
     pub const none: Charset = .init("", "", .{}, .{});
@@ -44,43 +46,6 @@ pub const charsets = [_]Charset{
     .init("cjk_symbols", "cjk_symbols", .init(10, 12), .init(0, 0, 160, 48)),
     .init("kana", "kana", .init(10, 12), .init(0, 0, 160, 144)),
     .init("fullwidth", "fullwidth", .init(10, 12), .init(0, 0, 160, 180)),
-};
-
-/// Contains a flag for each supported character set.
-pub const CharsetFlags = struct {
-    pub const none: CharsetFlags = .{};
-    pub const all: CharsetFlags = blk: {
-        var flags: CharsetFlags = .{};
-        for(charsets) |charset| {
-            @field(flags, charset.name) = true;
-        }
-        break :blk flags;
-    };
-    
-    /// Unicode Latin block.
-    /// Contains code points 0x20 through 0x7f.
-    latin: bool = false,
-    /// Unicode Latin1-Supplement block.
-    /// Contains code points 0xa0 through 0xff.
-    latin_supplement: bool = false,
-    /// Unicode Greek and Coptic block.
-    /// Contains code points 0x0370 through 0x03ff.
-    greek: bool = false,
-    /// Unicode Cyrillic block.
-    /// Contains code points 0x0400 through 0x04ff.
-    cyrillic: bool = false,
-    /// Unicode Arrows block.
-    /// Contains code points 0x2190 through 0x21ff.
-    arrows: bool = false,
-    /// Unicode CJK Symbols and Punctuation block.
-    /// Contains code points 0x3000 through 0x303f.
-    cjk_symbols: bool = false,
-    /// Unicode Hiragana block and Katakana block.
-    /// Contains code points 0x3040 through 0x30ff.
-    kana: bool = false,
-    /// Unicode Halfwidth and Fullwidth Forms block.
-    /// Contains code points 0xff00 through 0xffee.
-    fullwidth: bool = false,
 };
 
 /// Helper to check if a glyph pixel is set or not set.
