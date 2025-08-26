@@ -2,6 +2,7 @@ const gba = @import("gba");
 
 export var header linksection(".gbaheader") = gba.Header.init("PANICEXAMPLE", "APNE", "00", 0);
 
+// Enable `gba.debug.std_panic` as a custom `@panic` handler.
 pub const panic = gba.debug.std_panic;
 
 pub export fn main() void {
