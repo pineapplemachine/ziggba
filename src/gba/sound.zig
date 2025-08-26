@@ -5,7 +5,9 @@ const gba = @import("gba.zig");
 
 /// Contains a flag corresponding to each of the PSG audio channels.
 pub const ChannelFlags = packed struct(u4) {
+    /// All flags set.
     pub const all: ChannelFlags = @bitCast(0xf);
+    /// No flags set.
     pub const none: ChannelFlags = .{};
     
     /// PSG channel 1.
