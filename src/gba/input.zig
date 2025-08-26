@@ -27,15 +27,25 @@ const gba = @import("gba.zig");
 
 /// Enumeration of physical buttons (or "keys") on the GBA console.
 pub const Key = enum(u4) {
+    /// "A" face button (right side).
     A = 0,
+    /// "B" face button (left side).
     B = 1,
+    /// "SELECT" button.
     select = 2,
+    /// "START" button.
     start = 3,
+    /// D-pad right.
     right = 4,
+    /// D-pad left.
     left = 5,
+    /// D-pad up.
     up = 6,
+    /// D-pad down.
     down = 7,
+    /// Right shoulder button.
     R = 8,
+    /// Left shoulder button.
     L = 9,
 };
 
@@ -106,8 +116,8 @@ pub const KeysState = packed struct(u16) {
     /// +1 when right is pressed but not left, and 0 otherwise.
     pub fn getAxisHorizontal(self: KeysState) i2 {
         return (
-            @as(i2, if(self.leftIsPressed()) -1 else 0) +
-            @as(i2, if(self.rightIsPressed()) 1 else 0)
+            @as(i2, if(self.isPressed(.left)) -1 else 0) +
+            @as(i2, if(self.isPressed(.right)) 1 else 0)
         );
     }
     
@@ -118,8 +128,8 @@ pub const KeysState = packed struct(u16) {
     /// +1 when down is pressed but not up, and 0 otherwise.
     pub fn getAxisVertical(self: KeysState) i2 {
         return (
-            @as(i2, if(self.upIsPressed()) -1 else 0) +
-            @as(i2, if(self.downIsPressed()) 1 else 0)
+            @as(i2, if(self.isPressed(.up)) -1 else 0) +
+            @as(i2, if(self.isPressed(.down)) 1 else 0)
         );
     }
     
@@ -130,8 +140,8 @@ pub const KeysState = packed struct(u16) {
     /// +1 when R is pressed but not L, and 0 otherwise.
     pub fn getAxisShoulders(self: KeysState) i2 {
         return (
-            @as(i2, if(self.lIsPressed()) -1 else 0) +
-            @as(i2, if(self.rIsPressed()) 1 else 0)
+            @as(i2, if(self.isPressed(.L)) -1 else 0) +
+            @as(i2, if(self.isPressed(.R)) 1 else 0)
         );
     }
 };
