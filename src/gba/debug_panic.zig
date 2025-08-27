@@ -63,13 +63,15 @@ pub fn panic(location: ?[]const u8, message: []const u8) noreturn {
             .text = loc,
         });
     }
-    // TODO: This would significantly benefit from word wrap
     gba.text.drawToCharblock4Bpp(.{
         .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
         .color = 1,
         .x = 8,
         .y = 20,
         .text = message,
+        .max_width = 224,
+        .max_height = 140,
+        .wrap = .simple, // TODO: Smarter word wrap
     });
     // Try to also print the error to a debugger.
     gba.debug.init();

@@ -36,17 +36,34 @@ pub const GlyphLayoutIterator = struct {
     pub const full_height = 12;
     pub const full_width = 10;
     
+    pub const Wrap = enum(u2) {
+        /// No automatic text wrapping.
+        none,
+        /// Hard cutoffs at the end of lines.
+        simple,
+        // TODO: `smart` wrap:
+        // Try to break at word boundaries, and hyphenate when breaking
+        // in the middle of words.
+        // This could be reasonably implemented via a lookahead of ~8 chars
+        // when nearing the line length limit to find the best place to wrap.
+    };
+    
     pub const Glyph = struct {
+        /// Represents end of text.
         pub const eof: Glyph = .{ .point = -1 };
-        pub const unknown: Glyph = .{ .point = 0 };
+        /// Unknown or unprintable code point.
+        pub const unprintable: Glyph = .{ .point = 0 };
         
         point: i32,
         data: ?[*]const u8 = null,
         data_is_wide: bool = false,
         x: u16 = 0,
         y: u16 = 0,
+        next_x: u16 = 0,
         size_x: u4 = 0,
         size_y: u4 = 0,
+        truncated_x: bool = false,
+        truncated_y: bool = false,
         
         pub fn getDataRow(self: Glyph, row_i: u4) u16 {
             assert(self.data != null);
@@ -64,53 +81,70 @@ pub const GlyphLayoutIterator = struct {
             return self.point < 0;
         }
         
-        pub fn isUnknown(self: Glyph) bool {
+        pub fn isUnprintable(self: Glyph) bool {
             return self.data == null;
         }
     };
     
+    /// Options accepted by `init`.
     pub const InitOptions = struct {
+        /// Text to be laid out.
         text: []const u8,
+        /// X position of text, top-left corner.
         x: u16,
+        /// Y position of text, top-left corner.
         y: u16,
+        /// Clip text rendering exceeding this width in pixels.
         max_width: u16 = 0xffff,
+        /// Clip text rendering exceeding this height in pixels.
         max_height: u16 = 0xffff,
+        /// Increment Y by this amount for new lines.
         line_height: u8 = full_height,
+        // Width of the space character 0x20 `' '`.
         space_width: u8 = default_space_width,
+        /// Characters normally less wide than this are padded to this width.
+        /// Can be used, for example, to make text appear monospace.
         pad_character_width: u8 = 0,
+        /// Text wrapping behavior.
+        wrap: Wrap = .none,
     };
     
     points: CodePointIterator,
-    prev_point: i32 = -1,
-    max_width: u16 = 0xffff,
-    max_height: u16 = 0xffff,
+    max_x: u16 = 0xffff,
+    max_y: u16 = 0xffff,
     line_height: u8 = full_height,
     space_width: u8 = default_space_width,
     pad_character_width: u8 = 0,
     x_initial: u16,
     x: u16,
     y: u16,
+    wrap: Wrap,
     
     pub fn init(options: InitOptions) GlyphLayoutIterator {
         return .{
             .points = .init(options.text),
-            .max_width = options.max_width,
-            .max_height = options.max_height,
+            .max_x = options.max_width +| options.x,
+            .max_y = options.max_height +| options.y,
             .x_initial = options.x,
             .x = options.x,
             .y = options.y + options.line_height - full_height,
             .line_height = options.line_height,
             .space_width = options.space_width,
             .pad_character_width = options.pad_character_width,
+            .wrap = options.wrap,
         };
     }
     
+    fn startNextLine(self: *GlyphLayoutIterator) void {
+        self.x = self.x_initial;
+        self.y += self.line_height;
+    }
+    
     pub fn next(self: *GlyphLayoutIterator) Glyph {
-        if(self.y >= self.max_height) {
+        if(self.y >= self.max_y) {
             return .eof;
         }
         const point = self.points.next();
-        defer self.prev_point = point;
         if(point < 0) {
             return .eof;
         }
@@ -122,8 +156,11 @@ pub const GlyphLayoutIterator = struct {
                 self.x = (self.x & 0xfff0) + 0x10;
             },
             '\n' => { // line feed
-                self.x = self.x_initial;
-                self.y += self.line_height;
+                self.startNextLine();
+            },
+            0x00ad => { // soft hyphen
+                // TODO: Printable iff it's the last character on a line
+                return .unprintable;
             },
             0x2002 => { // en space
                 self.x += full_height >> 1;
@@ -160,17 +197,25 @@ pub const GlyphLayoutIterator = struct {
             else => {
                 for(enabled_charsets) |charset| {
                     if(charset.containsCodePoint(point)) {
-                        return self.layoutGlyph(charset, point);
+                        var glyph = self.layoutGlyph(charset, point);
+                        if(self.wrap != .none and (
+                            glyph.x > self.x_initial and glyph.truncated_x
+                        )) {
+                            self.startNextLine();
+                            glyph = self.layoutGlyph(charset, point);
+                        }
+                        self.x = glyph.next_x;
+                        return glyph;
                     }
                 }
             }
         }
-        return .unknown;
+        return .unprintable;
     }
     
     /// Helper called by `GlyphLayoutIterator.next` for a matching charset.
     fn layoutGlyph(
-        self: *GlyphLayoutIterator,
+        self: GlyphLayoutIterator,
         charset: Charset,
         point: i32,
     ) Glyph {
@@ -180,11 +225,12 @@ pub const GlyphLayoutIterator = struct {
         const header = charset.getHeader(
             @as(u16, @intCast(point)) - charset.code_point_min
         );
+        var next_x = self.x;
         var x = self.x;
         const y = self.y;
         const size_x = @max(header.size_x, self.pad_character_width);
         if(size_x >= full_width) {
-            self.x += size_x + 1;
+            next_x += size_x + 1;
             if(self.pad_character_width > header.size_x) {
                 x += (self.pad_character_width - header.size_x) >> 1;
             }
@@ -192,39 +238,44 @@ pub const GlyphLayoutIterator = struct {
         else {
             switch(glyph_align) {
                 .normal => {
-                    self.x += size_x + 1;
+                    next_x += size_x + 1;
                     if(self.pad_character_width > header.size_x) {
                         x += (self.pad_character_width - header.size_x) >> 1;
                     }
                 },
                 .fullwidth_left => {
-                    self.x += full_width;
+                    next_x += full_width;
                 },
                 .fullwidth_right => {
                     x += full_width - header.size_x - 1;
-                    self.x += full_width;
+                    next_x += full_width;
                 },
                 .fullwidth_center => {
                     x += (full_width - size_x) >> 1;
-                    self.x += full_width;
+                    next_x += full_width;
                 },
             }
         }
         const data = &charset.data[header.data_offset];
+        const truncated_x = x > (self.max_x - header.size_x);
+        const truncated_y = y > (self.max_y - header.size_y);
         return .{
             .point = point,
             .data = @ptrCast(data),
             .data_is_wide = header.size_x > 8,
             .x = x,
             .y = y + header.offset_y,
-            .size_x = @min(
-                header.size_x,
-                self.max_width - @min(self.max_width, x),
+            .next_x = next_x,
+            .size_x = (
+                if(truncated_x) @intCast(self.max_x - header.size_x)
+                else header.size_x
             ),
-            .size_y = @min(
-                header.size_y,
-                self.max_height - @min(self.max_height, y)
+            .size_y = (
+                if(truncated_y) @intCast(self.max_y - header.size_y)
+                else header.size_y
             ),
+            .truncated_x = truncated_x,
+            .truncated_y = truncated_y,
         };
     }
 };
@@ -278,6 +329,8 @@ pub const DrawToCharblock4BppOptions = struct {
     /// Except for some specially tagged fullwidth characters, the character
     /// will be centered in the widened space.
     pad_character_width: u8 = 0,
+    /// Text wrapping behavior.
+    wrap: GlyphLayoutIterator.Wrap = .none,
 };
 
 // TODO: Add similar functions for other kinds of render targets.
@@ -293,6 +346,7 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
         .line_height = options.line_height,
         .space_width = options.space_width,
         .pad_character_width = options.pad_character_width,
+        .wrap = options.wrap,
     });
     while(true) {
         @setRuntimeSafety(false);
@@ -300,7 +354,7 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
         if(glyph.isEof()) {
             return;
         }
-        else if(glyph.isUnknown()) {
+        else if(glyph.isUnprintable()) {
             continue;
         }
         for(0..glyph.size_y) |row_i| {
