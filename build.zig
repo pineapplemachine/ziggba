@@ -63,6 +63,11 @@ pub fn build(std_b: *std.Build) void {
         .root_source_file = b.path("examples/objDemo/objDemo.zig"),
     });
     _ = b.addExecutable(.{
+        .name = "panic",
+        .root_source_file = b.path("examples/panic/panic.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
+    _ = b.addExecutable(.{
         .name = "secondsTimer",
         .root_source_file = b.path("examples/secondsTimer/secondsTimer.zig"),
     });

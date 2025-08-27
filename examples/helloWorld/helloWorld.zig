@@ -8,12 +8,11 @@ pub export fn main() void {
     gba.display.bg_palette.banks[0][1] = .white;
     
     // Initialize a background, to be used for displaying text.
-    gba.display.bg_ctrl[0] = .{
+    const bg0_map = gba.display.BackgroundMap.setup(0, .{
         .base_screenblock = 31,
-        .size = .normal_32x32,
-    };
-    const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.display.bg_ctrl[0]);
-    normal_bg_map.getBaseScreenblock().fillLinear(.{});
+        .size = .size_32x32,
+    });
+    bg0_map.getBaseScreenblock().fillLinear(.{});
     
     // Draw text to the tile memory used by the initialized background.
     gba.text.drawToCharblock4Bpp(.{
@@ -34,9 +33,7 @@ pub export fn main() void {
     });
     
     // Initialize the display.
-    gba.display.ctrl.* = gba.display.Control{
-        .bg0 = true,
-    };
+    gba.display.ctrl.* = .initMode0(.{ .bg0 = true });
     
     // Initialize some important variables.
     var scroll: i16 = 0;

@@ -102,7 +102,6 @@ pub const Screenblock = extern union {
         rect_height: u6,
     ) void {
         assert((rect_x + rect_width) <= 32 and (rect_y + rect_height) <= 32);
-        // TODO: Define a common Rect type and use it for params here
         for(0..rect_height) |i_y| {
             var i = rect_x + ((rect_y + i_y) << 5);
             for(0..rect_width) |_| {
@@ -118,7 +117,11 @@ pub const Screenblock = extern union {
     ///
     /// This may be helpful to initialize a screenblock where every tile is
     /// unique.
-    pub fn fillLinear(self: *volatile Screenblock, base_entry: Screenblock.Entry) void {
+    pub fn fillLinear(
+        self: *volatile Screenblock,
+        base_entry: Screenblock.Entry,
+    ) void {
+        @setRuntimeSafety(false);
         var entry = base_entry;
         for(0..self.entries.len) |i| {
             self.entries[i] = entry;
@@ -141,7 +144,6 @@ pub const Screenblock = extern union {
         rect_height: u6,
     ) void {
         assert((rect_x + rect_width) <= 32 and (rect_y + rect_height) <= 32);
-        // TODO: Define a common Rect type and use it for params here
         var entry = base_entry;
         for(0..rect_height) |i_y| {
             var i = rect_x + ((rect_y + i_y) << 5);
@@ -682,6 +684,7 @@ pub const Tile4Bpp = extern union {
     pub fn fill(self: *volatile Tile4Bpp, color: u4) void {
         @setRuntimeSafety(false);
         var color_data: u32 = @as(u32, color);
+        color_data |= color_data << 4;
         color_data |= color_data << 8;
         color_data |= color_data << 16;
         for(0..8) |i| {
@@ -694,14 +697,8 @@ pub const Tile4Bpp = extern union {
     /// for each tile.
     pub fn fillLine(tiles: []volatile Tile4Bpp, color: u4) void {
         @setRuntimeSafety(false);
-        var color_data: u32 = @as(u32, color);
-        color_data |= color_data << 8;
-        color_data |= color_data << 16;
-        var data: [*]volatile u32 = @ptrCast(&tiles[0].data_32);
-        const data_len = tiles.len << 3;
-        for(0..data_len) |i| {
-            data[i] = color_data;
-        }
+        const color_8: u8 = color | (@as(u8, color) << 4);
+        gba.mem.memset(tiles.ptr, color_8, tiles.len << 5);
     }
     
     /// Get the color of a pixel at a given coordinate.

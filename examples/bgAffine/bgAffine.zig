@@ -27,11 +27,10 @@ pub export fn main() void {
     gba.display.bg_palette.banks[0][15] = .white;
     
     // Initialize a regular background. This will be used to display text.
-    gba.display.bg_ctrl[0] = .{
-        .base_screenblock = 4,
-        .size = .normal_32x32,
-    };
-    const normal_bg_map = gba.display.BackgroundMap.initCtrl(gba.display.bg_ctrl[0]);
+    const normal_bg_map = gba.display.BackgroundMap.setup(0, .{
+        .base_screenblock = 31,
+        .size = .size_32x32,
+    });
     normal_bg_map.getBaseScreenblock().fillRect(.{ .tile = 128 }, 0, 0, 32, 16);
     normal_bg_map.getBaseScreenblock().fillRectLinear(.{ .tile = 128 }, 0, 16, 32, 4);
     

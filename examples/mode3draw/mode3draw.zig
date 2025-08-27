@@ -20,7 +20,7 @@ pub export fn main() void {
     mode3.drawRectOutline(109, 73, 22, 14, .black);
     mode3.drawRectOutline(12, 88, 96, 64, .yellow);
     
-    // // Draw lines.
+    // Draw lines.
     for(0..9) |i| {
         const m: u8 = @intCast(i);
         const n: u5 = @intCast(3 * m + 7);

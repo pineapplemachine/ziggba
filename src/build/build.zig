@@ -6,6 +6,9 @@ pub const color = @import("color.zig");
 pub const font = @import("font.zig");
 pub const image = @import("image.zig");
 
+pub const LoggerInterface = @import("../gba/debug.zig").LoggerInterface;
+pub const CharsetFlags = font.CharsetFlags;
+
 const gba_linker_script_path = "src/gba/gba.ld";
 const gba_start_zig_file_path = "src/gba/start.zig";
 const gba_lib_file_path = "src/gba/gba.zig";
@@ -20,16 +23,20 @@ const asm_file_paths = [_][]const u8{
 pub const GbaBuild = struct {
     pub const CliOptions = struct {
         debug: bool = false,
+        safe: bool = false,
         gdb: bool = false,
     };
     
     /// These build options control some aspects of how ZigGBA is compiled.
     pub const BuildOptions = struct {
+        /// Choose default logger for use with `gba.debug.print` and
+        /// `gba.debug.write`.
+        default_logger: LoggerInterface = .mgba,
         /// Options relating to `gba.text`.
         /// Each charset flag, e.g. `charset_latin`, controls whether `gba.text`
         /// will embed font data for a certain subset of Unicode code points
         /// into the compiled ROM.
-        text_charsets: font.CharsetFlags = .{},
+        text_charsets: CharsetFlags = .{},
     };
     
     /// `std.Target.Query` object for GBA thumb compilation target.
@@ -66,11 +73,18 @@ pub const GbaBuild = struct {
                 break;
             }
         }
+        var optimize_mode: std.builtin.OptimizeMode = .ReleaseFast;
+        if(cli_options.debug) {
+            optimize_mode = .Debug;
+        }
+        else if(cli_options.safe) {
+            optimize_mode = .ReleaseSafe;
+        }
         return .{
             .b = b,
             .ziggba_dep = ziggba_dep,
             .thumb_target = b.resolveTargetQuery(GbaBuild.thumb_target_query),
-            .optimize_mode = if(cli_options.debug) .Debug else .ReleaseFast,
+            .optimize_mode = optimize_mode,
             .gdb = cli_options.gdb,
         };
     }
@@ -112,6 +126,13 @@ pub const GbaBuild = struct {
                     "Build the GBA ROM in debug mode instead of release mode.",
                 ) orelse false;
             },
+            .safe = blk: {
+                break :blk b.option(
+                    bool,
+                    "safe",
+                    "Build the GBA ROM in ReleaseSafe mode instead of ReleaseFast.",
+                ) orelse false;
+            },
             .gdb = blk: {
                 break :blk b.option(
                     bool,
@@ -129,13 +150,8 @@ pub const GbaBuild = struct {
         build_options: BuildOptions,
     ) *std.Build.Step.Options {
         const b_options = b.addOptions();
-        inline for(font.charsets) |charset| {
-            b_options.addOption(
-                bool,
-                "text_charset_" ++ charset.name,
-                @field(build_options.text_charsets, charset.name),
-            );
-        }
+        b_options.addOption(LoggerInterface, "default_logger", build_options.default_logger);
+        b_options.addOption(CharsetFlags, "text_charsets", build_options.text_charsets);
         return b_options;
     }
     

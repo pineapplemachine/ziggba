@@ -16,7 +16,7 @@
 //!         // Update the input state object.
 //!         input.poll();
 //! 
-//!         if(input.startIsJustPressed()) {
+//!         if(input.isJustPressed(.start)) {
 //!             // Do something when the start button was just pressed
 //!         }
 //!     }
@@ -26,17 +26,27 @@
 const gba = @import("gba.zig");
 
 /// Enumeration of physical buttons (or "keys") on the GBA console.
-pub const Key = enum {
-    A,
-    B,
-    select,
-    start,
-    right,
-    left,
-    up,
-    down,
-    R,
-    L,
+pub const Key = enum(u4) {
+    /// "A" face button (right side).
+    A = 0,
+    /// "B" face button (left side).
+    B = 1,
+    /// "SELECT" button.
+    select = 2,
+    /// "START" button.
+    start = 3,
+    /// D-pad right.
+    right = 4,
+    /// D-pad left.
+    left = 5,
+    /// D-pad up.
+    up = 6,
+    /// D-pad down.
+    down = 7,
+    /// Right shoulder button.
+    R = 8,
+    /// Left shoulder button.
+    L = 9,
 };
 
 /// Holds a bitfield representing the state of each of the console's buttons.
@@ -94,59 +104,9 @@ pub const KeysState = packed struct(u16) {
         };
     }
     
-    /// Returns true when the system's A (right) face button was pressed down.
-    pub inline fn aIsPressed(self: KeysState) bool {
-        return self.button_a == .pressed;
-    }
-    
-    /// Returns true when the system's B (left) face button was pressed down.
-    pub inline fn bIsPressed(self: KeysState) bool {
-        return self.button_b == .pressed;
-    }
-    
-    /// Returns true when the system's select button was pressed down.
-    pub inline fn selectIsPressed(self: KeysState) bool {
-        return self.button_select == .pressed;
-    }
-    
-    /// Returns true when the system's start button was pressed down.
-    pub inline fn startIsPressed(self: KeysState) bool {
-        return self.button_start == .pressed;
-    }
-    
-    /// Returns true when the system's dpad right button was pressed down.
-    pub inline fn rightIsPressed(self: KeysState) bool {
-        return self.button_right == .pressed;
-    }
-    
-    /// Returns true when the system's dpad left button was pressed down.
-    pub inline fn leftIsPressed(self: KeysState) bool {
-        return self.button_left == .pressed;
-    }
-    
-    /// Returns true when the system's dpad up button was pressed down.
-    pub inline fn upIsPressed(self: KeysState) bool {
-        return self.button_up == .pressed;
-    }
-    
-    /// Returns true when the system's dpad down button was pressed down.
-    pub inline fn downIsPressed(self: KeysState) bool {
-        return self.button_down == .pressed;
-    }
-    
-    /// Returns true when the system's R (right) shoulder button was pressed down.
-    pub inline fn rIsPressed(self: KeysState) bool {
-        return self.button_r == .pressed;
-    }
-    
-    /// Returns true when the system's L (left) shoulder button was pressed down.
-    pub inline fn lIsPressed(self: KeysState) bool {
-        return self.button_l == .pressed;
-    }
-    
     /// Returns true when any of the system's buttons were pressed down.
-    pub inline fn anyIsPressed(self: KeysState) bool {
-        return @as(u16, self) != 0x07ff;
+    pub inline fn isAnyPressed(self: KeysState) bool {
+        return @as(u16, @bitCast(self)) != 0x03ff;
     }
     
     /// Returns a signed integer representing the state of the system's
@@ -156,8 +116,8 @@ pub const KeysState = packed struct(u16) {
     /// +1 when right is pressed but not left, and 0 otherwise.
     pub fn getAxisHorizontal(self: KeysState) i2 {
         return (
-            @as(i2, if(self.leftIsPressed()) -1 else 0) +
-            @as(i2, if(self.rightIsPressed()) 1 else 0)
+            @as(i2, if(self.isPressed(.left)) -1 else 0) +
+            @as(i2, if(self.isPressed(.right)) 1 else 0)
         );
     }
     
@@ -168,8 +128,8 @@ pub const KeysState = packed struct(u16) {
     /// +1 when down is pressed but not up, and 0 otherwise.
     pub fn getAxisVertical(self: KeysState) i2 {
         return (
-            @as(i2, if(self.upIsPressed()) -1 else 0) +
-            @as(i2, if(self.downIsPressed()) 1 else 0)
+            @as(i2, if(self.isPressed(.up)) -1 else 0) +
+            @as(i2, if(self.isPressed(.down)) 1 else 0)
         );
     }
     
@@ -180,8 +140,8 @@ pub const KeysState = packed struct(u16) {
     /// +1 when R is pressed but not L, and 0 otherwise.
     pub fn getAxisShoulders(self: KeysState) i2 {
         return (
-            @as(i2, if(self.lIsPressed()) -1 else 0) +
-            @as(i2, if(self.rIsPressed()) 1 else 0)
+            @as(i2, if(self.isPressed(.L)) -1 else 0) +
+            @as(i2, if(self.isPressed(.R)) 1 else 0)
         );
     }
 };
@@ -229,159 +189,14 @@ pub const BufferedKeysState = packed struct(u32) {
         return self.previous.isPressed(key) and !self.current.isPressed(key);
     }
     
-    /// Returns true when the system's A (right) face button is currently pressed down.
-    pub inline fn aIsPressed(self: BufferedKeysState) bool {
-        return self.current.aIsPressed();
-    }
-    
-    /// Returns true when the system's A (right) face button was just pressed.
-    pub inline fn aIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.aIsPressed() and !self.previous.aIsPressed();
-    }
-    
-    /// Returns true when the system's A (right) face button was just released.
-    pub inline fn aIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.aIsPressed() and !self.current.aIsPressed();
-    }
-    
-    /// Returns true when the system's B (left) face button is currently pressed down.
-    pub inline fn bIsPressed(self: BufferedKeysState) bool {
-        return self.current.bIsPressed();
-    }
-    
-    /// Returns true when the system's B (left) face button was just pressed.
-    pub inline fn bIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.bIsPressed() and !self.previous.bIsPressed();
-    }
-    
-    /// Returns true when the system's B (left) face button was just released.
-    pub inline fn bIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.bIsPressed() and !self.current.bIsPressed();
-    }
-    
-    /// Returns true when the system's select button is currently pressed down.
-    pub inline fn selectIsPressed(self: BufferedKeysState) bool {
-        return self.current.selectIsPressed();
-    }
-    
-    /// Returns true when the system's select button was just pressed.
-    pub inline fn selectIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.selectIsPressed() and !self.previous.selectIsPressed();
-    }
-    
-    /// Returns true when the system's select button was just released.
-    pub inline fn selectIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.selectIsPressed() and !self.current.selectIsPressed();
-    }
-    
-    /// Returns true when the system's start button is currently pressed down.
-    pub inline fn startIsPressed(self: BufferedKeysState) bool {
-        return self.current.startIsPressed();
-    }
-    
-    /// Returns true when the system's start button was just pressed.
-    pub inline fn startIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.startIsPressed() and !self.previous.startIsPressed();
-    }
-    
-    /// Returns true when the system's start button was just released.
-    pub inline fn startIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.startIsPressed() and !self.current.startIsPressed();
-    }
-    
-    /// Returns true when the system's dpad right button is currently pressed down.
-    pub inline fn rightIsPressed(self: BufferedKeysState) bool {
-        return self.current.rightIsPressed();
-    }
-    
-    /// Returns true when the system's dpad right button was just pressed.
-    pub inline fn rightIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.rightIsPressed() and !self.previous.rightIsPressed();
-    }
-    
-    /// Returns true when the system's dpad right button was just released.
-    pub inline fn rightIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.rightIsPressed() and !self.current.rightIsPressed();
-    }
-    
-    /// Returns true when the system's dpad left button is currently pressed down.
-    pub inline fn leftIsPressed(self: BufferedKeysState) bool {
-        return self.current.leftIsPressed();
-    }
-    
-    /// Returns true when the system's dpad left button was just pressed.
-    pub inline fn leftIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.leftIsPressed() and !self.previous.leftIsPressed();
-    }
-    
-    /// Returns true when the system's dpad left button was just released.
-    pub inline fn leftIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.leftIsPressed() and !self.current.leftIsPressed();
-    }
-    
-    /// Returns true when the system's dpad up button is currently pressed down.
-    pub inline fn upIsPressed(self: BufferedKeysState) bool {
-        return self.current.upIsPressed();
-    }
-    
-    /// Returns true when the system's dpad up button was just pressed.
-    pub inline fn upIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.upIsPressed() and !self.previous.upIsPressed();
-    }
-    
-    /// Returns true when the system's dpad up button was just released.
-    pub inline fn upIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.upIsPressed() and !self.current.upIsPressed();
-    }
-    
-    /// Returns true when the system's dpad down button is currently pressed down.
-    pub inline fn downIsPressed(self: BufferedKeysState) bool {
-        return self.current.downIsPressed();
-    }
-    
-    /// Returns true when the system's dpad down button was just pressed.
-    pub inline fn downIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.downIsPressed() and !self.previous.downIsPressed();
-    }
-    
-    /// Returns true when the system's dpad down button was just released.
-    pub inline fn downIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.downIsPressed() and !self.current.downIsPressed();
-    }
-    
-    /// Returns true when the system's R (right) shoulder button is currently pressed down.
-    pub inline fn rIsPressed(self: BufferedKeysState) bool {
-        return self.current.rIsPressed();
-    }
-    
-    /// Returns true when the system's R (right) shoulder button was just pressed.
-    pub inline fn rIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.rIsPressed() and !self.previous.rIsPressed();
-    }
-    
-    /// Returns true when the system's R (right) shoulder button was just released.
-    pub inline fn rIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.rIsPressed() and !self.current.rIsPressed();
-    }
-    
-    /// Returns true when the system's L (left) shoulder button is currently pressed down.
-    pub inline fn lIsPressed(self: BufferedKeysState) bool {
-        return self.current.lIsPressed();
-    }
-    
-    /// Returns true when the system's L (left) shoulder button was just pressed.
-    pub inline fn lIsJustPressed(self: BufferedKeysState) bool {
-        return self.current.lIsPressed() and !self.previous.lIsPressed();
-    }
-    
-    /// Returns true when the system's L (left) shoulder button was just released.
-    pub inline fn lIsJustReleased(self: BufferedKeysState) bool {
-        return self.previous.lIsPressed() and !self.current.lIsPressed();
+    /// Returns true when any of the system's buttons are currently pressed down.
+    pub inline fn isAnyPressed(self: BufferedKeysState) bool {
+        return self.current.isAnyPressed();
     }
     
     /// Returns true when any of the system's buttons are currently pressed down.
-    pub inline fn anyIsPressed(self: BufferedKeysState) bool {
-        return self.current.anyIsPressed();
+    pub inline fn isAnyJustPressed(self: BufferedKeysState) bool {
+        return self.current.isAnyPressed() and !self.previous.isAnyPressed();
     }
     
     /// Returns a signed integer representing the state of the system's
@@ -458,6 +273,18 @@ pub const InterruptControl = packed struct(u16) {
     /// Determines whether to trigger an interrupt when any of the selected
     /// keys are pressed, or when all of them are pressed.
     condition: Condition = .any,
+    
+    /// Set the state of a given key to `KeyState.select`.
+    pub fn select(self: *volatile InterruptControl, key: Key) void {
+        const self_16: u16 = @bitCast(self.*);
+        self.* = @bitCast(self_16 | (@as(u16, 1) << @intFromEnum(key)));
+    }
+    
+    /// Set the state of a given key to `KeyState.ignore`.
+    pub fn ignore(self: *volatile InterruptControl, key: Key) void {
+        const self_16: u16 = @bitCast(self.*);
+        self.* = @bitCast(self_16 & ~(@as(u16, 1) << @intFromEnum(key)));
+    }
 };
 
 /// Records the current state of the GBA's buttons (also called "keys").

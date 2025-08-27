@@ -7,228 +7,28 @@
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
-const build_options = @import("ziggba_build_options");
+// Imports related to supported character sets.
+pub const charset_latin = @import("text_charsets.zig").charset_latin;
+pub const charset_latin_supplement = @import("text_charsets.zig").charset_latin_supplement;
+pub const charset_greek = @import("text_charsets.zig").charset_greek;
+pub const charset_cyrillic = @import("text_charsets.zig").charset_cyrillic;
+pub const charset_arrows = @import("text_charsets.zig").charset_arrows;
+pub const charset_cjk_symbols = @import("text_charsets.zig").charset_cjk_symbols;
+pub const charset_kana = @import("text_charsets.zig").charset_kana;
+pub const charset_fullwidth = @import("text_charsets.zig").charset_fullwidth;
+pub const all_charsets = @import("text_charsets.zig").all_charsets;
+pub const CharsetFlags = @import("text_charsets.zig").CharsetFlags;
+pub const Charset = @import("text_charsets.zig").Charset;
+pub const enabled_charsets = @import("text_charsets.zig").enabled_charsets;
 
 // Import Unicode-related helpers.
 pub const CodePointAlignment = @import("text_unicode.zig").CodePointAlignment;
 pub const getCodePointAlignment = @import("text_unicode.zig").getCodePointAlignment;
 pub const CodePointIterator = @import("text_unicode.zig").CodePointIterator;
 
-// The seemingly obvious solution of using an optional pointer for a
-// `Charset` without data causes the compiler to crash in 0.14.1.
-// https://github.com/ziglang/zig/issues/24593
-const charset_data_empty: [0]u8 = .{};
-
-/// Contains data regarding supported character sets for text rendering.
-pub const Charset = struct {
-    pub const CharHeader = packed struct(u32) {
-        /// Width of character in pixels.
-        /// If this is 8 or less, then the character's bitmap data is stored
-        /// in 8-bit rows. Otherwise, it's stored in 16-bit rows.
-        size_x: u4 = 0,
-        /// Height of character in pixels.
-        /// Indicates the number of rows of bitmap data belonging to this
-        /// character.
-        size_y: u4 = 0,
-        /// A Y offset of this character, representing an amount of empty
-        /// space above the first populated row of the character.
-        offset_y: u4 = 0,
-        /// Unused padding bits.
-        _: u4 = 0,
-        /// Offset of character bitmap within the binary charset data.
-        data_offset: u16 = 0,
-    };
-    
-    pub const none: Charset = .{
-        .enabled = false,
-        .data = &charset_data_empty,
-        .code_point_min = 0,
-        .code_point_max = 0,
-    };
-    
-    /// Records whether support for this charset has been enabled in
-    /// build options.
-    enabled: bool,
-    /// Spacing and image data for this charset, if enabled,
-    /// or an empty array if not enabled.
-    data: []align(2) const u8,
-    /// Inclusive low bound of Unicode code point range represented by
-    /// this charset.
-    code_point_min: u16,
-    /// Inclusive high bound of Unicode code point range represented by
-    /// this charset.
-    code_point_max: u16,
-    
-    pub inline fn getHeader(self: Charset, index: u16) *align(2) const CharHeader {
-        const header_data: [*]align(2) const CharHeader = @ptrCast(self.data);
-        return &header_data[index];
-    }
-    
-    pub fn containsCodePoint(self: Charset, point: i32) bool {
-        return point >= self.code_point_min and point <= self.code_point_max;
-    }
-    
-    pub fn hasData(self: Charset) bool {
-        return self.data.len > 0;
-    }
-};
-
-const charset_latin_data align(2) = blk: {
-    if (build_options.text_charset_latin) {
-        break :blk @embedFile("ziggba_font_latin.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_latin = Charset{
-    .enabled = build_options.text_charset_latin,
-    .code_point_min = 0x20,
-    .code_point_max = 0x7f,
-    .data = &charset_latin_data,
-};
-
-const charset_latin_supplement_data align(2) = blk: {
-    if (build_options.text_charset_latin_supplement) {
-        break :blk @embedFile("ziggba_font_latin_supplement.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_latin_supplement = Charset{
-    .enabled = build_options.text_charset_latin_supplement,
-    .code_point_min = 0xa0,
-    .code_point_max = 0xff,
-    .data = &charset_latin_supplement_data,
-};
-
-const charset_greek_data align(2) = blk: {
-    if (build_options.text_charset_greek) {
-        break :blk @embedFile("ziggba_font_greek.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_greek = Charset{
-    .enabled = build_options.text_charset_greek,
-    .code_point_min = 0x0370,
-    .code_point_max = 0x03ff,
-    .data = &charset_greek_data,
-};
-
-const charset_cyrillic_data align(2) = blk: {
-    if (build_options.text_charset_cyrillic) {
-        break :blk @embedFile("ziggba_font_cyrillic.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_cyrillic = Charset{
-    .enabled = build_options.text_charset_cyrillic,
-    .code_point_min = 0x0400,
-    .code_point_max = 0x04ff,
-    .data = &charset_cyrillic_data,
-};
-
-const charset_arrows_data align(2) = blk: {
-    if (build_options.text_charset_arrows) {
-        break :blk @embedFile("ziggba_font_arrows.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_arrows = Charset{
-    .enabled = build_options.text_charset_arrows,
-    .code_point_min = 0x2190,
-    .code_point_max = 0x21ff,
-    .data = &charset_arrows_data,
-};
-
-const charset_cjk_symbols_data align(2) = blk: {
-    if (build_options.text_charset_cjk_symbols) {
-        break :blk @embedFile("ziggba_font_cjk_symbols.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_cjk_symbols = Charset{
-    .enabled = build_options.text_charset_cjk_symbols,
-    .code_point_min = 0x3000,
-    .code_point_max = 0x303f,
-    .data = &charset_cjk_symbols_data,
-};
-
-const charset_kana_data align(2) = blk: {
-    if (build_options.text_charset_kana) {
-        break :blk @embedFile("ziggba_font_kana.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_kana = Charset{
-    .enabled = build_options.text_charset_kana,
-    .code_point_min = 0x3040,
-    .code_point_max = 0x30ff,
-    .data = &charset_kana_data,
-};
-
-const charset_fullwidth_data align(2) = blk: {
-    if (build_options.text_charset_fullwidth) {
-        break :blk @embedFile("ziggba_font_fullwidth.bin").*;
-    }
-    else {
-        break :blk charset_data_empty;
-    }
-};
-pub const charset_fullwidth = Charset{
-    .enabled = build_options.text_charset_fullwidth,
-    .code_point_min = 0xff00,
-    .code_point_max = 0xff60,
-    .data = &charset_fullwidth_data,
-};
-
-/// List of all supported charsets.
-pub const all_charsets = [_]Charset{
-    charset_latin,
-    charset_latin_supplement,
-    charset_greek,
-    charset_cyrillic,
-    charset_arrows,
-    charset_cjk_symbols,
-    charset_kana,
-    charset_fullwidth,
-};
-
-const num_enabled_charsets: u8 = blk: {
-    var count: u8 = 0;
-    for(all_charsets) |charset| {
-        count += @intFromBool(charset.hasData());
-    }
-    break :blk count;
-};
-
-/// List of all supported charsets whose font image data has been embedded
-/// based on ZigGBA's build options.
-pub const enabled_charsets = blk: {
-    var array: [num_enabled_charsets]Charset = @splat(.none);
-    var array_index: u8 = 0;
-    for(all_charsets) |charset| {
-        if(charset.hasData()) {
-            array[array_index] = charset;
-            array_index += 1;
-        }
-    }
-    assert(array_index == array.len);
-    break :blk array;
-};
-
-const GlyphLayoutIterator = struct {
+/// Helper used for text-drawing functions.
+/// Provides a common interface for laying out text.
+pub const GlyphLayoutIterator = struct {
     // TODO: Might be helpful to support line wrapping
     // TODO: Support combining characters (e.g. 0x0300-0x036f)
     
@@ -236,17 +36,34 @@ const GlyphLayoutIterator = struct {
     pub const full_height = 12;
     pub const full_width = 10;
     
+    pub const Wrap = enum(u2) {
+        /// No automatic text wrapping.
+        none,
+        /// Hard cutoffs at the end of lines.
+        simple,
+        // TODO: `smart` wrap:
+        // Try to break at word boundaries, and hyphenate when breaking
+        // in the middle of words.
+        // This could be reasonably implemented via a lookahead of ~8 chars
+        // when nearing the line length limit to find the best place to wrap.
+    };
+    
     pub const Glyph = struct {
+        /// Represents end of text.
         pub const eof: Glyph = .{ .point = -1 };
-        pub const unknown: Glyph = .{ .point = 0 };
+        /// Unknown or unprintable code point.
+        pub const unprintable: Glyph = .{ .point = 0 };
         
         point: i32,
         data: ?[*]const u8 = null,
         data_is_wide: bool = false,
         x: u16 = 0,
         y: u16 = 0,
+        next_x: u16 = 0,
         size_x: u4 = 0,
         size_y: u4 = 0,
+        truncated_x: bool = false,
+        truncated_y: bool = false,
         
         pub fn getDataRow(self: Glyph, row_i: u4) u16 {
             assert(self.data != null);
@@ -264,53 +81,70 @@ const GlyphLayoutIterator = struct {
             return self.point < 0;
         }
         
-        pub fn isUnknown(self: Glyph) bool {
+        pub fn isUnprintable(self: Glyph) bool {
             return self.data == null;
         }
     };
     
+    /// Options accepted by `init`.
     pub const InitOptions = struct {
+        /// Text to be laid out.
         text: []const u8,
+        /// X position of text, top-left corner.
         x: u16,
+        /// Y position of text, top-left corner.
         y: u16,
+        /// Clip text rendering exceeding this width in pixels.
         max_width: u16 = 0xffff,
+        /// Clip text rendering exceeding this height in pixels.
         max_height: u16 = 0xffff,
+        /// Increment Y by this amount for new lines.
         line_height: u8 = full_height,
+        // Width of the space character 0x20 `' '`.
         space_width: u8 = default_space_width,
+        /// Characters normally less wide than this are padded to this width.
+        /// Can be used, for example, to make text appear monospace.
         pad_character_width: u8 = 0,
+        /// Text wrapping behavior.
+        wrap: Wrap = .none,
     };
     
     points: CodePointIterator,
-    prev_point: i32 = -1,
-    max_width: u16 = 0xffff,
-    max_height: u16 = 0xffff,
+    max_x: u16 = 0xffff,
+    max_y: u16 = 0xffff,
     line_height: u8 = full_height,
     space_width: u8 = default_space_width,
     pad_character_width: u8 = 0,
     x_initial: u16,
     x: u16,
     y: u16,
+    wrap: Wrap,
     
     pub fn init(options: InitOptions) GlyphLayoutIterator {
         return .{
             .points = .init(options.text),
-            .max_width = options.max_width,
-            .max_height = options.max_height,
+            .max_x = options.max_width +| options.x,
+            .max_y = options.max_height +| options.y,
             .x_initial = options.x,
             .x = options.x,
             .y = options.y + options.line_height - full_height,
             .line_height = options.line_height,
             .space_width = options.space_width,
             .pad_character_width = options.pad_character_width,
+            .wrap = options.wrap,
         };
     }
     
+    fn startNextLine(self: *GlyphLayoutIterator) void {
+        self.x = self.x_initial;
+        self.y += self.line_height;
+    }
+    
     pub fn next(self: *GlyphLayoutIterator) Glyph {
-        if(self.y >= self.max_height) {
+        if(self.y >= self.max_y) {
             return .eof;
         }
         const point = self.points.next();
-        defer self.prev_point = point;
         if(point < 0) {
             return .eof;
         }
@@ -322,8 +156,11 @@ const GlyphLayoutIterator = struct {
                 self.x = (self.x & 0xfff0) + 0x10;
             },
             '\n' => { // line feed
-                self.x = self.x_initial;
-                self.y += self.line_height;
+                self.startNextLine();
+            },
+            0x00ad => { // soft hyphen
+                // TODO: Printable iff it's the last character on a line
+                return .unprintable;
             },
             0x2002 => { // en space
                 self.x += full_height >> 1;
@@ -360,17 +197,25 @@ const GlyphLayoutIterator = struct {
             else => {
                 for(enabled_charsets) |charset| {
                     if(charset.containsCodePoint(point)) {
-                        return self.layoutGlyph(charset, point);
+                        var glyph = self.layoutGlyph(charset, point);
+                        if(self.wrap != .none and (
+                            glyph.x > self.x_initial and glyph.truncated_x
+                        )) {
+                            self.startNextLine();
+                            glyph = self.layoutGlyph(charset, point);
+                        }
+                        self.x = glyph.next_x;
+                        return glyph;
                     }
                 }
             }
         }
-        return .unknown;
+        return .unprintable;
     }
     
     /// Helper called by `GlyphLayoutIterator.next` for a matching charset.
     fn layoutGlyph(
-        self: *GlyphLayoutIterator,
+        self: GlyphLayoutIterator,
         charset: Charset,
         point: i32,
     ) Glyph {
@@ -380,11 +225,12 @@ const GlyphLayoutIterator = struct {
         const header = charset.getHeader(
             @as(u16, @intCast(point)) - charset.code_point_min
         );
+        var next_x = self.x;
         var x = self.x;
         const y = self.y;
         const size_x = @max(header.size_x, self.pad_character_width);
         if(size_x >= full_width) {
-            self.x += size_x + 1;
+            next_x += size_x + 1;
             if(self.pad_character_width > header.size_x) {
                 x += (self.pad_character_width - header.size_x) >> 1;
             }
@@ -392,44 +238,49 @@ const GlyphLayoutIterator = struct {
         else {
             switch(glyph_align) {
                 .normal => {
-                    self.x += size_x + 1;
+                    next_x += size_x + 1;
                     if(self.pad_character_width > header.size_x) {
                         x += (self.pad_character_width - header.size_x) >> 1;
                     }
                 },
                 .fullwidth_left => {
-                    self.x += full_width;
+                    next_x += full_width;
                 },
                 .fullwidth_right => {
                     x += full_width - header.size_x - 1;
-                    self.x += full_width;
+                    next_x += full_width;
                 },
                 .fullwidth_center => {
                     x += (full_width - size_x) >> 1;
-                    self.x += full_width;
+                    next_x += full_width;
                 },
             }
         }
         const data = &charset.data[header.data_offset];
+        const truncated_x = x > (self.max_x - header.size_x);
+        const truncated_y = y > (self.max_y - header.size_y);
         return .{
             .point = point,
             .data = @ptrCast(data),
             .data_is_wide = header.size_x > 8,
             .x = x,
             .y = y + header.offset_y,
-            .size_x = @min(
-                header.size_x,
-                self.max_width - @min(self.max_width, x),
+            .next_x = next_x,
+            .size_x = (
+                if(truncated_x) @intCast(self.max_x - header.size_x)
+                else header.size_x
             ),
-            .size_y = @min(
-                header.size_y,
-                self.max_height - @min(self.max_height, y)
+            .size_y = (
+                if(truncated_y) @intCast(self.max_y - header.size_y)
+                else header.size_y
             ),
+            .truncated_x = truncated_x,
+            .truncated_y = truncated_y,
         };
     }
 };
 
-/// Options type accepted by `drawToCharblock4Bpp`.
+/// Options accepted by `drawToCharblock4Bpp`.
 pub const DrawToCharblock4BppOptions = struct {
     /// Location in memory where the text should be drawn.
     /// This tile is treated as the top-left corner.
@@ -478,6 +329,8 @@ pub const DrawToCharblock4BppOptions = struct {
     /// Except for some specially tagged fullwidth characters, the character
     /// will be centered in the widened space.
     pad_character_width: u8 = 0,
+    /// Text wrapping behavior.
+    wrap: GlyphLayoutIterator.Wrap = .none,
 };
 
 // TODO: Add similar functions for other kinds of render targets.
@@ -493,6 +346,7 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
         .line_height = options.line_height,
         .space_width = options.space_width,
         .pad_character_width = options.pad_character_width,
+        .wrap = options.wrap,
     });
     while(true) {
         @setRuntimeSafety(false);
@@ -500,7 +354,7 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
         if(glyph.isEof()) {
             return;
         }
-        else if(glyph.isUnknown()) {
+        else if(glyph.isUnprintable()) {
             continue;
         }
         for(0..glyph.size_y) |row_i| {

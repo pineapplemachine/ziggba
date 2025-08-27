@@ -74,7 +74,7 @@ memset32_thumb:
 // Clobbers r3 and r12
 memcpy_arm:
     cmp     r2, #1
-    bxls    lr                  // return if n < 1
+    bxlt    lr                  // return if n < 1
     ands    r3, r0, #1          // var lsb = dst & 1
     beq     .memcpy_arm_dst_16_aligned // branch if lsb == 0
     ands    r3, r1, #1          // lsb = src & 1
@@ -117,7 +117,7 @@ memcpy_arm:
 // Clobbers r3 and r12
 memcpy16_arm:
     cmp     r2, #1
-    bxls    lr                  // return if n < 1
+    bxlt    lr                  // return if n < 1
     ands    r3, r0, #3          // var lsb = dst & 3
     beq     .memcpy16_arm_dst_32_aligned // branch if lsb == 0
     ands    r3, r1, #3          // lsb = src & 3
