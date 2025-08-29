@@ -82,16 +82,16 @@ pub fn BitmapPair(comptime BitmapT: type) type {
 /// Parameterized `Bitmap` type corresponding to the VRAM layout used for
 /// graphics mode 3, which uses a single 16bpp buffer.
 /// These buffers are sometimes also called "pages" or "frames".
-pub const Mode3Bitmap = gba.bitmap.Bitmap16Bpp;
+pub const Mode3Bitmap = gba.image.Surface16Bpp;
 
 /// Parameterized `Bitmap` type corresponding to the VRAM layout used for
 /// graphics mode 4, which uses two 8bpp (256-color) buffers.
-pub const Mode4Bitmap = gba.bitmap.Bitmap8BppVram;
+pub const Mode4Bitmap = gba.image.Surface8BppVram;
 
 /// Parameterized `Bitmap` type corresponding to the VRAM layout used for
 /// graphics mode 5, which uses two 16bpp buffers.
 /// These buffers are sometimes also called "pages" or "frames".
-pub const Mode5Bitmap = gba.bitmap.Bitmap16Bpp;
+pub const Mode5Bitmap = gba.image.Surface16Bpp;
 
 /// Get a helper for accessing bitmap data in graphics mode 3.
 pub fn getMode3Bitmap() Mode3Bitmap {
