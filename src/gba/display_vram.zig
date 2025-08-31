@@ -87,9 +87,7 @@ pub const Screenblock = extern union {
     
     /// Fill every tile in this screenblock with a given entry.
     pub fn fill(self: *volatile Screenblock, entry: Screenblock.Entry) void {
-        for(0..self.entries.len) |i| {
-            self.entries[i] = entry;
-        }
+        gba.mem.memset16(self, @bitCast(entry), self.entries.len);
     }
     
     /// Fill every tile within a rect in this screenblock with a given entry.
@@ -607,9 +605,131 @@ pub const Charblock = extern union {
     bpp_8: [256]Tile8Bpp,
     /// Background charblocks and screenblocks share the same VRAM.
     screenblocks: [8]Screenblock,
+    
+    pub const Surface4BppSize = enum(u4) {
+        size_1x512 = 0,
+        size_2x256 = 1,
+        size_4x128 = 2,
+        size_8x64 = 3,
+        size_16x32 = 4,
+        size_32x16 = 5,
+        size_64x8 = 6,
+        size_128x4 = 7,
+        size_256x2 = 8,
+        size_512x1 = 9,
+        
+        pub fn initWidth(width: u10) Surface4BppSize {
+            return switch(width) {
+                1 => size_1x512,
+                2 => size_2x256,
+                4 => size_4x128,
+                8 => size_8x64,
+                16 => size_16x32,
+                32 => size_32x16,
+                64 => size_64x8,
+                128 => size_128x4,
+                256 => size_256x2,
+                512 => size_512x1,
+                else => unreachable,
+            };
+        }
+        
+        pub fn initHeight(height: u10) Surface4BppSize {
+            return switch(height) {
+                1 => size_512x1,
+                2 => size_256x2,
+                4 => size_128x4,
+                8 => size_64x8,
+                16 => size_32x16,
+                32 => size_16x32,
+                64 => size_8x64,
+                128 => size_4x128,
+                256 => size_2x256,
+                512 => size_1x512,
+                else => unreachable,
+            };
+        }
+        
+        pub fn getWidth(self: Surface4BppSize) u10 {
+            return @as(u10, 1) << @intFromEnum(self);
+        }
+        
+        pub fn getHeight(self: Surface4BppSize) u10 {
+            return @as(u10, 1) << (9 - @intFromEnum(self));
+        }
+    };
+    
+    pub const Surface8BppSize = enum(u4) {
+        size_1x256 = 0,
+        size_2x128 = 1,
+        size_4x64 = 2,
+        size_8x32 = 3,
+        size_16x16 = 4,
+        size_32x8 = 5,
+        size_64x4 = 6,
+        size_128x2 = 7,
+        size_256x1 = 8,
+        
+        pub fn initWidth(width: u10) Surface8BppSize {
+            return switch(width) {
+                1 => size_1x256,
+                2 => size_2x128,
+                4 => size_4x64,
+                8 => size_8x32,
+                16 => size_16x16,
+                32 => size_32x8,
+                64 => size_64x4,
+                128 => size_128x2,
+                256 => size_256x1,
+                else => unreachable,
+            };
+        }
+        
+        pub fn initHeight(height: u10) Surface8BppSize {
+            return switch(height) {
+                1 => size_256x1,
+                2 => size_128x2,
+                4 => size_64x4,
+                8 => size_32x8,
+                16 => size_16x16,
+                32 => size_8x32,
+                64 => size_4x64,
+                128 => size_2x128,
+                256 => size_1x256,
+                else => unreachable,
+            };
+        }
+        
+        pub fn getWidth(self: Surface8BppSize) u10 {
+            return @as(u10, 1) << @intFromEnum(self);
+        }
+        
+        pub fn getHeight(self: Surface8BppSize) u10 {
+            return @as(u10, 1) << (8 - @intFromEnum(self));
+        }
+    };
+    
+    pub fn getSurface4Bpp(
+        self: *volatile Charblock,
+        size: Surface4BppSize,
+    ) SurfaceTiles4Bpp {
+        const w = size.getWidth();
+        const h = size.getHeight();
+        return .init(w, h, w, &self.bpp_4);
+    }
+    
+    pub fn getSurface8Bpp(
+        self: *volatile Charblock,
+        size: Surface8BppSize,
+    ) SurfaceTiles8Bpp {
+        const w = size.getWidth();
+        const h = size.getHeight();
+        return .init(w, h, w, &self.bpp_8);
+    }
 };
 
 pub const CharblockTiles = extern union {
+    charblocks: [6]Charblock,
     /// Provides access to charblock data as 16-color 4bpp tiles.
     bpp_4: [3072]Tile4Bpp,
     /// Provides access to charblock data as 256-color 8bpp tiles.
@@ -619,6 +739,7 @@ pub const CharblockTiles = extern union {
 };
 
 pub const BackgroundCharblockTiles = extern union {
+    charblocks: [4]Charblock,
     /// Provides access to charblock data as 16-color 4bpp tiles.
     bpp_4: [2048]Tile4Bpp,
     /// Provides access to charblock data as 256-color 8bpp tiles.
@@ -628,6 +749,7 @@ pub const BackgroundCharblockTiles = extern union {
 };
 
 pub const ObjectCharblockTiles = extern union {
+    charblocks: [2]Charblock,
     /// Provides access to charblock data as 16-color 4bpp tiles.
     bpp_4: [1024]Tile4Bpp,
     /// Provides access to charblock data as 256-color 8bpp tiles.
@@ -672,9 +794,32 @@ pub const TileBpp = enum(u1) {
 /// Represents a 16-color 8x8 pixel tile, 4 bits per pixel.
 /// Also called an "s-tile", or single-size tile.
 pub const Tile4Bpp = extern union {
+    pub const Row = extern union {
+        data_8: [4]u8,
+        data_16: [2]u16,
+        data_32: [1]u32,
+        
+        pub fn initFill(px: u4) Row {
+            const px_8 = @as(u8, px) | (@as(u8, px) << 4);
+            return .{ .data_8 = @splat(px_8) };
+        }
+        
+        pub fn getPixel(self: Row, x: u3) u4 {
+            const x_half = x >> 1;
+            return switch(x & 1) {
+                0 => @truncate(self.data_8[x_half]),
+                1 => @truncate(self.data_8[x_half] >> 4),
+                else => unreachable,
+            };
+        }
+    };
+    
+    pub const Bpp = TileBpp.bpp_4;
+    
     data_8: [32]u8,
     data_16: [16]u16,
     data_32: [8]u32,
+    rows: [8]Row,
     
     pub fn init(data_8: [32]u8) Tile4Bpp {
         return Tile4Bpp{ .data_8 = data_8 };
@@ -755,9 +900,28 @@ pub const Tile4Bpp = extern union {
 /// Represents a 256-color 8x8 pixel tile, 8 bits per pixel.
 /// Also called a "d-tile", or double-size tile.
 pub const Tile8Bpp = extern union {
+    pub const Row = extern union {
+        pixels: [8]u8,
+        data_8: [8]u8,
+        data_16: [4]u16,
+        data_32: [2]u32,
+        
+        pub fn initFill(px: u8) Row {
+            return .{ .pixels = @splat(px) };
+        }
+        
+        pub fn getPixel(self: Row, x: u3) u8 {
+            return self.pixels[x];
+        }
+    };
+    
+    pub const Bpp = TileBpp.bpp_8;
+    
     pixels: [64]u8,
+    data_8: [64]u8,
     data_16: [32]u16,
     data_32: [16]u32,
+    rows: [8]Row,
     
     pub fn init(pixels: [64]u8) Tile8Bpp {
         return Tile8Bpp{ .pixels = pixels };
@@ -769,6 +933,8 @@ pub const Tile8Bpp = extern union {
         const i: u8 = x + (@as(u8, y) << 3);
         return self.pixels[i];
     }
+    
+    // TODO: Rename to setPixel/setPixelVram
     
     /// Set the color of a pixel at a given coordinate.
     /// Colors are indices into a palette.

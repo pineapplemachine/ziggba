@@ -8,24 +8,24 @@ const assert = @import("std").debug.assert;
 /// at least 1 byte large.
 fn pxmemset(
     /// Data type being written to the destination.
-    comptime PixelT: type,
+    comptime Pixel: type,
     /// Whether the destination disallows writes smaller than 16 bits.
     comptime vram: bool,
     /// Write pixels to this destination.
-    destination: *align(@sizeOf(PixelT)) volatile anyopaque,
+    destination: *align(@sizeOf(Pixel)) volatile anyopaque,
     /// Set pixels to this value.
-    px: PixelT,
+    px: Pixel,
     /// Number of pixels to set.
     len: u32,
 ) void {
-    if(comptime(@sizeOf(PixelT) == 1)) {
+    if(comptime(@sizeOf(Pixel) == 1)) {
         if(comptime(vram)) {
             const destination_u8: [*]volatile u8 = @ptrCast(destination);
             if((@intFromPtr(destination_u8) & 1) == 0) {
                 gba.mem.memset(destination_u8, @bitCast(px), len);
             }
             else if(len > 0) {
-                gba.mem.vramSetByte(destination_u8, @bitCast(px));
+                gba.mem.setByteVram(destination_u8, @bitCast(px));
                 gba.mem.memset(&destination_u8[1], @bitCast(px), len - 1);
             }
         }
@@ -33,13 +33,13 @@ fn pxmemset(
             gba.mem.memset(destination, @bitCast(px), len);
         }
     }
-    else if(comptime(@sizeOf(PixelT) == 2)) {
+    else if(comptime(@sizeOf(Pixel) == 2)) {
         gba.mem.memset16(destination, @bitCast(px), len);
     }
-    else if(comptime(@sizeOf(PixelT) == 4)) {
+    else if(comptime(@sizeOf(Pixel) == 4)) {
         gba.mem.memset32(destination, @bitCast(px), len);
     }
-    else if(comptime(!vram or (@sizeOf(PixelT) & 1) == 0)) {
+    else if(comptime(!vram or (@sizeOf(Pixel) & 1) == 0)) {
         for(0..len) |i| {
             destination[i] = px;
         }
@@ -56,20 +56,19 @@ pub fn Surface(
     /// with palette indices for each pixel, or `gba.ColorRgb555` for a 16bpp
     /// bitmap with a 16-bit color for each pixel.
     comptime PixelT: type,
-    /// Expected byte alignment of bitmap data in memory.
-    comptime data_align: comptime_int,
     /// All writes to the backing bitmap data must be at least 16-bit writes,
-    /// and not 8-bit writes. This is important if `PixelT` is less than
-    /// 16 bits, and if the bitmap data resides in the system's VRAM.
+    /// and not 8-bit writes, if this flag is set.
+    /// This is important if `PixelT` is less than 16 bits, and if the bitmap
+    /// data resides in the system's VRAM.
     comptime vram: bool,
 ) type {
-    if(vram and ((data_align & 1) != 0)) {
-        @compileError("If vram is true, data_align must be a multiple of 2.");
-    }
     return struct {
         const Self = @This();
         
         pub const Pixel = PixelT;
+        pub const data_align = (
+            if(vram) @max(2, @alignOf(Pixel)) else @alignOf(Pixel)
+        );
         
         /// Width of the bitmap, in pixels.
         width: u32 = 0,
@@ -79,13 +78,13 @@ pub fn Surface(
         /// This allows for the possibility of padding.
         pitch: u32 = 0,
         /// Memory containing pixel data for this bitmap.
-        data: [*]align(data_align) volatile PixelT,
+        data: [*]align(data_align) volatile Pixel,
         
         pub fn init(
             width: u32,
             height: u32,
             pitch: u32,
-            data: [*]align(data_align) volatile PixelT,
+            data: [*]align(data_align) volatile Pixel,
         ) Self {
             assert(width <= pitch);
             return .{
@@ -104,13 +103,25 @@ pub fn Surface(
             height: u32,
             pitch: u32,
         ) !Self {
-            const data = try allocator.alloc(PixelT, height * pitch);
+            const data = try allocator.alloc(Pixel, height * pitch);
             return .init(width, height, pitch, data);
         }
         
         /// Free pixel data belonging to a given allocator.
         pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
             allocator.free(self.data);
+        }
+        
+        /// Get a surface referring to the same underlying bitmap data,
+        /// ensuring no writes smaller than 16 bits.
+        /// The `data` pointer must be at least 16-bit aligned.
+        pub fn inVram(self: Self) Surface(Pixel, true) {
+            return .init(
+                self.width,
+                self.height,
+                self.pitch,
+                @alignCast(self.data),
+            );
         }
         
         /// Get a `data` index corresponding to a given pixel coordinate
@@ -124,30 +135,40 @@ pub fn Surface(
             return self.height * self.pitch;
         }
         
+        /// Get width in pixels.
+        pub fn getWidth(self: Self) u32 {
+            return self.width;
+        }
+        
+        /// Get height in pixels.
+        pub fn getHeight(self: Self) u32 {
+            return self.height;
+        }
+        
         /// Set the value associated with a pixel at a given coordinate
         /// within the bitmap.
-        pub fn setPixel(self: Self, x: u32, y: u32, px: PixelT) void {
+        pub fn setPixel(self: Self, x: u32, y: u32, px: Pixel) void {
             assert(x < self.width and y < self.height);
-            if(comptime(@sizeOf(PixelT) > 1 or !vram)) {
+            if(comptime(@sizeOf(Pixel) > 1 or !vram)) {
                 self.data[self.getPixelIndex(x, y)] = px;
             }
             else {
                 const i = self.getPixelIndex(x, y);
-                gba.mem.vramSetByte(&self.data[i], @bitCast(px));
+                gba.mem.setByteVram(&self.data[i], @bitCast(px));
             }
         }
         
         /// Retrieve the value associated with a pixel at a given coordinate
         /// within the bitmap.
-        pub fn getPixel(self: Self, x: u32, y: u32) PixelT {
+        pub fn getPixel(self: Self, x: u32, y: u32) Pixel {
             assert(x < self.width and y < self.height);
             return self.data[self.getPixelIndex(x, y)];
         }
         
         /// Fill the entire bitmap with a given pixel value.
-        pub fn fill(self: Self, px: PixelT) void {
-            if(self.width - self.pitch <= 8) {
-                pxmemset(PixelT, vram, self.data, px, self.pitch * self.height);
+        pub fn fill(self: Self, px: Pixel) void {
+            if(self.width == self.pitch) {
+                pxmemset(Pixel, vram, self.data, px, self.pitch * self.height);
             }
             else {
                 for(0..self.height) |y| {
@@ -163,7 +184,7 @@ pub fn Surface(
             y: u32,
             width: u32,
             height: u32,
-            px: PixelT,
+            px: Pixel,
         ) void {
             assert(x + width <= self.width and y + height <= self.height);
             SurfaceDrawUtil(Self).fillRect(self, x, y, width, height, px);
@@ -176,7 +197,7 @@ pub fn Surface(
             y: u32,
             width: u32,
             height: u32,
-            px: PixelT,
+            px: Pixel,
         ) void {
             assert(x + width <= self.width and y + height <= self.height);
             SurfaceDrawUtil(Self).drawRectOutline(self, x, y, width, height, px);
@@ -189,11 +210,11 @@ pub fn Surface(
             x: u32,
             y: u32,
             len: u32,
-            px: PixelT,
+            px: Pixel,
         ) void {
             assert(x + len <= self.width and y < self.height);
             const i = self.getPixelIndex(x, y);
-            pxmemset(PixelT, vram, &self.data[i], px, len);
+            pxmemset(Pixel, vram, &self.data[i], px, len);
         }
         
         /// Draw a strictly vertical line, starting at the provided `x`, `y`
@@ -203,7 +224,7 @@ pub fn Surface(
             x: u32,
             y: u32,
             len: u32,
-            px: PixelT,
+            px: Pixel,
         ) void {
             assert(x < self.width and y + len <= self.height);
             SurfaceDrawUtil(Self).drawLineVertical(self, x, y, len, px);
@@ -217,10 +238,401 @@ pub fn Surface(
             y0: u32,
             x1: u32,
             y1: u32,
-            px: PixelT,
+            px: Pixel,
         ) void {
             assert(x0 < self.width and y0 < self.height);
             assert(x1 < self.width and y1 < self.height);
+            SurfaceDrawUtil(Self).drawLine(self, x0, y0, x1, y1, px);
+        }
+    };
+}
+
+/// Parameterized type for interacting with VRAM tiles as a surface.
+fn SurfaceTiles(
+    bpp: gba.display.TileBpp,
+    /// All writes to the backing bitmap data must be at least 16-bit writes,
+    /// and not 8-bit writes, if this flag is set.
+    /// This is important if the bitmap data resides in the system's VRAM.
+    comptime vram: bool,
+) type {
+    return struct {
+        const Self = @This();
+        
+        pub const Tile = switch(bpp) {
+            .bpp_4 => gba.display.Tile4Bpp,
+            .bpp_8 => gba.display.Tile8Bpp,
+        };
+        pub const Pixel = switch(bpp) {
+            .bpp_4 => u4,
+            .bpp_8 => u8,
+        };
+        pub const data_align = if(vram) @sizeOf(Tile) else @alignOf(Tile);
+        
+        /// Width of the bitmap, in tiles.
+        width_tiles: u16 = 0,
+        /// Height of the bitmap, in tiles.
+        height_tiles: u16 = 0,
+        /// Number of tiles in each row of bitmap data.
+        /// This allows for the possibility of padding.
+        pitch_tiles: u16 = 0,
+        /// Memory containing pixel data for this bitmap.
+        data: [*]align(data_align) volatile Tile,
+        
+        pub fn init(
+            width_tiles: u16,
+            height_tiles: u16,
+            pitch_tiles: u16,
+            data: [*]align(data_align) volatile Tile,
+        ) Self {
+            assert(width_tiles <= pitch_tiles);
+            return .{
+                .width_tiles = width_tiles,
+                .height_tiles = height_tiles,
+                .pitch_tiles = pitch_tiles,
+                .data = data,
+            };
+        }
+        
+        /// Initialize a bitmap with its pixel data allocated using a
+        /// given allocator.
+        pub fn create(
+            allocator: std.mem.Allocator,
+            width_tiles: u16,
+            height_tiles: u16,
+            pitch_tiles: u16,
+        ) !Self {
+            const tiles = pitch_tiles * height_tiles;
+            const data = try allocator.alloc(Tile, tiles);
+            return .init(width_tiles, height_tiles, pitch_tiles, data);
+        }
+        
+        /// Free pixel data belonging to a given allocator.
+        pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
+            allocator.free(self.data);
+        }
+        
+        /// Get a surface referring to the same underlying bitmap data,
+        /// ensuring no writes smaller than 16 bits.
+        /// The `data` pointer must be appropriately aligned.
+        pub fn inVram(self: Self) SurfaceTiles(bpp, true) {
+            return .init(
+                self.width_tiles,
+                self.height_tiles,
+                self.pitch_tiles,
+                @alignCast(self.data),
+            );
+        }
+        
+        /// Get the expected length of the bitmap's `data` buffer.
+        pub fn getDataLength(self: Self) u32 {
+            const tiles = pitch_tiles * height_tiles;
+            return tiles * @sizeOf(Tile);
+        }
+        
+        /// Get width in pixels.
+        pub fn getWidth(self: Self) u32 {
+            return @as(u32, self.width_tiles) << 3;
+        }
+        
+        /// Get height in pixels.
+        pub fn getHeight(self: Self) u32 {
+            return @as(u32, self.height_tiles) << 3;
+        }
+        
+        /// Get offset of a pixel within the bitmap data,
+        /// counting in nibbles (4-bit units) for 4bpp tiles and
+        /// counting in bytes for 8bpp tiles.
+        fn getPixelOffset(self: Self, x: u32, y: u32) u32 {
+            const tile_x = x >> 3;
+            const tile_y = y >> 3;
+            const tile_i = self.getTileIndex(tile_x, tile_y);
+            const tile_offset = (tile_i << 1) * @sizeOf(Tile);
+            const tile_px_x = x & 0x7;
+            const tile_px_y = y & 0x7;
+            const tile_px_offset = tile_px_x + (tile_px_y << 3);
+            return tile_offset + tile_px_offset;
+        }
+        
+        /// Get offset of a tile within the bitmap data,
+        /// counting by tiles (32-byte units).
+        pub fn getTileIndex(self: Self, tile_x: u16, tile_y: u16) u32 {
+            return tile_x + (tile_y * self.pitch_tiles);
+        }
+        
+        /// Set the value associated with a pixel at a given coordinate
+        /// within the bitmap.
+        pub fn setPixel(self: Self, x: u32, y: u32, px: Pixel) void {
+            assert(x < self.getWidth() and y < self.getHeight());
+            const i = self.getPixelOffset(x, y);
+            switch(comptime(bpp)) {
+                .bpp_4 => {
+                    if(vram) {
+                        gba.mem.setNibbleVram(self.data, i, px);
+                    }
+                    else {
+                        gba.mem.setNibble(self.data, i, px);
+                    }
+                },
+                .bpp_8 => {
+                    const data_8: [*]volatile u8 = @ptrCast(self.data);
+                    if(vram) {
+                        gba.mem.setByteVram(data_8, i, px);
+                    }
+                    else {
+                        data_8[i] = px;
+                    }
+                },
+            }
+        }
+        
+        /// Retrieve the value associated with a pixel at a given coordinate
+        /// within the bitmap.
+        pub fn getPixel(self: Self, x: u32, y: u32) Pixel {
+            assert(x < self.getWidth() and y < self.getHeight());
+            const i = self.getPixelOffset(x, y);
+            switch(comptime(bpp)) {
+                .bpp_4 => {
+                    return gba.mem.getNibble(self.data, i);
+                },
+                .bpp_8 => {
+                    const data_8: [*]volatile u8 = @ptrCast(self.data);
+                    return data_8[i];
+                },
+            };
+        }
+        
+        /// Fill the entire bitmap with a given pixel value.
+        pub fn fill(self: Self, px: Pixel) void {
+            if(self.width_tiles == self.pitch_tiles) {
+                const tiles = self.pitch_tiles * self.height_tiles;
+                const px_8: u8 = @as(u8, px) | (@as(u8, px) << 4);
+                pxmemset(
+                    u8,
+                    vram,
+                    self.data,
+                    px_8,
+                    tiles * @sizeOf(Tile),
+                );
+            }
+            else {
+                for(0..self.height_tiles) |y| {
+                    self.fillTileRow(0, y, self.width_tiles, px);
+                }
+            }
+        }
+        
+        /// Fill one tile with a given pixel value.
+        pub fn fillTile(self: Self, tile_x: u16, tile_y: u16, px: Pixel) void {
+            assert(tile_x < self.width_tiles and tile_y < self.height_tiles);
+            const tile_i = self.getTileIndex(tile_x, tile_y);
+            const px_8: u8 = @as(u8, px) | (@as(u8, px) << 4);
+            pxmemset(
+                u8,
+                vram,
+                &self.data[tile_i],
+                px_8,
+                @sizeOf(Tile),
+            );
+        }
+        
+        /// Fill a row of tiles with a given pixel value.
+        pub fn fillTileRow(
+            self: Self,
+            tile_x: u16,
+            tile_y: u16,
+            len: u16,
+            px: Pixel,
+        ) void {
+            assert(tile_x + len <= self.width_tiles);
+            assert(tile_y < self.height_tiles);
+            const tile_i = self.getTileIndex(tile_x, tile_y);
+            const px_8: u8 = @as(u8, px) | (@as(u8, px) << 4);
+            pxmemset(
+                u8,
+                vram,
+                &self.data[tile_i],
+                px_8,
+                len * @sizeOf(Tile),
+            );
+        }
+        
+        /// Fill a column of tiles with a given pixel value.
+        pub fn fillTileColumn(
+            self: Self,
+            tile_x: u16,
+            tile_y: u16,
+            len: u16,
+            px: Pixel,
+        ) void {
+            assert(tile_x < self.width_tiles);
+            assert(tile_y + len <= self.height_tiles);
+            for(0..len) |y_i| {
+                self.fillTile(tile_x, @intCast(tile_y + y_i), px);
+            }
+        }
+        
+        /// Fill a rectangular region of the bitmap with a given pixel value.
+        pub fn fillTileRect(
+            self: Self,
+            tile_x: u16,
+            tile_y: u16,
+            width_tiles: u16,
+            height_tiles: u16,
+            px: Pixel,
+        ) void {
+            assert(tile_x + width_tiles <= self.width_tiles);
+            assert(tile_y + height_tiles <= self.height_tiles);
+            for(0..height_tiles) |y_i| {
+                self.fillTileRow(
+                    tile_x,
+                    @intCast(tile_y + y_i),
+                    width_tiles,
+                    px,
+                );
+            }
+        }
+        
+        /// Fill a rectangular region of the bitmap with a given pixel value.
+        pub fn fillRect(
+            self: Self,
+            x: u32,
+            y: u32,
+            width: u32,
+            height: u32,
+            px: Pixel,
+        ) void {
+            assert(x + width <= self.getWidth());
+            assert(y + height <= self.getHeight());
+            const x_lo = x & 0x7;
+            const y_lo = y & 0x7;
+            const width_t = width - x_lo;
+            const width_t_lo = width_t & 0x7;
+            const width_t_hi = width_t & 0xfffffff8;
+            const height_t = height - y_lo;
+            const height_t_lo = height_t & 0x7;
+            const height_t_hi = height_t & 0xfffffff8;
+            const margin_left = (8 - x_lo) & 0x7;
+            const margin_top = (8 - y_lo) & 0x7;
+            const margin_right = width_t & 0x7;
+            const margin_bottom = height_t & 0x7;
+            // Interior tiles (fast)
+            self.fillTileRect(
+                (x + margin_left) >> 3,
+                (y + margin_top) >> 3,
+                width_t >> 3,
+                height_t >> 3,
+                px,
+            );
+            // Top margin
+            SurfaceDrawUtil(Self).fillRect(
+                self,
+                x,
+                y,
+                width,
+                margin_top,
+                px,
+            );
+            // Bottom margin
+            SurfaceDrawUtil(Self).fillRect(
+                self,
+                x,
+                height - margin_bottom + y,
+                width,
+                margin_bottom,
+                px,
+            );
+            // Left margin
+            SurfaceDrawUtil(Self).fillRect(
+                self,
+                x,
+                y + margin_top,
+                margin_left,
+                height_t - margin_bottom,
+                px,
+            );
+            // Right margin
+            SurfaceDrawUtil(Self).fillRect(
+                self,
+                width - margin_right + x,
+                y + margin_top,
+                margin_right,
+                height_t - margin_bottom,
+                px,
+            );
+        }
+        
+        /// Draw a single-pixel-wide outline of a rectangle.
+        pub fn drawRectOutline(
+            self: Self,
+            x: u32,
+            y: u32,
+            width: u32,
+            height: u32,
+            px: Pixel,
+        ) void {
+            assert(x + width <= self.getWidth());
+            assert(y + height <= self.getHeight());
+            SurfaceDrawUtil(Self).drawRectOutline(self, x, y, width, height, px);
+        }
+        
+        /// Draw a strictly horizontal line, starting at the provided `x`, `y`
+        /// coordinates and extending to the right for `len` pixels.
+        pub fn drawLineHorizontal(
+            self: Self,
+            x: u32,
+            y: u32,
+            len: u32,
+            px: Pixel,
+        ) void {
+            assert(x + len <= self.getWidth() and y < self.getHeight());
+            const x_lo = x & 0x7;
+            const width_t = len - x_lo;
+            const width_t_lo = width_t & 0x7;
+            const width_t_hi = width_t & 0xfffffff8;
+            const margin_left = (8 - x_lo) & 0x7;
+            const margin_right = width_t & 0x7;
+            for(0..margin_left) |x_i| {
+                self.setPixel(x + x_i, y, px);
+            }
+            for(0..margin_right) |x_i| {
+                self.setPixel(len - margin_right + x + x_i, y, px);
+            }
+            const tile_row_i = y & 0x7;
+            const tile_i = (
+                ((x + margin_left) >> 3) +
+                ((y >> 3) * self.pitch_tiles)
+            );
+            const row: Tile.Row = .initFill(px);
+            for(0..(width_t >> 3)) |x_i| {
+                self.data[tile_i + x_i].rows[tile_row_i] = row;
+            }
+        }
+        
+        /// Draw a strictly vertical line, starting at the provided `x`, `y`
+        /// coordinates and extending downward for `len` pixels.
+        pub fn drawLineVertical(
+            self: Self,
+            x: u32,
+            y: u32,
+            len: u32,
+            px: Pixel,
+        ) void {
+            assert(x < self.getWidth() and y + len <= self.getHeight());
+            SurfaceDrawUtil(Self).drawLineVertical(self, x, y, len, px);
+        }
+        
+        /// Draw a line between two points.
+        /// Uses Bresenham's line drawing algorithm.
+        pub fn drawLine(
+            self: Self,
+            x0: u32,
+            y0: u32,
+            x1: u32,
+            y1: u32,
+            px: Pixel,
+        ) void {
+            assert(x0 < self.getWidth() and y0 < self.getHeight());
+            assert(x1 < self.getWidth() and y1 < self.getHeight());
             SurfaceDrawUtil(Self).drawLine(self, x0, y0, x1, y1, px);
         }
     };
@@ -241,6 +653,9 @@ pub fn SurfaceDrawUtil(comptime SurfaceT: type) type {
             height: u32,
             px: SurfaceT.Pixel,
         ) void {
+            if(width == 0) {
+                return;
+            }
             const y_max = y + height;
             for(y..y_max) |y_i| {
                 surface.drawLineHorizontal(x, @intCast(y_i), width, px);
@@ -257,13 +672,11 @@ pub fn SurfaceDrawUtil(comptime SurfaceT: type) type {
             height: u32,
             px: SurfaceT.Pixel,
         ) void {
-            if(width == 0) {
-                if(height == 0) {
-                    surface.setPixel(x, y, px);
-                }
-                else {
-                    surface.drawLineVertical(x, y, height, px);
-                }
+            if(width == 0 or height == 0) {
+                return;
+            }
+            else if(width == 1) {
+                surface.drawLineVertical(x, y, height, px);
             }
             else {
                 surface.drawLineHorizontal(x, y, width, px);
@@ -287,10 +700,8 @@ pub fn SurfaceDrawUtil(comptime SurfaceT: type) type {
             len: u32,
             px: SurfaceT.Pixel,
         ) void {
-            const y_max = y + len;
-            var y_i: u32 = y;
-            while(y_i < y_max) : (y_i += 1) {
-                surface.setPixel(x, y_i, px);
+            for(0..len) |y_i| {
+                surface.setPixel(x, y + y_i, px);
             }
         }
         
@@ -421,16 +832,42 @@ pub fn SurfaceDrawUtil(comptime SurfaceT: type) type {
 
 /// Represents a bitmap where each pixel is associated with a
 /// `gba.ColorRgb555` 16-bit color value.
-pub const Surface16Bpp = Surface(gba.ColorRgb555, 2, true);
+pub const Surface16Bpp = Surface(gba.ColorRgb555, true);
 
 /// Represents a bitmap where each pixel is associated with an
 /// 8-bit palette index.
 /// Use `Surface8BppVram` instead for a bitmap located in VRAM,
 /// which does not support 8-bit writes.
-pub const Surface8Bpp = Surface(u8, 1, false);
+pub const Surface8Bpp = Surface(u8, false);
 
 /// Represents a bitmap where each pixel is associated with an
 /// 8-bit palette index.
 /// Always writes 16 bits at a time, meaning it's safe to use
 /// for a bitmap located in the GBA's VRAM.
-pub const Surface8BppVram = Surface(u8, 2, true);
+pub const Surface8BppVram = Surface(u8, true);
+
+/// Represents a bitmap where pixels are laid out in 4bpp tiles,
+/// like for use with a background or object/sprite.
+/// Use `SurfaceTiles4BppVram` instead for a bitmap located in VRAM,
+/// which does not support 8-bit writes.
+pub const SurfaceTiles4Bpp = SurfaceTiles(.bpp_4, false);
+
+/// Represents a bitmap where pixels are laid out in 4bpp tiles,
+/// like for use with a background or object/sprite.
+/// Always writes 16 bits at a time, meaning it's safe to use
+/// for a bitmap located in the GBA's VRAM.
+pub const SurfaceTiles4BppVram = SurfaceTiles(.bpp_4, true);
+
+/// Represents a bitmap where pixels are laid out in 8bpp tiles,
+/// like for use with a background or object/sprite.
+/// Use `SurfaceTiles4BppVram` instead for a bitmap located in VRAM,
+/// which does not support 8-bit writes.
+pub const SurfaceTiles8Bpp = SurfaceTiles(.bpp_8, false);
+
+/// Represents a bitmap where pixels are laid out in 8bpp tiles,
+/// like for use with a background or object/sprite.
+/// Always writes 16 bits at a time, meaning it's safe to use
+/// for a bitmap located in the GBA's VRAM.
+pub const SurfaceTiles8BppVram = SurfaceTiles(.bpp_8, true);
+
+
