@@ -28,7 +28,7 @@ pub const CodePointIterator = @import("text_unicode.zig").CodePointIterator;
 
 /// Helper used for text-drawing functions.
 /// Provides a common interface for laying out text.
-pub const GlyphLayoutIterator = struct {
+pub const TextLayoutIterator = struct {
     // TODO: Might be helpful to support line wrapping
     // TODO: Support combining characters (e.g. 0x0300-0x036f)
     
@@ -87,7 +87,7 @@ pub const GlyphLayoutIterator = struct {
     };
     
     /// Options accepted by `init`.
-    pub const InitOptions = struct {
+    pub const Options = struct {
         /// Text to be laid out.
         text: []const u8,
         /// X position of text, top-left corner.
@@ -120,7 +120,7 @@ pub const GlyphLayoutIterator = struct {
     y: u16,
     wrap: Wrap,
     
-    pub fn init(options: InitOptions) GlyphLayoutIterator {
+    pub fn init(options: Options) TextLayoutIterator {
         return .{
             .points = .init(options.text),
             .max_x = options.max_width +| options.x,
@@ -135,12 +135,12 @@ pub const GlyphLayoutIterator = struct {
         };
     }
     
-    fn startNextLine(self: *GlyphLayoutIterator) void {
+    fn startNextLine(self: *TextLayoutIterator) void {
         self.x = self.x_initial;
         self.y += self.line_height;
     }
     
-    pub fn next(self: *GlyphLayoutIterator) Glyph {
+    pub fn next(self: *TextLayoutIterator) Glyph {
         if(self.y >= self.max_y) {
             return .eof;
         }
@@ -213,9 +213,9 @@ pub const GlyphLayoutIterator = struct {
         return .unprintable;
     }
     
-    /// Helper called by `GlyphLayoutIterator.next` for a matching charset.
+    /// Helper called by `TextLayoutIterator.next` for a matching charset.
     fn layoutGlyph(
-        self: GlyphLayoutIterator,
+        self: TextLayoutIterator,
         charset: Charset,
         point: i32,
     ) Glyph {
@@ -280,23 +280,14 @@ pub const GlyphLayoutIterator = struct {
     }
 };
 
-/// Options accepted by `drawToCharblock4Bpp`.
-pub const DrawToCharblock4BppOptions = struct {
-    /// Location in memory where the text should be drawn.
-    /// This tile is treated as the top-left corner.
-    /// Normally, this should be a location in VRAM.
-    target: [*]volatile gba.display.Tile4Bpp,
-    /// Determines how many tiles are considered to constitute one row.
-    /// Number of tiles wide is computed as `1 << pitch_shift`.
-    ///
-    /// You probably want this to be the width in 8x8 tiles of the
-    /// destination where the text will be drawn, i.e. not more than
-    /// `1 << 5 == 32` (includes full width of the GBA's screen).
-    pitch_shift: u4 = 5,
-    /// Palette color index for drawn text.
-    color: u4,
+pub fn DrawTextOptions(comptime SurfaceT: type) {
     /// The text to draw, either ASCII or UTF-8 encoded.
     text: []const u8,
+    /// Target to which text should be drawn.
+    surface: SurfaceT,
+    /// Data to write to the surface for each pixel of the displayed text.
+    /// Typically either a palette color or `gba.ColorRgb555`.
+    pixel: SurfaceT.Pixel,
     /// Start drawing text at this X position.
     x: u16,
     /// Start drawing text at this Y position.
@@ -319,7 +310,7 @@ pub const DrawToCharblock4BppOptions = struct {
     /// Width in pixels of the space character (' ', 0x20).
     /// Default is 3 pixels. For monospace text with ASCII digits and
     /// upper-case letters, use 6 pixels.
-    space_width: u8 = GlyphLayoutIterator.default_space_width,
+    space_width: u8 = TextLayoutIterator.default_space_width,
     /// When a character is less wide than this number of pixels, make it
     /// take up this amount of space anyway.
     ///
@@ -330,19 +321,26 @@ pub const DrawToCharblock4BppOptions = struct {
     /// will be centered in the widened space.
     pad_character_width: u8 = 0,
     /// Text wrapping behavior.
-    wrap: GlyphLayoutIterator.Wrap = .none,
-};
+    wrap: TextLayoutIterator.Wrap = .none,
+}
 
-// TODO: Add similar functions for other kinds of render targets.
-
-/// Draw text to memory structured as 16-color background or object tile data.
-pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
-    var layoutGlyphs = GlyphLayoutIterator.init(.{
+/// Draw text using a default font provided with ZigGBA.
+pub fn drawText(
+    comptime SurfaceT: type,
+    options: DrawTextOptions(SurfaceT),
+) void {
+    var layoutGlyphs = TextLayoutIterator.init(.{
         .text = options.text,
         .x = options.x,
         .y = options.y,
-        .max_width = @min(options.max_width, @as(u16, 8) << options.pitch_shift),
-        .max_height = options.max_height,
+        .max_width = @min(
+            options.max_width,
+            options.surface.getWidth() - options.x,
+        ),
+        .max_height = @min(
+            options.max_height,
+            options.surface.getHeight() - options.y,
+        ),
         .line_height = options.line_height,
         .space_width = options.space_width,
         .pad_character_width = options.pad_character_width,
@@ -365,14 +363,10 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
                 if(pixel != 0) {
                     const px_x = glyph.x + col_i;
                     const px_y = glyph.y + row_i;
-                    var tile = &options.target[
-                        (px_x >> 3) +
-                        ((px_y >> 3) << options.pitch_shift)
-                    ];
-                    tile.setPixel16(
-                        @truncate(px_x),
-                        @truncate(px_y),
-                        options.color,
+                    options.surface.setPixel(
+                        @intCast(px_x),
+                        @intCast(px_y),
+                        options.pixel,
                     );
                 }
             }
