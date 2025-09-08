@@ -11,8 +11,8 @@ pub export fn main() void {
     gba.display.ctrl.* = .initMode4(.{});
     
     // Load graphics data into VRAM.
-    gba.mem.memcpy(gba.display.getMode4Bitmap(0).data, &front_image_data, front_image_data.len);
-    gba.mem.memcpy(gba.display.getMode4Bitmap(1).data, &back_image_data, back_image_data.len);
+    gba.mem.memcpy(gba.display.getMode4Surface(0).data, &front_image_data, front_image_data.len);
+    gba.mem.memcpy(gba.display.getMode4Surface(1).data, &back_image_data, back_image_data.len);
     gba.mem.memcpy(gba.display.bg_palette, &palette_data, palette_data.len);
     
     // Enable VBlank interrupts.

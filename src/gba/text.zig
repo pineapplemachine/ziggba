@@ -26,10 +26,14 @@ pub const CodePointAlignment = @import("text_unicode.zig").CodePointAlignment;
 pub const getCodePointAlignment = @import("text_unicode.zig").getCodePointAlignment;
 pub const CodePointIterator = @import("text_unicode.zig").CodePointIterator;
 
+// TODO: It will be tricky in combination with the plan for smarter
+// word wrapping, which is going to require a lookahead buffer of a handful
+// of characters, but it ought to be feasible to make text layout and rendering
+// happen via a stream (e.g. with formatted text).
+
 /// Helper used for text-drawing functions.
 /// Provides a common interface for laying out text.
 pub const TextLayoutIterator = struct {
-    // TODO: Might be helpful to support line wrapping
     // TODO: Support combining characters (e.g. 0x0300-0x036f)
     
     pub const default_space_width = 3;
@@ -280,66 +284,72 @@ pub const TextLayoutIterator = struct {
     }
 };
 
-pub fn DrawTextOptions(comptime SurfaceT: type) {
-    /// The text to draw, either ASCII or UTF-8 encoded.
-    text: []const u8,
-    /// Target to which text should be drawn.
-    surface: SurfaceT,
-    /// Data to write to the surface for each pixel of the displayed text.
-    /// Typically either a palette color or `gba.ColorRgb555`.
-    pixel: SurfaceT.Pixel,
-    /// Start drawing text at this X position.
-    x: u16,
-    /// Start drawing text at this Y position.
-    y: u16,
-    /// Clip text past this width.
-    ///
-    /// This applies from the top-left corner of reserved space, not from the
-    /// (X, Y) coordinate of drawn text.
-    ///
-    /// If this value is larger than `8px << pitch_shift`, then the text
-    /// is clipped to that width limit instead.
-    max_width: u16 = 0xffff,
-    /// Clip text past this height.
-    ///
-    /// This applies from the top-left corner of reserved space, not from the
-    /// (X, Y) coordinate of drawn text.
-    max_height: u16 = 0xffff,
-    /// Added to Y position to represent a newline ('\n').
-    line_height: u8 = 12,
-    /// Width in pixels of the space character (' ', 0x20).
-    /// Default is 3 pixels. For monospace text with ASCII digits and
-    /// upper-case letters, use 6 pixels.
-    space_width: u8 = TextLayoutIterator.default_space_width,
-    /// When a character is less wide than this number of pixels, make it
-    /// take up this amount of space anyway.
-    ///
-    /// Supplying a `space_width` of 6 and a `pad_character_width` of 5
-    /// will result in monospace text, if not using any extra wide characters.
-    ///
-    /// Except for some specially tagged fullwidth characters, the character
-    /// will be centered in the widened space.
-    pad_character_width: u8 = 0,
-    /// Text wrapping behavior.
-    wrap: TextLayoutIterator.Wrap = .none,
+pub fn DrawTextOptions(comptime PixelT: type) type {
+    return struct {
+        /// Data to write to the surface for each pixel of the displayed text.
+        /// Typically either a palette color or `gba.ColorRgb555`.
+        pixel: PixelT,
+        /// Start drawing text at this X position.
+        x: u16,
+        /// Start drawing text at this Y position.
+        y: u16,
+        /// Clip text past this width.
+        ///
+        /// This applies from the top-left corner of reserved space, not from the
+        /// (X, Y) coordinate of drawn text.
+        ///
+        /// If this value is larger than `8px << pitch_shift`, then the text
+        /// is clipped to that width limit instead.
+        max_width: u16 = 0xffff,
+        /// Clip text past this height.
+        ///
+        /// This applies from the top-left corner of reserved space, not from the
+        /// (X, Y) coordinate of drawn text.
+        max_height: u16 = 0xffff,
+        /// Added to Y position to represent a newline ('\n').
+        line_height: u8 = 12,
+        /// Width in pixels of the space character (' ', 0x20).
+        /// Default is 3 pixels. For monospace text with ASCII digits and
+        /// upper-case letters, use 6 pixels.
+        space_width: u8 = TextLayoutIterator.default_space_width,
+        /// When a character is less wide than this number of pixels, make it
+        /// take up this amount of space anyway.
+        ///
+        /// Supplying a `space_width` of 6 and a `pad_character_width` of 5
+        /// will result in monospace text, if not using any extra wide characters.
+        ///
+        /// Except for some specially tagged fullwidth characters, the character
+        /// will be centered in the widened space.
+        pad_character_width: u8 = 0,
+        /// Text wrapping behavior.
+        wrap: TextLayoutIterator.Wrap = .none,
+    };
 }
 
 /// Draw text using a default font provided with ZigGBA.
+/// Note that fonts will only be embedded in the ROM and available
+/// for drawing text if they are explicitly enabled in build options.
 pub fn drawText(
     comptime SurfaceT: type,
-    options: DrawTextOptions(SurfaceT),
+    comptime PixelT: type,
+    /// Surface to draw the text to.
+    surface: SurfaceT,
+    /// The text to draw, either ASCII or UTF-8 encoded.
+    text: []const u8,
+    /// Options for text layout and appearance.
+    options: DrawTextOptions(PixelT),
 ) void {
     var layoutGlyphs = TextLayoutIterator.init(.{
-        .text = options.text,
+        .text = text,
         .x = options.x,
         .y = options.y,
         .max_width = @min(
             options.max_width,
-            options.surface.getWidth() - options.x,
+            surface.getWidth() - options.x,
         ),
         .max_height = @min(
             options.max_height,
-            options.surface.getHeight() - options.y,
+            surface.getHeight() - options.y,
         ),
         .line_height = options.line_height,
         .space_width = options.space_width,
@@ -355,6 +365,8 @@ pub fn drawText(
         else if(glyph.isUnprintable()) {
             continue;
         }
+        // TODO: It's probably possible to significantly optimize this
+        // loop for VRAM by writing 16 bits of pixels at once whenever possible.
         for(0..glyph.size_y) |row_i| {
             var row = glyph.getDataRow(@truncate(row_i));
             for(0..glyph.size_x) |col_i| {
@@ -363,7 +375,7 @@ pub fn drawText(
                 if(pixel != 0) {
                     const px_x = glyph.x + col_i;
                     const px_y = glyph.y + row_i;
-                    options.surface.setPixel(
+                    surface.setPixel(
                         @intCast(px_x),
                         @intCast(px_y),
                         options.pixel,
@@ -372,4 +384,109 @@ pub fn drawText(
             }
         }
     }
+}
+
+/// Same as `drawText` but with a preset `SurfaceT` argument.
+pub fn drawText16Bpp(
+    surface: gba.image.Surface16Bpp,
+    text: []const u8,
+    options: DrawTextOptions(gba.image.Surface16Bpp.Pixel),
+) void {
+    drawText(
+        gba.image.Surface16Bpp,
+        gba.image.Surface16Bpp.Pixel,
+        surface,
+        text,
+        options,
+    );
+}
+
+/// Same as `drawText` but with a preset `SurfaceT` argument.
+pub fn drawText8Bpp(
+    surface: gba.image.Surface8Bpp,
+    text: []const u8,
+    options: DrawTextOptions(gba.image.Surface8Bpp.Pixel),
+) void {
+    drawText(
+        gba.image.Surface8Bpp,
+        gba.image.Surface8Bpp.Pixel,
+        surface,
+        text,
+        options,
+    );
+}
+
+/// Same as `drawText` but with a preset `SurfaceT` argument.
+pub fn drawText8BppVram(
+    surface: gba.image.Surface8BppVram,
+    text: []const u8,
+    options: DrawTextOptions(gba.image.Surface8BppVram.Pixel),
+) void {
+    drawText(
+        gba.image.Surface8BppVram,
+        gba.image.Surface8BppVram.Pixel,
+        surface,
+        text,
+        options,
+    );
+}
+
+/// Same as `drawText` but with a preset `SurfaceT` argument.
+pub fn drawTextTiles4Bpp(
+    surface: gba.image.SurfaceTiles4Bpp,
+    text: []const u8,
+    options: DrawTextOptions(gba.image.SurfaceTiles4Bpp.Pixel),
+) void {
+    drawText(
+        gba.image.SurfaceTiles4Bpp,
+        gba.image.SurfaceTiles4Bpp.Pixel,
+        surface,
+        text,
+        options,
+    );
+}
+
+/// Same as `drawText` but with a preset `SurfaceT` argument.
+pub fn drawTextTiles4BppVram(
+    surface: gba.image.SurfaceTiles4BppVram,
+    text: []const u8,
+    options: DrawTextOptions(gba.image.SurfaceTiles4BppVram.Pixel),
+) void {
+    drawText(
+        gba.image.SurfaceTiles4BppVram,
+        gba.image.SurfaceTiles4BppVram.Pixel,
+        surface,
+        text,
+        options,
+    );
+}
+
+/// Same as `drawText` but with a preset `SurfaceT` argument.
+pub fn drawTextTiles8Bpp(
+    surface: gba.image.SurfaceTiles8Bpp,
+    text: []const u8,
+    options: DrawTextOptions(gba.image.SurfaceTiles8Bpp.Pixel),
+) void {
+    drawText(
+        gba.image.SurfaceTiles8Bpp,
+        gba.image.SurfaceTiles8Bpp.Pixel,
+        surface,
+        text,
+        options,
+    );
+}
+
+/// Same as `drawText` but with a preset `SurfaceT` argument.
+pub fn drawTextTiles8BppVram(
+    surface: gba.image.SurfaceTiles8BppVram,
+    text: []const u8,
+    options: DrawTextOptions(gba.image.SurfaceTiles8BppVram.Pixel),
+) void {
+    drawText(
+        gba.image.SurfaceTiles8BppVram,
+        gba.image.SurfaceTiles8BppVram.Pixel,
+        surface,
+        text,
+        options,
+    );
 }

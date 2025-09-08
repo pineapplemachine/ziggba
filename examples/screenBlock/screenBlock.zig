@@ -10,11 +10,11 @@ pub export fn main() void {
     });
 
     // Initialize tiles: basic tile and a cross.
-    gba.display.bg_charblocks[0].bpp_4[0] = @bitCast([_]u32{
+    gba.display.bg_blocks.tiles_4bpp[0] = @bitCast([_]u32{
         0x11111111, 0x01111111, 0x01111111, 0x01111111,
         0x01111111, 0x01111111, 0x01111111, 0x00000001,
     });
-    gba.display.bg_charblocks[0].bpp_4[1] = @bitCast([_]u32{
+    gba.display.bg_blocks.tiles_4bpp[1] = @bitCast([_]u32{
         0x00000000, 0x00100100, 0x01100110, 0x00011000,
         0x00011000, 0x01100110, 0x00100100, 0x00000000,
     });

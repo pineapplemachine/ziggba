@@ -44,31 +44,27 @@ pub fn panic(location: ?[]const u8, message: []const u8) noreturn {
     });
     bg0_map.getBaseScreenblock().fillLinear(.{});
     gba.display.Tile4Bpp.fillLine(
-        gba.display.bg_charblock_tiles.bpp_4[0..640],
+        gba.display.bg_blocks.tiles_4bpp[0..640],
         0,
     );
-    gba.text.drawToCharblock4Bpp(.{
-        .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-        .color = 2,
+    const text_surface = gba.display.bg_blocks.getSurface4Bpp(0, 32, 32);
+    const text_header = if(location) |_| "PANIC @" else "PANIC";
+    text_surface.draw().text(text_header, .{
+        .pixel = 2,
         .x = 8,
         .y = 4,
-        .text = if(location) |_| "PANIC @" else "PANIC",
     });
     if(location) |loc| {
-        gba.text.drawToCharblock4Bpp(.{
-            .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-            .color = 2,
+        text_surface.draw().text(loc, .{
+            .pixel = 2,
             .x = 50,
             .y = 4,
-            .text = loc,
         });
     }
-    gba.text.drawToCharblock4Bpp(.{
-        .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-        .color = 1,
+    text_surface.draw().text(message, .{
+        .pixel = 1,
         .x = 8,
         .y = 20,
-        .text = message,
         .max_width = 224,
         .max_height = 140,
         .wrap = .simple, // TODO: Smarter word wrap

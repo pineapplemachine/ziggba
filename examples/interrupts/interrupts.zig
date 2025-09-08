@@ -24,14 +24,13 @@ const interrupt_names: [14][]const u8 = .{
 };
 
 fn drawInterruptNames() void {
+    const text_surface = gba.display.bg_blocks.getSurface4Bpp(0, 32, 32);
     for(0..14) |i| {
         const frame_delta = frame_counter -% interrupt_last_frame[i];
-        gba.text.drawToCharblock4Bpp(.{
-            .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-            .color = if(frame_delta <= 3) 1 else 2,
+        text_surface.draw().text(interrupt_names[i], .{
+            .pixel = if(frame_delta <= 3) 1 else 2,
             .x = 8,
             .y = @intCast(4 + (8 * i)),
-            .text = interrupt_names[i],
         });
     }
 }

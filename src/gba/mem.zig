@@ -320,12 +320,12 @@ pub fn setNibble(
     const dest_8: [*]volatile u8 = @ptrCast(destination);
     const dest_8_offset = dest_8 + (nibble_offset >> 1);
     const dest_4_lo = nibble_offset & 1;
-    const read_8 = dest_8.*;
+    const read_8 = dest_8_offset.*;
     const write_8 = (
         if(dest_4_lo == 0) (read_8 & 0xf0) | value
         else (read_8 & 0x0f) | (@as(u8, value) << 4)
     );
-    dest_8.* = write_8;
+    dest_8_offset.* = write_8;
 }
 
 /// Helper for reading a 4-bit value from memory.
@@ -335,7 +335,7 @@ pub fn getNibble(
     source: *volatile anyopaque,
     nibble_offset: u32,
 ) u4 {
-    const dest_8: [*]volatile u8 = @ptrCast(destination);
+    const dest_8: [*]volatile u8 = @ptrCast(source);
     const value_8 = dest_8[nibble_offset >> 1];
     const dest_4_lo = nibble_offset & 1;
     if(dest_4_lo == 0) {

@@ -48,19 +48,16 @@ pub export fn main() void {
     }
     
     // Draw initial static text, which doesn't change from frame to frame.
-    gba.text.drawToCharblock4Bpp(.{
-        .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4[128]),
-        .color = 15,
+    const text_surface = gba.display.bg_blocks.getSurface4Bpp(128, 32, 32);
+    text_surface.draw().text("Press left & right to rotate ↻", .{
+        .pixel = 15,
         .x = 8,
         .y = 4,
-        .text = "Press left & right to rotate ↻",
     });
-    gba.text.drawToCharblock4Bpp(.{
-        .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4[128]),
-        .color = 15,
+    text_surface.draw().text("Angle:", .{
+        .pixel = 15,
         .x = 8,
         .y = 14,
-        .text = "Angle:",
     });
     
     // Initialize the display.
@@ -107,7 +104,7 @@ pub export fn main() void {
         // Clear tiles where angle text is about to be drawn to.
         // This clears text drawn in the previous frame.
         gba.display.Tile4Bpp.fillLine(
-            gba.display.bg_charblock_tiles.bpp_4[197..205],
+            gba.display.bg_blocks.tiles_4bpp[197..205],
             0,
         );
         
@@ -120,12 +117,10 @@ pub export fn main() void {
         });
         text_buffer[fmt_len] = 0xc2; // Continuation byte (UTF-8 encoding)
         text_buffer[fmt_len + 1] = '°';
-        gba.text.drawToCharblock4Bpp(.{
-            .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4[128]),
-            .color = 15,
+        text_surface.draw().text(text_buffer[0..fmt_len + 2], .{
+            .pixel = 15,
             .x = 40,
             .y = 14,
-            .text = text_buffer[0..fmt_len + 2],
             .space_width = 6,
         });
     }

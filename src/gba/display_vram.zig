@@ -63,7 +63,7 @@ pub const Screenblock = extern union {
     
     /// Get affine tile data at a given coordinate within the single
     /// screenblock.
-    pub inline fn getAffine(self: Screenblock, index: u11) Entry {
+    pub fn getAffine(self: Screenblock, index: u11) Entry {
         return self.affine_entries[index];
     }
     
@@ -220,12 +220,12 @@ pub const BackgroundMap = struct {
     }
     
     /// Return the width of the map, in tiles. Returns either 32 or 64.
-    pub inline fn width(self: BackgroundMap) u7 {
+    pub fn width(self: BackgroundMap) u7 {
         return @as(u7, 0x20) << @intFromEnum(self.size.x);
     }
     
     /// Return the height of the map, in tiles. Returns either 32 or 64.
-    pub inline fn height(self: BackgroundMap) u7 {
+    pub fn height(self: BackgroundMap) u7 {
         return @as(u7, 0x20) << @intFromEnum(self.size.y);
     }
     
@@ -265,13 +265,13 @@ pub const BackgroundMap = struct {
     
     /// Given a tile coordinate, get the index of the screenblock which it
     /// belongs to.
-    pub inline fn getScreenblockIndex(self: BackgroundMap, x: u6, y: u6) u5 {
+    pub fn getScreenblockIndex(self: BackgroundMap, x: u6, y: u6) u5 {
         return self.base_screenblock + self.getScreenblockOffset(x, y);
     }
     
     /// Given a tile coordinate, get the offset of the screenblock which it
     /// belongs to, relative to `base_screenblock`.
-    pub inline fn getScreenblockOffset(self: BackgroundMap, x: u6, y: u6) u2 {
+    pub fn getScreenblockOffset(self: BackgroundMap, x: u6, y: u6) u2 {
         return @intCast(
             (x >> 5) +
             ((y >> 5) << @intFromEnum(self.size.x))
@@ -281,7 +281,7 @@ pub const BackgroundMap = struct {
     /// Get the number of screenblocks used by this background map,
     /// as an integer.
     /// Returns 1 for 32x32, 2 for 64x32 or 32x64, or 4 for 64x64.
-    pub inline fn getScreenblockCount(self: BackgroundMap) u3 {
+    pub fn getScreenblockCount(self: BackgroundMap) u3 {
         return @as(u3, 1) << @intFromEnum(self.size.x) << @intFromEnum(self.size.y);
     }
     
@@ -527,17 +527,17 @@ pub const AffineBackgroundMap = struct {
     /// always the same for affine backgrounds.
     ///
     /// Returns 16, 32, 64, or 128.
-    pub inline fn dimension(self: AffineBackgroundMap) u8 {
+    pub fn dimension(self: AffineBackgroundMap) u8 {
         return @as(u7, 0x10) << @intFromEnum(self.size);
     }
     
     /// Returns the same thing as `AffineBackgroundMap.dimension`.
-    pub inline fn width(self: AffineBackgroundMap) u8 {
+    pub fn width(self: AffineBackgroundMap) u8 {
         return self.dimension();
     }
     
     /// Returns the same thing as `AffineBackgroundMap.dimension`.
-    pub inline fn height(self: AffineBackgroundMap) u8 {
+    pub fn height(self: AffineBackgroundMap) u8 {
         return self.dimension();
     }
     
@@ -567,14 +567,14 @@ pub const AffineBackgroundMap = struct {
     
     /// Given a tile coordinate, get the index of the corresponding entry
     /// within the affine tile data.
-    pub inline fn getTileIndex(self: AffineBackgroundMap, x: u7, y: u7) u14 {
+    pub fn getTileIndex(self: AffineBackgroundMap, x: u7, y: u7) u14 {
         const pitch: u4 = @as(u4, 4) + @intFromEnum(self.size);
         return x + (@as(u14, y) << pitch);
     }
     
     /// Given a tile coordinate, get the index of the screenblock which it
     /// belongs to.
-    pub inline fn getScreenblockIndex(self: AffineBackgroundMap, x: u7, y: u7) u5 {
+    pub fn getScreenblockIndex(self: AffineBackgroundMap, x: u7, y: u7) u5 {
         return self.base_screenblock + (
             @as(u5, @intCast(self.getTileIndex(x, y) >> 11))
         );
@@ -583,7 +583,7 @@ pub const AffineBackgroundMap = struct {
     /// Get the number of screenblocks used by this background map,
     /// as an integer.
     /// Returns 1 for 16x16 or 32x32, 2 for 64x64, or 8 for 128x128.
-    pub inline fn getScreenblockCount(self: AffineBackgroundMap) u4 {
+    pub fn getScreenblockCount(self: AffineBackgroundMap) u4 {
         return switch(self.size) {
             .size_16 => 1,
             .size_32 => 1,
@@ -600,182 +600,135 @@ pub const AffineBackgroundMap = struct {
 /// backgrounds, and the final two are used for objects/sprites.
 pub const Charblock = extern union {
     /// Provides access to charblock data as 16-color 4bpp tiles.
-    bpp_4: [512]Tile4Bpp,
+    tiles_4bpp: [512]Tile4Bpp,
     /// Provides access to charblock data as 256-color 8bpp tiles.
-    bpp_8: [256]Tile8Bpp,
+    tiles_8bpp: [256]Tile8Bpp,
     /// Background charblocks and screenblocks share the same VRAM.
-    screenblocks: [8]Screenblock,
-    
-    pub const Surface4BppSize = enum(u4) {
-        size_1x512 = 0,
-        size_2x256 = 1,
-        size_4x128 = 2,
-        size_8x64 = 3,
-        size_16x32 = 4,
-        size_32x16 = 5,
-        size_64x8 = 6,
-        size_128x4 = 7,
-        size_256x2 = 8,
-        size_512x1 = 9,
-        
-        pub fn initWidth(width: u10) Surface4BppSize {
-            return switch(width) {
-                1 => size_1x512,
-                2 => size_2x256,
-                4 => size_4x128,
-                8 => size_8x64,
-                16 => size_16x32,
-                32 => size_32x16,
-                64 => size_64x8,
-                128 => size_128x4,
-                256 => size_256x2,
-                512 => size_512x1,
-                else => unreachable,
-            };
-        }
-        
-        pub fn initHeight(height: u10) Surface4BppSize {
-            return switch(height) {
-                1 => size_512x1,
-                2 => size_256x2,
-                4 => size_128x4,
-                8 => size_64x8,
-                16 => size_32x16,
-                32 => size_16x32,
-                64 => size_8x64,
-                128 => size_4x128,
-                256 => size_2x256,
-                512 => size_1x512,
-                else => unreachable,
-            };
-        }
-        
-        pub fn getWidth(self: Surface4BppSize) u10 {
-            return @as(u10, 1) << @intFromEnum(self);
-        }
-        
-        pub fn getHeight(self: Surface4BppSize) u10 {
-            return @as(u10, 1) << (9 - @intFromEnum(self));
-        }
-    };
-    
-    pub const Surface8BppSize = enum(u4) {
-        size_1x256 = 0,
-        size_2x128 = 1,
-        size_4x64 = 2,
-        size_8x32 = 3,
-        size_16x16 = 4,
-        size_32x8 = 5,
-        size_64x4 = 6,
-        size_128x2 = 7,
-        size_256x1 = 8,
-        
-        pub fn initWidth(width: u10) Surface8BppSize {
-            return switch(width) {
-                1 => size_1x256,
-                2 => size_2x128,
-                4 => size_4x64,
-                8 => size_8x32,
-                16 => size_16x16,
-                32 => size_32x8,
-                64 => size_64x4,
-                128 => size_128x2,
-                256 => size_256x1,
-                else => unreachable,
-            };
-        }
-        
-        pub fn initHeight(height: u10) Surface8BppSize {
-            return switch(height) {
-                1 => size_256x1,
-                2 => size_128x2,
-                4 => size_64x4,
-                8 => size_32x8,
-                16 => size_16x16,
-                32 => size_8x32,
-                64 => size_4x64,
-                128 => size_2x128,
-                256 => size_1x256,
-                else => unreachable,
-            };
-        }
-        
-        pub fn getWidth(self: Surface8BppSize) u10 {
-            return @as(u10, 1) << @intFromEnum(self);
-        }
-        
-        pub fn getHeight(self: Surface8BppSize) u10 {
-            return @as(u10, 1) << (8 - @intFromEnum(self));
-        }
-    };
-    
-    pub fn getSurface4Bpp(
-        self: *volatile Charblock,
-        size: Surface4BppSize,
-    ) SurfaceTiles4Bpp {
-        const w = size.getWidth();
-        const h = size.getHeight();
-        return .init(w, h, w, &self.bpp_4);
-    }
-    
-    pub fn getSurface8Bpp(
-        self: *volatile Charblock,
-        size: Surface8BppSize,
-    ) SurfaceTiles8Bpp {
-        const w = size.getWidth();
-        const h = size.getHeight();
-        return .init(w, h, w, &self.bpp_8);
-    }
-};
-
-pub const CharblockTiles = extern union {
-    charblocks: [6]Charblock,
-    /// Provides access to charblock data as 16-color 4bpp tiles.
-    bpp_4: [3072]Tile4Bpp,
-    /// Provides access to charblock data as 256-color 8bpp tiles.
-    bpp_8: [1536]Tile8Bpp,
-    /// Background charblocks and screenblocks share the same VRAM.
+    /// Not relevant to charblocks 5 and 6, which are for objects only.
     screenblocks: [32]Screenblock,
 };
 
-pub const BackgroundCharblockTiles = extern union {
-    charblocks: [4]Charblock,
-    /// Provides access to charblock data as 16-color 4bpp tiles.
-    bpp_4: [2048]Tile4Bpp,
-    /// Provides access to charblock data as 256-color 8bpp tiles.
-    bpp_8: [1024]Tile8Bpp,
-    /// Background charblocks and screenblocks share the same VRAM.
-    screenblocks: [32]Screenblock,
-};
+/// Helper to produce charblock types for different numbers of charblocks.
+fn BlocksType(
+    comptime charblock_count: comptime_int,
+    comptime screenblock_count: comptime_int,
+) type {
+    return extern union {
+        const Self = @This();
+        
+        charblocks: [charblock_count]Charblock,
+        /// Provides access to charblock data as 16-color 4bpp tiles.
+        tiles_4bpp: [512 * charblock_count]Tile4Bpp,
+        /// Provides access to charblock data as 256-color 8bpp tiles.
+        tiles_8bpp: [256 * charblock_count]Tile8Bpp,
+        /// Background charblocks and screenblocks share the same VRAM.
+        /// Not relevant to charblocks 5 and 6, which are for objects only.
+        screenblocks: [screenblock_count]Screenblock,
+        
+        /// Get a surface for drawing to 4bpp tiles in charblocks.
+        pub fn getSurface4Bpp(
+            self: *align(@sizeOf(Tile4Bpp)) volatile Self,
+            offset: u16,
+            width_tiles: u16,
+            height_tiles: u16,
+        ) gba.image.SurfaceTiles4BppVram {
+            return .init(
+                width_tiles,
+                height_tiles,
+                @ptrCast(&self.tiles_4bpp[offset]),
+            );
+        }
+        
+        /// Get a surface for drawing to 4bpp tiles in charblocks.
+        pub fn getSurface4BppPitch(
+            self: *align(@sizeOf(Tile4Bpp)) volatile Self,
+            offset: u16,
+            width_tiles: u16,
+            height_tiles: u16,
+            pitch_tiles: u16,
+        ) gba.image.SurfaceTiles4BppVram {
+            return .initPitch(
+                width_tiles,
+                height_tiles,
+                pitch_tiles,
+                @ptrCast(&self.tiles_4bpp[offset]),
+            );
+        }
+        
+        /// Get a surface for drawing to 8bpp tiles in charblocks.
+        pub fn getSurface8Bpp(
+            self: *align(@sizeOf(Tile8Bpp)) volatile Self,
+            offset: u16,
+            width_tiles: u16,
+            height_tiles: u16,
+        ) gba.image.SurfaceTiles8BppVram {
+            return .init(
+                width_tiles,
+                height_tiles,
+                @ptrCast(&self.tiles_8bpp[offset]),
+            );
+        }
+        
+        /// Get a surface for drawing to 8bpp tiles in charblocks.
+        pub fn getSurface8BppPitch(
+            self: *align(@sizeOf(Tile8Bpp)) volatile Self,
+            offset: u16,
+            width_tiles: u16,
+            height_tiles: u16,
+            pitch_tiles: u16,
+        ) gba.image.SurfaceTiles8BppVram {
+            return .initPitch(
+                width_tiles,
+                height_tiles,
+                pitch_tiles,
+                @ptrCast(&self.tiles_8bpp[offset]),
+            );
+        }
+    };
+}
 
-pub const ObjectCharblockTiles = extern union {
-    charblocks: [2]Charblock,
-    /// Provides access to charblock data as 16-color 4bpp tiles.
-    bpp_4: [1024]Tile4Bpp,
-    /// Provides access to charblock data as 256-color 8bpp tiles.
-    bpp_8: [512]Tile8Bpp,
-};
+pub const CombinedBlocks = BlocksType(6, 32);
 
-/// Represents all 32 screenblocks in VRAM.
-pub const screenblocks: *volatile [32]Screenblock = @ptrCast(gba.mem.vram);
+pub const BackgroundBlocks = BlocksType(4, 32);
 
-/// Represents all six charblocks in VRAM.
-pub const charblocks: *volatile [6]Charblock = @ptrCast(gba.mem.vram);
+pub const ObjectBlocks = BlocksType(2, 0);
 
-/// Represents the tiles of all six charblocks in VRAM as one flat array.
-pub const charblock_tiles: *volatile CharblockTiles = @ptrCast(charblocks);
+/// Represents all charblocks and screenblocks in VRAM, both background
+/// and object/sprite data combined.
+pub const blocks: *align(@sizeOf(Charblock)) volatile CombinedBlocks = (
+    @ptrCast(gba.mem.vram)
+);
 
-/// Represents the four charblocks in VRAM that can be used in backgrounds.
-pub const bg_charblocks: *volatile [4]Charblock = charblocks[0..4];
+/// Represents all charblocks in VRAM, both background
+/// and object/sprite charblocks combined.
+pub const charblocks: *align(@sizeOf(Charblock)) volatile [6]Charblock = (
+    @ptrCast(gba.mem.vram)
+);
 
-/// Represents the tiles of the charblocks usable with backgrounds.
-pub const bg_charblock_tiles: *volatile BackgroundCharblockTiles = @ptrCast(bg_charblocks);
+/// Represents all screenblocks in VRAM.
+pub const screenblocks: *align(@sizeOf(Charblock)) volatile [32]Screenblock = (
+    @ptrCast(gba.mem.vram)
+);
 
-/// Represents the two charblocks in VRAM that can be used in objects.
-pub const obj_charblocks: *volatile [2]Charblock = charblocks[4..6];
+/// Represents charblocks and screenblocks in VRAM usable with backgrounds.
+pub const bg_blocks: *align(@sizeOf(Charblock)) volatile BackgroundBlocks = (
+    @ptrCast(&charblocks[0])
+);
 
-/// Represents the tiles of the charblocks usable with objects.
-pub const obj_charblock_tiles: *volatile ObjectCharblockTiles = @ptrCast(obj_charblocks);
+/// Represents the four charblocks in VRAM usable with backgrounds.
+pub const bg_charblocks: *align(@sizeOf(Charblock)) volatile [4]Charblock = (
+    @ptrCast(&charblocks[0])
+);
+
+/// Represents charblocks in VRAM usable with objects/sprites.
+pub const obj_blocks: *align(@sizeOf(Charblock)) volatile ObjectBlocks = (
+    @ptrCast(&charblocks[4])
+);
+
+/// Represents the two charblocks in VRAM usable with objects/sprites.
+pub const obj_charblocks: *align(@sizeOf(Charblock)) volatile [4]Charblock = (
+    @ptrCast(&charblocks[4])
+);
 
 /// Enumeration of bits per pixel values for tiles.
 ///
@@ -1004,7 +957,7 @@ pub fn memcpyTiles8Bpp(
 
 /// Copy memory for 16-color tiles into background charblock VRAM.
 /// Wraps `memcpyTiles4Bpp` to always start in charblock 0.
-pub inline fn memcpyBackgroundTiles4Bpp(
+pub fn memcpyBackgroundTiles4Bpp(
     /// Offset in tiles. (Each 16-color tile is 32 bytes.)
     tile_offset: u16,
     /// Pointer to image data that should be copied into charblock VRAM.
@@ -1016,7 +969,7 @@ pub inline fn memcpyBackgroundTiles4Bpp(
 
 /// Copy memory for 16-color tiles into background charblock VRAM.
 /// Wraps `memcpyTiles8Bpp` to always start in charblock 0.
-pub inline fn memcpyBackgroundTiles8Bpp(
+pub fn memcpyBackgroundTiles8Bpp(
     /// Offset in tiles. (Each 256-color tile is 64 bytes.)
     tile_offset: u16,
     /// Pointer to image data that should be copied into charblock VRAM.
@@ -1028,7 +981,7 @@ pub inline fn memcpyBackgroundTiles8Bpp(
 
 /// Copy memory for 16-color tiles into object charblock VRAM.
 /// Wraps `memcpyTiles4Bpp` to always start in charblock 4.
-pub inline fn memcpyObjectTiles4Bpp(
+pub fn memcpyObjectTiles4Bpp(
     /// Offset in tiles. (Each 16-color tile is 32 bytes.)
     tile_offset: u16,
     /// Pointer to image data that should be copied into charblock VRAM.
@@ -1040,7 +993,7 @@ pub inline fn memcpyObjectTiles4Bpp(
 
 /// Copy memory for 16-color tiles into object charblock VRAM.
 /// Wraps `memcpyTiles8Bpp` to always start in charblock 4.
-pub inline fn memcpyObjectTiles8Bpp(
+pub fn memcpyObjectTiles8Bpp(
     /// Offset in tiles. (Each 256-color tile is 64 bytes.)
     tile_offset: u16,
     /// Pointer to image data that should be copied into charblock VRAM.

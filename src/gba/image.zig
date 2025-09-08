@@ -49,6 +49,234 @@ fn pxmemset(
     }
 }
 
+/// Generic helper for drawing to a surface.
+pub fn SurfaceDraw(
+    comptime SurfaceT: type,
+    comptime PixelT: type,
+) type {
+    return struct {
+        const Self = @This();
+        
+        pub const Surface = SurfaceT;
+        pub const Pixel = PixelT;
+        
+        surface: SurfaceT,
+        
+        pub fn init(surface: SurfaceT) Self {
+            return .{ .surface = surface };
+        }
+        
+        /// Draw text to the bitmap.
+        pub fn text(
+            self: Self,
+            string: []const u8,
+            options: gba.text.DrawTextOptions(Pixel),
+        ) void {
+            gba.text.drawText(SurfaceT, Pixel, self.surface, string, options);
+        }
+        
+        /// Draw a single pixel in the bitmap.
+        pub fn pixel(self: Self, x: u32, y: u32, px: Pixel) void {
+            self.surface.setPixel(x, y, px);
+        }
+        
+        /// Fill the entire bitmap with a given pixel value.
+        pub fn fill(
+            self: Self,
+            px: PixelT,
+        ) void {
+            self.surface.fill(px);
+        }
+        
+        /// Fill a rectangular region of the bitmap with a given pixel value.
+        pub fn fillRect(
+            self: Self,
+            x: u32,
+            y: u32,
+            width: u32,
+            height: u32,
+            px: PixelT,
+        ) void {
+            self.surface.fillRect(x, y, width, height, px);
+        }
+        
+        /// Draw a single-pixel-wide outline of a rectangle.
+        pub fn rectOutline(
+            self: Self,
+            x: u32,
+            y: u32,
+            width: u32,
+            height: u32,
+            px: PixelT,
+        ) void {
+            if(width == 0 or height == 0) {
+                return;
+            }
+            else if(width == 1) {
+                self.surface.drawLineVertical(x, y, height, px);
+            }
+            else {
+                self.surface.drawLineHorizontal(x, y, width, px);
+                if(height > 0) {
+                    self.surface.drawLineHorizontal(x, y + height - 1, width, px);
+                    if(height > 1) {
+                        const y1 = y + 1;
+                        const h2 = height - 2;
+                        self.surface.drawLineVertical(x, y1, h2, px);
+                        self.surface.drawLineVertical(x + width - 1, y1, h2, px);
+                    }
+                }
+            }
+        }
+        
+        /// Draw a strictly horizontal line, starting at the provided `x`, `y`
+        /// coordinates and extending to the right for `len` pixels.
+        pub fn lineHorizontal(
+            self: Self,
+            x: u32,
+            y: u32,
+            len: u32,
+            px: PixelT,
+        ) void {
+            self.surface.drawLineHorizontal(x, y, len, px);
+        }
+        
+        /// Draw a strictly vertical line, starting at the provided `x`, `y`
+        /// coordinates and extending downward for `len` pixels.
+        pub fn lineVertical(
+            self: Self,
+            x: u32,
+            y: u32,
+            len: u32,
+            px: PixelT,
+        ) void {
+            self.surface.drawLineVertical(x, y, len, px);
+        }
+        
+        /// Draw a line between two points.
+        /// Uses Bresenham's line drawing algorithm.
+        pub fn line(
+            self: Self,
+            x0: u32,
+            y0: u32,
+            x1: u32,
+            y1: u32,
+            px: PixelT,
+        ) void {
+            // Optimized special case for horizontal lines
+            if(y0 == y1) {
+                if(x0 == x1) {
+                    self.surface.setPixel(x0, y0, px);
+                }
+                else if(x0 < x1) {
+                    self.surface.drawLineHorizontal(x0, y0, x1 - x0 + 1, px);
+                }
+                else {
+                    self.surface.drawLineHorizontal(x1, y0, x0 - x1 + 1, px);
+                }
+            }
+            // Optimized special case for vertical lines
+            else if(x0 == x1) {
+                if(y0 < y1) {
+                    self.surface.drawLineVertical(x0, y0, y1 - y0 + 1, px);
+                }
+                else {
+                    self.surface.drawLineVertical(x0, y1, y0 - y1 + 1, px);
+                }
+            }
+            // General case
+            else {
+                const x0i: i32 = @intCast(x0);
+                const y0i: i32 = @intCast(y0);
+                const x1i: i32 = @intCast(x1);
+                const y1i: i32 = @intCast(y1);
+                if(@abs(y1i - y0i) < @abs(x1i - x0i)) {
+                    if(x0 > x1) {
+                        self.lineLow(x1i, y1i, x0i, y0i, px);
+                    }
+                    else {
+                        self.lineLow(x0i, y0i, x1i, y1i, px);
+                    }
+                }
+                else {
+                    if(y0 > y1) {
+                        self.lineHigh(x1i, y1i, x0i, y0i, px);
+                    }
+                    else {
+                        self.lineHigh(x0i, y0i, x1i, y1i, px);
+                    }
+                }
+            }
+        }
+
+        /// Used internally by `drawLine` for a Y/X slope of less than 1.
+        fn lineLow(
+            self: Self,
+            x0: i32,
+            y0: i32,
+            x1: i32,
+            y1: i32,
+            px: PixelT,
+        ) void {
+            assert(x0 <= x1);
+            const dx = x1 - x0;
+            var dy = y1 - y0;
+            var yi: i32 = 1;
+            if(dy < 0) {
+                yi = -1;
+                dy = -dy;
+            }
+            var diff = (dy << 1) - dx;
+            var x = x0;
+            var y = y0;
+            while(x <= x1) : (x += 1) {
+                @setRuntimeSafety(false);
+                self.surface.setPixel(@intCast(x), @intCast(y), px);
+                if(diff > 0) {
+                    y += yi;
+                    diff += ((dy - dx) << 1);
+                }
+                else {
+                    diff += (dy << 1);
+                }
+            }
+        }
+
+        /// Used internally by `drawLine` for a Y/X slope of 1 or more.
+        fn lineHigh(
+            self: Self,
+            x0: i32,
+            y0: i32,
+            x1: i32,
+            y1: i32,
+            px: PixelT,
+        ) void {
+            assert(y0 <= y1);
+            const dy = y1 - y0;
+            var dx = x1 - x0;
+            var xi: i32 = 1;
+            if(dx < 0) {
+                xi = -1;
+                dx = -dx;
+            }
+            var diff = (dx << 1) - dy;
+            var x = x0;
+            var y = y0;
+            while(y <= y1) : (y += 1) {
+                @setRuntimeSafety(false);
+                self.surface.setPixel(@intCast(x), @intCast(y), px);
+                if(diff > 0) {
+                    x += xi;
+                    diff += ((dx - dy) << 1);
+                }
+                else {
+                    diff += (dx << 1);
+                }
+            }
+        }
+    };
+}
+
 /// Implements a generic helper for reading and drawing to a bitmap,
 /// where each pixel uses at least 1 byte of memory.
 pub fn Surface(
@@ -81,6 +309,14 @@ pub fn Surface(
         data: [*]align(data_align) volatile Pixel,
         
         pub fn init(
+            width: u32,
+            height: u32,
+            data: [*]align(data_align) volatile Pixel,
+        ) Self {
+            return .initPitch(width, height, width, data);
+        }
+        
+        pub fn initPitch(
             width: u32,
             height: u32,
             pitch: u32,
@@ -122,6 +358,11 @@ pub fn Surface(
                 self.pitch,
                 @alignCast(self.data),
             );
+        }
+        
+        /// Return a helper for drawing to this surface.
+        pub fn draw(self: Self) SurfaceDraw(Self, Pixel) {
+            return .init(self);
         }
         
         /// Get a `data` index corresponding to a given pixel coordinate
@@ -187,20 +428,13 @@ pub fn Surface(
             px: Pixel,
         ) void {
             assert(x + width <= self.width and y + height <= self.height);
-            SurfaceDrawUtil(Self).fillRect(self, x, y, width, height, px);
-        }
-        
-        /// Draw a single-pixel-wide outline of a rectangle.
-        pub fn drawRectOutline(
-            self: Self,
-            x: u32,
-            y: u32,
-            width: u32,
-            height: u32,
-            px: Pixel,
-        ) void {
-            assert(x + width <= self.width and y + height <= self.height);
-            SurfaceDrawUtil(Self).drawRectOutline(self, x, y, width, height, px);
+            if(width <= 0) {
+                return;
+            }
+            const y_max = y + height;
+            for(y..y_max) |y_i| {
+                self.drawLineHorizontal(x, @intCast(y_i), width, px);
+            }
         }
         
         /// Draw a strictly horizontal line, starting at the provided `x`, `y`
@@ -227,22 +461,9 @@ pub fn Surface(
             px: Pixel,
         ) void {
             assert(x < self.width and y + len <= self.height);
-            SurfaceDrawUtil(Self).drawLineVertical(self, x, y, len, px);
-        }
-        
-        /// Draw a line between two points.
-        /// Uses Bresenham's line drawing algorithm.
-        pub fn drawLine(
-            self: Self,
-            x0: u32,
-            y0: u32,
-            x1: u32,
-            y1: u32,
-            px: Pixel,
-        ) void {
-            assert(x0 < self.width and y0 < self.height);
-            assert(x1 < self.width and y1 < self.height);
-            SurfaceDrawUtil(Self).drawLine(self, x0, y0, x1, y1, px);
+            for(0..len) |y_i| {
+                self.setPixel(x, y + y_i, px);
+            }
         }
     };
 }
@@ -279,6 +500,14 @@ fn SurfaceTiles(
         data: [*]align(data_align) volatile Tile,
         
         pub fn init(
+            width_tiles: u16,
+            height_tiles: u16,
+            data: [*]align(data_align) volatile Tile,
+        ) Self {
+            return .initPitch(width_tiles, height_tiles, width_tiles, data);
+        }
+        
+        pub fn initPitch(
             width_tiles: u16,
             height_tiles: u16,
             pitch_tiles: u16,
@@ -323,9 +552,14 @@ fn SurfaceTiles(
             );
         }
         
+        /// Return a helper for drawing to this surface.
+        pub fn draw(self: Self) SurfaceDraw(Self, Pixel) {
+            return .init(self);
+        }
+        
         /// Get the expected length of the bitmap's `data` buffer.
         pub fn getDataLength(self: Self) u32 {
-            const tiles = pitch_tiles * height_tiles;
+            const tiles = self.pitch_tiles * self.height_tiles;
             return tiles * @sizeOf(Tile);
         }
         
@@ -343,8 +577,8 @@ fn SurfaceTiles(
         /// counting in nibbles (4-bit units) for 4bpp tiles and
         /// counting in bytes for 8bpp tiles.
         fn getPixelOffset(self: Self, x: u32, y: u32) u32 {
-            const tile_x = x >> 3;
-            const tile_y = y >> 3;
+            const tile_x: u16 = @intCast(x >> 3);
+            const tile_y: u16 = @intCast(y >> 3);
             const tile_i = self.getTileIndex(tile_x, tile_y);
             const tile_offset = (tile_i << 1) * @sizeOf(Tile);
             const tile_px_x = x & 0x7;
@@ -398,7 +632,7 @@ fn SurfaceTiles(
                     const data_8: [*]volatile u8 = @ptrCast(self.data);
                     return data_8[i];
                 },
-            };
+            }
         }
         
         /// Fill the entire bitmap with a given pixel value.
@@ -492,6 +726,24 @@ fn SurfaceTiles(
             }
         }
         
+        /// Helper used by `fillRect`.
+        fn fillRectMargin(
+            self: Self,
+            x: u32,
+            y: u32,
+            width: u32,
+            height: u32,
+            px: Pixel,
+        ) void {
+            if(width <= 0) {
+                return;
+            }
+            const y_max = y + height;
+            for(y..y_max) |y_i| {
+                self.drawLineHorizontal(x, @intCast(y_i), width, px);
+            }
+        }
+        
         /// Fill a rectangular region of the bitmap with a given pixel value.
         pub fn fillRect(
             self: Self,
@@ -506,11 +758,7 @@ fn SurfaceTiles(
             const x_lo = x & 0x7;
             const y_lo = y & 0x7;
             const width_t = width - x_lo;
-            const width_t_lo = width_t & 0x7;
-            const width_t_hi = width_t & 0xfffffff8;
             const height_t = height - y_lo;
-            const height_t_lo = height_t & 0x7;
-            const height_t_hi = height_t & 0xfffffff8;
             const margin_left = (8 - x_lo) & 0x7;
             const margin_top = (8 - y_lo) & 0x7;
             const margin_right = width_t & 0x7;
@@ -524,8 +772,7 @@ fn SurfaceTiles(
                 px,
             );
             // Top margin
-            SurfaceDrawUtil(Self).fillRect(
-                self,
+            self.fillRectMargin(
                 x,
                 y,
                 width,
@@ -533,8 +780,7 @@ fn SurfaceTiles(
                 px,
             );
             // Bottom margin
-            SurfaceDrawUtil(Self).fillRect(
-                self,
+            self.fillRectMargin(
                 x,
                 height - margin_bottom + y,
                 width,
@@ -542,8 +788,7 @@ fn SurfaceTiles(
                 px,
             );
             // Left margin
-            SurfaceDrawUtil(Self).fillRect(
-                self,
+            self.fillRectMargin(
                 x,
                 y + margin_top,
                 margin_left,
@@ -551,28 +796,13 @@ fn SurfaceTiles(
                 px,
             );
             // Right margin
-            SurfaceDrawUtil(Self).fillRect(
-                self,
+            self.fillRectMargin(
                 width - margin_right + x,
                 y + margin_top,
                 margin_right,
                 height_t - margin_bottom,
                 px,
             );
-        }
-        
-        /// Draw a single-pixel-wide outline of a rectangle.
-        pub fn drawRectOutline(
-            self: Self,
-            x: u32,
-            y: u32,
-            width: u32,
-            height: u32,
-            px: Pixel,
-        ) void {
-            assert(x + width <= self.getWidth());
-            assert(y + height <= self.getHeight());
-            SurfaceDrawUtil(Self).drawRectOutline(self, x, y, width, height, px);
         }
         
         /// Draw a strictly horizontal line, starting at the provided `x`, `y`
@@ -587,8 +817,6 @@ fn SurfaceTiles(
             assert(x + len <= self.getWidth() and y < self.getHeight());
             const x_lo = x & 0x7;
             const width_t = len - x_lo;
-            const width_t_lo = width_t & 0x7;
-            const width_t_hi = width_t & 0xfffffff8;
             const margin_left = (8 - x_lo) & 0x7;
             const margin_right = width_t & 0x7;
             for(0..margin_left) |x_i| {
@@ -618,213 +846,8 @@ fn SurfaceTiles(
             px: Pixel,
         ) void {
             assert(x < self.getWidth() and y + len <= self.getHeight());
-            SurfaceDrawUtil(Self).drawLineVertical(self, x, y, len, px);
-        }
-        
-        /// Draw a line between two points.
-        /// Uses Bresenham's line drawing algorithm.
-        pub fn drawLine(
-            self: Self,
-            x0: u32,
-            y0: u32,
-            x1: u32,
-            y1: u32,
-            px: Pixel,
-        ) void {
-            assert(x0 < self.getWidth() and y0 < self.getHeight());
-            assert(x1 < self.getWidth() and y1 < self.getHeight());
-            SurfaceDrawUtil(Self).drawLine(self, x0, y0, x1, y1, px);
-        }
-    };
-}
-
-/// Provides common implementations for drawing functions for surfaces.
-/// The passed `SurfaceT` type must implement `setPixel`, `drawLineHorizontal`,
-/// and `drawLineVertical` functions.
-pub fn SurfaceDrawUtil(comptime SurfaceT: type) type {
-    return struct {
-        /// Universal implementation for drawing a filled rectangle
-        /// on a surface.
-        pub fn fillRect(
-            surface: SurfaceT,
-            x: u32,
-            y: u32,
-            width: u32,
-            height: u32,
-            px: SurfaceT.Pixel,
-        ) void {
-            if(width == 0) {
-                return;
-            }
-            const y_max = y + height;
-            for(y..y_max) |y_i| {
-                surface.drawLineHorizontal(x, @intCast(y_i), width, px);
-            }
-        }
-        
-        /// Universal implementation for drawing a single-pixel-wide outline
-        /// of a rectangle on a surface.
-        pub fn drawRectOutline(
-            surface: SurfaceT,
-            x: u32,
-            y: u32,
-            width: u32,
-            height: u32,
-            px: SurfaceT.Pixel,
-        ) void {
-            if(width == 0 or height == 0) {
-                return;
-            }
-            else if(width == 1) {
-                surface.drawLineVertical(x, y, height, px);
-            }
-            else {
-                surface.drawLineHorizontal(x, y, width, px);
-                if(height > 0) {
-                    surface.drawLineHorizontal(x, y + height - 1, width, px);
-                    if(height > 1) {
-                        const y1 = y + 1;
-                        const h2 = height - 2;
-                        surface.drawLineVertical(x, y1, h2, px);
-                        surface.drawLineVertical(x + width - 1, y1, h2, px);
-                    }
-                }
-            }
-        }
-        
-        /// Universal implementation for drawing a vertical line on a surface.
-        pub fn drawLineVertical(
-            surface: SurfaceT,
-            x: u32,
-            y: u32,
-            len: u32,
-            px: SurfaceT.Pixel,
-        ) void {
             for(0..len) |y_i| {
-                surface.setPixel(x, y + y_i, px);
-            }
-        }
-        
-        /// Universal implementation for drawing a line between two arbitrary
-        /// points on a surface.
-        /// Uses Bresenham's line drawing algorithm.
-        pub fn drawLine(
-            surface: SurfaceT,
-            x0: u32,
-            y0: u32,
-            x1: u32,
-            y1: u32,
-            px: SurfaceT.Pixel,
-        ) void {
-            // Optimized special case for horizontal lines
-            if(y0 == y1) {
-                if(x0 == x1) {
-                    surface.setPixel(x0, y0, px);
-                }
-                else if(x0 < x1) {
-                    surface.drawLineHorizontal(x0, y0, x1 - x0 + 1, px);
-                }
-                else {
-                    surface.drawLineHorizontal(x1, y0, x0 - x1 + 1, px);
-                }
-            }
-            // Optimized special case for vertical lines
-            else if(x0 == x1) {
-                if(y0 < y1) {
-                    surface.drawLineVertical(x0, y0, y1 - y0 + 1, px);
-                }
-                else {
-                    surface.drawLineVertical(x0, y1, y0 - y1 + 1, px);
-                }
-            }
-            // General case
-            else {
-                const x0i: i32 = @intCast(x0);
-                const y0i: i32 = @intCast(y0);
-                const x1i: i32 = @intCast(x1);
-                const y1i: i32 = @intCast(y1);
-                if(@abs(y1i - y0i) < @abs(x1i - x0i)) {
-                    if(x0 > x1) {
-                        drawLineLow(surface, x1i, y1i, x0i, y0i, px);
-                    }
-                    else {
-                        drawLineLow(surface, x0i, y0i, x1i, y1i, px);
-                    }
-                }
-                else {
-                    if(y0 > y1) {
-                        drawLineHigh(surface, x1i, y1i, x0i, y0i, px);
-                    }
-                    else {
-                        drawLineHigh(surface, x0i, y0i, x1i, y1i, px);
-                    }
-                }
-            }
-        }
-
-        /// Used internally by `drawLine` for a Y/X slope of less than 1.
-        fn drawLineLow(
-            surface: SurfaceT,
-            x0: i32,
-            y0: i32,
-            x1: i32,
-            y1: i32,
-            px: SurfaceT.Pixel,
-        ) void {
-            assert(x0 <= x1);
-            const dx = x1 - x0;
-            var dy = y1 - y0;
-            var yi: i32 = 1;
-            if(dy < 0) {
-                yi = -1;
-                dy = -dy;
-            }
-            var diff = (dy << 1) - dx;
-            var x = x0;
-            var y = y0;
-            while(x <= x1) : (x += 1) {
-                @setRuntimeSafety(false);
-                surface.setPixel(@intCast(x), @intCast(y), px);
-                if(diff > 0) {
-                    y += yi;
-                    diff += ((dy - dx) << 1);
-                }
-                else {
-                    diff += (dy << 1);
-                }
-            }
-        }
-
-        /// Used internally by `drawLine` for a Y/X slope of 1 or more.
-        fn drawLineHigh(
-            surface: SurfaceT,
-            x0: i32,
-            y0: i32,
-            x1: i32,
-            y1: i32,
-            px: SurfaceT.Pixel,
-        ) void {
-            assert(y0 <= y1);
-            const dy = y1 - y0;
-            var dx = x1 - x0;
-            var xi: i32 = 1;
-            if(dx < 0) {
-                xi = -1;
-                dx = -dx;
-            }
-            var diff = (dx << 1) - dy;
-            var x = x0;
-            var y = y0;
-            while(y <= y1) : (y += 1) {
-                @setRuntimeSafety(false);
-                surface.setPixel(@intCast(x), @intCast(y), px);
-                if(diff > 0) {
-                    x += xi;
-                    diff += ((dx - dy) << 1);
-                }
-                else {
-                    diff += (dx << 1);
-                }
+                self.setPixel(x, y + y_i, px);
             }
         }
     };
@@ -869,5 +892,3 @@ pub const SurfaceTiles8Bpp = SurfaceTiles(.bpp_8, false);
 /// Always writes 16 bits at a time, meaning it's safe to use
 /// for a bitmap located in the GBA's VRAM.
 pub const SurfaceTiles8BppVram = SurfaceTiles(.bpp_8, true);
-
-

@@ -5,7 +5,7 @@ export var header linksection(".gbaheader") = gba.Header.init("MODE3DRAW", "AM3E
 pub export fn main() void {
     // Initialize graphics mode 3.
     gba.display.ctrl.* = .initMode3(.{});
-    const mode3 = gba.display.getMode3Bitmap();
+    const mode3 = gba.display.getMode3Surface().draw();
 
     // Fill the buffer initially with gray.
     mode3.fill(.rgb(12, 12, 12));
@@ -16,23 +16,23 @@ pub export fn main() void {
     mode3.fillRect(132, 88, 96, 64, .blue);
 
     // Draw rectangle frames.
-    mode3.drawRectOutline(132, 8, 96, 64, .cyan);
-    mode3.drawRectOutline(109, 73, 22, 14, .black);
-    mode3.drawRectOutline(12, 88, 96, 64, .yellow);
+    mode3.rectOutline(132, 8, 96, 64, .cyan);
+    mode3.rectOutline(109, 73, 22, 14, .black);
+    mode3.rectOutline(12, 88, 96, 64, .yellow);
     
     // Draw lines.
     for(0..9) |i| {
         const m: u8 = @intCast(i);
         const n: u5 = @intCast(3 * m + 7);
         // Draw lines in the top right frame.
-        mode3.drawLine(
+        mode3.line(
             132 + 11 * m,
             9,
             226,
             12 + 7 * m,
             .rgb(n, 0, n),
         );
-        mode3.drawLine(
+        mode3.line(
             226 - 11 * m,
             70,
             133,
@@ -40,7 +40,7 @@ pub export fn main() void {
             .rgb(n, 0, n),
         );
         // Draw lines in the bottom left frame.
-        mode3.drawLine(
+        mode3.line(
             15 + 11 * m,
             88,
             104 - 11 * m,
