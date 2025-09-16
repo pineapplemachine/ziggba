@@ -605,7 +605,7 @@ pub const Charblock = extern union {
     tiles_8bpp: [256]Tile8Bpp,
     /// Background charblocks and screenblocks share the same VRAM.
     /// Not relevant to charblocks 5 and 6, which are for objects only.
-    screenblocks: [32]Screenblock,
+    screenblocks: [8]Screenblock,
 };
 
 /// Helper to produce charblock types for different numbers of charblocks.

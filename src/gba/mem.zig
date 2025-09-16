@@ -288,20 +288,20 @@ pub fn setNibbleVram(
     const dest_8_offset_lo = @intFromPtr(dest_8_offset) & 1;
     const dest_4_lo = nibble_offset & 1;
     if(dest_8_offset_lo == 0) {
-        const dest_16: *volatile u16 = @alignCast(@ptrCast(destination));
-        const read_16 = dest_16.*;
+        const dest_16: *volatile u16 = @alignCast(@ptrCast(dest_8_offset));
+        const read_16: u16 = dest_16.*;
         const write_16 = (
-            if(dest_4_lo == 0) (read_16 & 0xfff0) | value
-            else (read_16 & 0xff0f) | (@as(u16, value) << 4)
+            if(dest_4_lo == 0) ((read_16 & 0xfff0) | value)
+            else ((read_16 & 0xff0f) | (@as(u16, value) << 4))
         );
         dest_16.* = write_16;
     }
     else {
         const dest_16: *volatile u16 = @alignCast(@ptrCast(dest_8_offset - 1));
-        const read_16 = dest_16.*;
+        const read_16: u16 = dest_16.*;
         const write_16 = (
-            if(dest_4_lo == 0) (read_16 & 0xf0ff) | value
-            else (read_16 & 0x0fff) | (@as(u16, value) << 4)
+            if(dest_4_lo == 0) ((read_16 & 0xf0ff) | (@as(u16, value) << 8))
+            else ((read_16 & 0x0fff) | (@as(u16, value) << 12))
         );
         dest_16.* = write_16;
     }
