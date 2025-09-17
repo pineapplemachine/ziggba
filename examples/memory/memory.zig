@@ -52,14 +52,12 @@ const performance_test_names: [16][]const u8 = .{
 
 fn drawMemResults() void {
     const text_surface = gba.display.bg_blocks.getSurface4Bpp(0, 32, 32);
-    text_surface.draw().text("Performance:", .{
-        .pixel = 1,
+    text_surface.draw().text("Performance:", .init(1), .{
         .x = 4,
         .y = 2,
     });
     for(0..performance_test_names.len) |i| {
-        text_surface.draw().text(performance_test_names[i], .{
-            .pixel = 1,
+        text_surface.draw().text(performance_test_names[i], .init(1), .{
             .x = 4,
             .y = @intCast(12 + (i << 3)),
         });
@@ -69,14 +67,12 @@ fn drawMemResults() void {
             performance_test_times[i],
             .{ .pad_zero_len = 4 },
         );
-        text_surface.draw().text(text_buffer[0..text_len], .{
-            .pixel = 1,
+        text_surface.draw().text(text_buffer[0..text_len], .init(1), .{
             .x = 80,
             .y = @intCast(12 + (i << 3)),
         });
     }
-    text_surface.draw().text("Correctness:", .{
-        .pixel = 1,
+    text_surface.draw().text("Correctness:", .init(1), .{
         .x = 124,
         .y = 2,
     });
@@ -87,8 +83,7 @@ fn drawMemResults() void {
             gba.format.hex_digits_ascii[(i >> 4) & 0xf],
             gba.format.hex_digits_ascii[i & 0xf],
         };
-        text_surface.draw().text(&status_text_buffer, .{
-            .pixel = if(ok) 1 else 2,
+        text_surface.draw().text(&status_text_buffer, .init(if(ok) 1 else 2), .{
             .x = @intCast(124 + ((i >> 4) * 20)),
             .y = @intCast(12 + ((i & 0xf) << 3)),
         });
@@ -100,8 +95,7 @@ fn drawMemResults() void {
             gba.format.hex_digits_ascii[(i >> 4) & 0xf],
             gba.format.hex_digits_ascii[i & 0xf],
         };
-        text_surface.draw().text(&status_text_buffer, .{
-            .pixel = if(ok) 1 else 2,
+        text_surface.draw().text(&status_text_buffer, .init(if(ok) 1 else 2), .{
             .x = @intCast(204 + ((i >> 4) * 20)),
             .y = @intCast(12 + ((i & 0xf) << 3)),
         });
