@@ -26,10 +26,14 @@ pub const CodePointAlignment = @import("text_unicode.zig").CodePointAlignment;
 pub const getCodePointAlignment = @import("text_unicode.zig").getCodePointAlignment;
 pub const CodePointIterator = @import("text_unicode.zig").CodePointIterator;
 
+// TODO: It will be tricky in combination with the plan for smarter
+// word wrapping, which is going to require a lookahead buffer of a handful
+// of characters, but it ought to be feasible to make text layout and rendering
+// happen via a stream (e.g. with formatted text).
+
 /// Helper used for text-drawing functions.
 /// Provides a common interface for laying out text.
-pub const GlyphLayoutIterator = struct {
-    // TODO: Might be helpful to support line wrapping
+pub const TextLayout = struct {
     // TODO: Support combining characters (e.g. 0x0300-0x036f)
     
     pub const default_space_width = 3;
@@ -57,9 +61,9 @@ pub const GlyphLayoutIterator = struct {
         point: i32,
         data: ?[*]const u8 = null,
         data_is_wide: bool = false,
-        x: u16 = 0,
-        y: u16 = 0,
-        next_x: u16 = 0,
+        x: u32 = 0,
+        y: u32 = 0,
+        next_x: u32 = 0,
         size_x: u4 = 0,
         size_y: u4 = 0,
         truncated_x: bool = false,
@@ -86,61 +90,111 @@ pub const GlyphLayoutIterator = struct {
         }
     };
     
-    /// Options accepted by `init`.
-    pub const InitOptions = struct {
-        /// Text to be laid out.
-        text: []const u8,
-        /// X position of text, top-left corner.
-        x: u16,
-        /// Y position of text, top-left corner.
-        y: u16,
-        /// Clip text rendering exceeding this width in pixels.
-        max_width: u16 = 0xffff,
+    /// Options accepted by `init`, describing how glyphs should be laid out.
+    pub const Options = struct {
+        /// Start drawing text at this X position.
+        x: u32,
+        /// Start drawing text at this Y position.
+        y: u32,
+        /// Clip text exceeding this width in pixels.
+        /// Note that this applies from the top-left corner of reserved space,
+        /// not from the (X, Y) coordinate of drawn text.
+        max_width: u32 = 0xffffffff,
         /// Clip text rendering exceeding this height in pixels.
-        max_height: u16 = 0xffff,
+        /// Note that this applies from the top-left corner of reserved space,
+        /// not from the (X, Y) coordinate of drawn text.
+        max_height: u32 = 0xffffffff,
         /// Increment Y by this amount for new lines.
         line_height: u8 = full_height,
-        // Width of the space character 0x20 `' '`.
+        /// Width in pixels of the space character (`' '`, 0x20).
+        /// Default is 3 pixels. For monospace text with ASCII digits and
+        /// upper-case letters, use 6 pixels.
         space_width: u8 = default_space_width,
-        /// Characters normally less wide than this are padded to this width.
-        /// Can be used, for example, to make text appear monospace.
+        /// When a character is less wide than this number of pixels, make it
+        /// take up this amount of space anyway.
+        ///
+        /// Supplying a `space_width` of 6 and a `pad_character_width` of 5
+        /// will result in monospace text, if not using any extra wide characters.
+        ///
+        /// Except for some specially tagged fullwidth characters, the character
+        /// will be centered in the widened space.
         pad_character_width: u8 = 0,
         /// Text wrapping behavior.
         wrap: Wrap = .none,
+        
+        pub fn clampMaxSize(self: Options, max_x: u32, max_y: u32) Options {
+            var options: Options = self;
+            options.max_width = (
+                if(max_x > self.x) @min(options.max_width, max_x - self.x)
+                else 0
+            );
+            options.max_height = (
+                if(max_y > self.y) @min(options.max_height, max_y - self.y)
+                else 0
+            );
+            return options;
+        }
     };
     
     points: CodePointIterator,
-    max_x: u16 = 0xffff,
-    max_y: u16 = 0xffff,
-    line_height: u8 = full_height,
-    space_width: u8 = default_space_width,
-    pad_character_width: u8 = 0,
-    x_initial: u16,
-    x: u16,
-    y: u16,
+    max_x: u32,
+    max_y: u32,
+    line_height: u8,
+    space_width: u8,
+    pad_character_width: u8,
+    x_initial: u32,
+    y_initial: u32,
+    x: u32,
+    y: u32,
     wrap: Wrap,
+    bounds_min_x: u32,
+    bounds_min_y: u32,
+    bounds_max_x: u32,
+    bounds_max_y: u32,
     
-    pub fn init(options: InitOptions) GlyphLayoutIterator {
+    pub fn init(text: []const u8, options: Options) TextLayout {
+        const y = options.y + options.line_height - full_height;
         return .{
-            .points = .init(options.text),
+            .points = .init(text),
             .max_x = options.max_width +| options.x,
             .max_y = options.max_height +| options.y,
             .x_initial = options.x,
+            .y_initial = options.y,
             .x = options.x,
-            .y = options.y + options.line_height - full_height,
+            .y = y,
             .line_height = options.line_height,
             .space_width = options.space_width,
             .pad_character_width = options.pad_character_width,
             .wrap = options.wrap,
+            .bounds_min_x = options.x,
+            .bounds_min_y = y,
+            .bounds_max_x = options.x,
+            .bounds_max_y = y,
         };
     }
     
-    fn startNextLine(self: *GlyphLayoutIterator) void {
+    pub fn getBoundsRect(self: TextLayout) gba.math.RectU32 {
+        return .initBounds(
+            self.bounds_min_x,
+            self.bounds_min_y,
+            self.bounds_max_x,
+            self.bounds_max_y,
+        );
+    }
+    
+    pub fn getBoundsOffset(self: TextLayout) gba.math.Vec2U32 {
+        return .init(
+            self.bounds_min_x - self.x_initial,
+            self.bounds_min_y - self.y_initial,
+        );
+    }
+    
+    fn startNextLine(self: *TextLayout) void {
         self.x = self.x_initial;
         self.y += self.line_height;
     }
     
-    pub fn next(self: *GlyphLayoutIterator) Glyph {
+    pub fn next(self: *TextLayout) Glyph {
         if(self.y >= self.max_y) {
             return .eof;
         }
@@ -205,6 +259,31 @@ pub const GlyphLayoutIterator = struct {
                             glyph = self.layoutGlyph(charset, point);
                         }
                         self.x = glyph.next_x;
+                        if(
+                            (self.bounds_max_x == self.bounds_min_x) and
+                            (self.bounds_max_y == self.bounds_min_y)
+                        ) {
+                            self.bounds_min_x = glyph.x;
+                            self.bounds_min_y = glyph.y;
+                        }
+                        else {
+                            self.bounds_min_x = @min(
+                                self.bounds_min_x,
+                                glyph.x,
+                            );
+                            self.bounds_min_y = @min(
+                                self.bounds_min_y,
+                                glyph.y,
+                            );
+                        }
+                        self.bounds_max_x = @max(
+                            self.bounds_max_x,
+                            glyph.x + glyph.size_x,
+                        );
+                        self.bounds_max_y = @max(
+                            self.bounds_max_y,
+                            glyph.y + glyph.size_y,
+                        );
                         return glyph;
                     }
                 }
@@ -213,9 +292,15 @@ pub const GlyphLayoutIterator = struct {
         return .unprintable;
     }
     
-    /// Helper called by `GlyphLayoutIterator.next` for a matching charset.
+    /// Process all glyphs.
+    /// This might be useful to compute the bounds of some text.
+    pub fn exhaust(self: *TextLayout) void {
+        while(!self.next().isEof()) {}
+    }
+    
+    /// Helper called by `TextLayout.next` for a matching charset.
     fn layoutGlyph(
-        self: GlyphLayoutIterator,
+        self: TextLayout,
         charset: Charset,
         point: i32,
     ) Glyph {
@@ -280,83 +365,47 @@ pub const GlyphLayoutIterator = struct {
     }
 };
 
-/// Options accepted by `drawToCharblock4Bpp`.
-pub const DrawToCharblock4BppOptions = struct {
-    /// Location in memory where the text should be drawn.
-    /// This tile is treated as the top-left corner.
-    /// Normally, this should be a location in VRAM.
-    target: [*]volatile gba.display.Tile4Bpp,
-    /// Determines how many tiles are considered to constitute one row.
-    /// Number of tiles wide is computed as `1 << pitch_shift`.
-    ///
-    /// You probably want this to be the width in 8x8 tiles of the
-    /// destination where the text will be drawn, i.e. not more than
-    /// `1 << 5 == 32` (includes full width of the GBA's screen).
-    pitch_shift: u4 = 5,
-    /// Palette color index for drawn text.
-    color: u4,
-    /// The text to draw, either ASCII or UTF-8 encoded.
-    text: []const u8,
-    /// Start drawing text at this X position.
-    x: u16,
-    /// Start drawing text at this Y position.
-    y: u16,
-    /// Clip text past this width.
-    ///
-    /// This applies from the top-left corner of reserved space, not from the
-    /// (X, Y) coordinate of drawn text.
-    ///
-    /// If this value is larger than `8px << pitch_shift`, then the text
-    /// is clipped to that width limit instead.
-    max_width: u16 = 0xffff,
-    /// Clip text past this height.
-    ///
-    /// This applies from the top-left corner of reserved space, not from the
-    /// (X, Y) coordinate of drawn text.
-    max_height: u16 = 0xffff,
-    /// Added to Y position to represent a newline ('\n').
-    line_height: u8 = 12,
-    /// Width in pixels of the space character (' ', 0x20).
-    /// Default is 3 pixels. For monospace text with ASCII digits and
-    /// upper-case letters, use 6 pixels.
-    space_width: u8 = GlyphLayoutIterator.default_space_width,
-    /// When a character is less wide than this number of pixels, make it
-    /// take up this amount of space anyway.
-    ///
-    /// Supplying a `space_width` of 6 and a `pad_character_width` of 5
-    /// will result in monospace text, if not using any extra wide characters.
-    ///
-    /// Except for some specially tagged fullwidth characters, the character
-    /// will be centered in the widened space.
-    pad_character_width: u8 = 0,
-    /// Text wrapping behavior.
-    wrap: GlyphLayoutIterator.Wrap = .none,
-};
+pub fn TextStyleOptions(comptime PixelT: type) type {
+    // TODO: Outline, drop shadow, and potentially other effects
+    return struct {
+        const Self = @This();
+        
+        /// Data to write to the surface for each pixel of the displayed text.
+        /// Typically either a palette color or `gba.ColorRgb555`, depending
+        /// on the type of surface being drawn to.
+        pixel: PixelT,
+        
+        /// Initialize with a foreground pixel/color and no other style effects.
+        pub fn init(pixel: PixelT) Self {
+            return .{ .pixel = pixel };
+        }
+    };
+}
 
-// TODO: Add similar functions for other kinds of render targets.
-
-/// Draw text to memory structured as 16-color background or object tile data.
-pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
-    var layoutGlyphs = GlyphLayoutIterator.init(.{
-        .text = options.text,
-        .x = options.x,
-        .y = options.y,
-        .max_width = @min(options.max_width, @as(u16, 8) << options.pitch_shift),
-        .max_height = options.max_height,
-        .line_height = options.line_height,
-        .space_width = options.space_width,
-        .pad_character_width = options.pad_character_width,
-        .wrap = options.wrap,
-    });
+/// Draw text using a default font provided with ZigGBA.
+/// Note that fonts will only be embedded in the ROM and available
+/// for drawing text if they are explicitly enabled in build options.
+pub fn drawTextLayout(
+    comptime SurfaceT: type,
+    comptime PixelT: type,
+    /// Surface to draw the text to.
+    surface: SurfaceT,
+    /// Options for text appearance.
+    style_options: TextStyleOptions(PixelT),
+    /// Object used to determine glyph positions when rendering text.
+    layout: *TextLayout,
+) void {
+    @setRuntimeSafety(false);
     while(true) {
-        @setRuntimeSafety(false);
-        const glyph = layoutGlyphs.next();
+        const glyph = layout.next();
         if(glyph.isEof()) {
             return;
         }
         else if(glyph.isUnprintable()) {
             continue;
         }
+        // TODO: It's probably possible to significantly optimize this
+        // loop for VRAM by writing 16 bits of pixels at once whenever possible
         for(0..glyph.size_y) |row_i| {
             var row = glyph.getDataRow(@truncate(row_i));
             for(0..glyph.size_x) |col_i| {
@@ -365,17 +414,57 @@ pub fn drawToCharblock4Bpp(options: DrawToCharblock4BppOptions) void {
                 if(pixel != 0) {
                     const px_x = glyph.x + col_i;
                     const px_y = glyph.y + row_i;
-                    var tile = &options.target[
-                        (px_x >> 3) +
-                        ((px_y >> 3) << options.pitch_shift)
-                    ];
-                    tile.setPixel16(
-                        @truncate(px_x),
-                        @truncate(px_y),
-                        options.color,
+                    surface.setPixel(
+                        @intCast(px_x),
+                        @intCast(px_y),
+                        style_options.pixel,
                     );
                 }
             }
         }
     }
+}
+
+/// Draw text using a default font provided with ZigGBA.
+/// Wraps `drawTextLayout`.
+pub fn drawText(
+    comptime SurfaceT: type,
+    comptime PixelT: type,
+    /// Surface to draw the text to.
+    surface: SurfaceT,
+    /// The text to draw, either ASCII or UTF-8 encoded.
+    text: []const u8,
+    /// Options for text appearance.
+    style_options: TextStyleOptions(PixelT),
+    /// Options for text layout.
+    layout_options: TextLayout.Options,
+) void {
+    var layout: TextLayout = .init(
+        text,
+        layout_options.clampMaxSize(surface.getWidth(), surface.getHeight()),
+    );
+    drawTextLayout(SurfaceT, PixelT, surface, style_options, &layout);
+}
+
+/// Draw text using a default font provided with ZigGBA,
+/// and get the bounding box rect of drawn pixels.
+/// Wraps `drawTextLayout`.
+pub fn drawTextGetBounds(
+    comptime SurfaceT: type,
+    comptime PixelT: type,
+    /// Surface to draw the text to.
+    surface: SurfaceT,
+    /// The text to draw, either ASCII or UTF-8 encoded.
+    text: []const u8,
+    /// Options for text appearance.
+    style_options: TextStyleOptions(PixelT),
+    /// Options for text layout.
+    layout_options: TextLayout.Options,
+) gba.math.RectU32 {
+    var layout: TextLayout = .init(
+        text,
+        layout_options.clampMaxSize(surface.getWidth(), surface.getHeight()),
+    );
+    drawTextLayout(SurfaceT, PixelT, surface, style_options, &layout);
+    return layout.getBoundsRect();
 }

@@ -15,21 +15,20 @@ pub export fn main() void {
     bg0_map.getBaseScreenblock().fillLinear(.{});
     
     // Draw text to the tile memory used by the initialized background.
-    gba.text.drawToCharblock4Bpp(.{
-        .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-        .color = 1,
+    const text_surface = gba.display.bg_blocks.getSurface4Bpp(0, 32, 32);
+    const text_hello = (
+        "Hello, world!\n" ++ // English (ASCII)
+        "Ｈｅｌｌｏ，　ｗｏｒｌｄ！\n" ++ // English (Fullwidth)
+        "¡Hola, mundo!\n" ++ // Spanish
+        "Hej, världen!\n" ++ // Swedish
+        "Γειά σου, κόσμε!\n" ++ // Greek
+        "Привет, мир!\n" ++ // Russian
+        "こんにちは、せかい！" // Japanese (Kana)
+    );
+    text_surface.draw().text(text_hello, .init(1), .{
         .x = 8,
         .y = 4,
         .line_height = 16,
-        .text = (
-            "Hello, world!\n" ++ // English (ASCII)
-            "Ｈｅｌｌｏ，　ｗｏｒｌｄ！\n" ++ // English (Fullwidth)
-            "¡Hola, mundo!\n" ++ // Spanish
-            "Hej, världen!\n" ++ // Swedish
-            "Γειά σου, κόσμε!\n" ++ // Greek
-            "Привет, мир!\n" ++ // Russian
-            "こんにちは、せかい！" // Japanese (Kana)
-        ),
     });
     
     // Initialize the display.

@@ -51,20 +51,15 @@ const performance_test_names: [16][]const u8 = .{
 };
 
 fn drawMemResults() void {
-    gba.text.drawToCharblock4Bpp(.{
-        .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-        .color = 1,
+    const text_surface = gba.display.bg_blocks.getSurface4Bpp(0, 32, 32);
+    text_surface.draw().text("Performance:", .init(1), .{
         .x = 4,
         .y = 2,
-        .text = "Performance:",
     });
     for(0..performance_test_names.len) |i| {
-        gba.text.drawToCharblock4Bpp(.{
-            .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-            .color = 1,
+        text_surface.draw().text(performance_test_names[i], .init(1), .{
             .x = 4,
             .y = @intCast(12 + (i << 3)),
-            .text = performance_test_names[i],
         });
         var text_buffer: [16]u8 = @splat(0);
         const text_len = gba.format.formatHexI32(
@@ -72,20 +67,14 @@ fn drawMemResults() void {
             performance_test_times[i],
             .{ .pad_zero_len = 4 },
         );
-        gba.text.drawToCharblock4Bpp(.{
-            .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-            .color = 1,
+        text_surface.draw().text(text_buffer[0..text_len], .init(1), .{
             .x = 80,
             .y = @intCast(12 + (i << 3)),
-            .text = text_buffer[0..text_len],
         });
     }
-    gba.text.drawToCharblock4Bpp(.{
-        .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-        .color = 1,
+    text_surface.draw().text("Correctness:", .init(1), .{
         .x = 124,
         .y = 2,
-        .text = "Correctness:",
     });
     for(0..cpy_correctness_test_results.len) |i| {
         const ok = cpy_correctness_test_results[i];
@@ -94,12 +83,9 @@ fn drawMemResults() void {
             gba.format.hex_digits_ascii[(i >> 4) & 0xf],
             gba.format.hex_digits_ascii[i & 0xf],
         };
-        gba.text.drawToCharblock4Bpp(.{
-            .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-            .color = if(ok) 1 else 2,
+        text_surface.draw().text(&status_text_buffer, .init(if(ok) 1 else 2), .{
             .x = @intCast(124 + ((i >> 4) * 20)),
             .y = @intCast(12 + ((i & 0xf) << 3)),
-            .text = &status_text_buffer,
         });
     }
     for(0..set_correctness_test_results.len) |i| {
@@ -109,12 +95,9 @@ fn drawMemResults() void {
             gba.format.hex_digits_ascii[(i >> 4) & 0xf],
             gba.format.hex_digits_ascii[i & 0xf],
         };
-        gba.text.drawToCharblock4Bpp(.{
-            .target = @ptrCast(&gba.display.bg_charblock_tiles.bpp_4),
-            .color = if(ok) 1 else 2,
+        text_surface.draw().text(&status_text_buffer, .init(if(ok) 1 else 2), .{
             .x = @intCast(204 + ((i >> 4) * 20)),
             .y = @intCast(12 + ((i & 0xf) << 3)),
-            .text = &status_text_buffer,
         });
     }
 }

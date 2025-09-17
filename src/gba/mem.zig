@@ -248,6 +248,104 @@ pub fn memset32(
     }
 }
 
+/// Helper for writing a single byte to VRAM, which only supports 16-bit writes.
+/// First reads the half-word at the destination, modifies it according to the
+/// provided 8-bit value, and then writes the modified half-word.
+pub fn setByteVram(
+    destination: *volatile anyopaque,
+    value: u8,
+) void {
+    const dest_lo = @intFromPtr(destination) & 1;
+    // Destination is half-word aligned.
+    if(dest_lo == 0) {
+        const dest_16: *volatile u16 = @alignCast(@ptrCast(destination));
+        const read_16 = dest_16.*;
+        const write_16 = (read_16 & 0xff00) | value;
+        dest_16.* = write_16;
+    }
+    // Destination is not half-word aligned.
+    else {
+        const dest_8: [*]volatile u8 = @ptrCast(destination);
+        const dest_16: *volatile u16 = @alignCast(@ptrCast(dest_8 - 1));
+        const read_16 = dest_16.*;
+        const write_16 = (read_16 & 0x00ff) | (@as(u16, value) << 8);
+        dest_16.* = write_16;
+    }
+}
+
+/// Helper for writing a 4-bit value to VRAM, which only supports 16-bit writes.
+/// First reads the half-word at the destination, modifies it according to the
+/// provided 4-bit value, and then writes the modified half-word.
+/// Nibble offset 0 within a byte corresponds to its low 4 bits and nibble
+/// offset 1 corresponds to its high 4 bits.
+pub fn setNibbleVram(
+    destination: *volatile anyopaque,
+    nibble_offset: u32,
+    value: u4,
+) void {
+    const dest_8: [*]volatile u8 = @ptrCast(destination);
+    const dest_8_offset = dest_8 + (nibble_offset >> 1);
+    const dest_8_offset_lo = @intFromPtr(dest_8_offset) & 1;
+    const dest_4_lo = nibble_offset & 1;
+    if(dest_8_offset_lo == 0) {
+        const dest_16: *volatile u16 = @alignCast(@ptrCast(dest_8_offset));
+        const read_16: u16 = dest_16.*;
+        const write_16 = (
+            if(dest_4_lo == 0) ((read_16 & 0xfff0) | value)
+            else ((read_16 & 0xff0f) | (@as(u16, value) << 4))
+        );
+        dest_16.* = write_16;
+    }
+    else {
+        const dest_16: *volatile u16 = @alignCast(@ptrCast(dest_8_offset - 1));
+        const read_16: u16 = dest_16.*;
+        const write_16 = (
+            if(dest_4_lo == 0) ((read_16 & 0xf0ff) | (@as(u16, value) << 8))
+            else ((read_16 & 0x0fff) | (@as(u16, value) << 12))
+        );
+        dest_16.* = write_16;
+    }
+}
+
+/// Helper for writing a 4-bit value to memory.
+/// First reads the byte at the destination, modifies it according to the
+/// provided 4-bit value, and then writes the modified byte.
+/// Nibble offset 0 within a byte corresponds to its low 4 bits and nibble
+/// offset 1 corresponds to its high 4 bits.
+pub fn setNibble(
+    destination: *volatile anyopaque,
+    nibble_offset: u32,
+    value: u4,
+) void {
+    const dest_8: [*]volatile u8 = @ptrCast(destination);
+    const dest_8_offset = dest_8 + (nibble_offset >> 1);
+    const dest_4_lo = nibble_offset & 1;
+    const read_8 = dest_8_offset.*;
+    const write_8 = (
+        if(dest_4_lo == 0) (read_8 & 0xf0) | value
+        else (read_8 & 0x0f) | (@as(u8, value) << 4)
+    );
+    dest_8_offset.* = write_8;
+}
+
+/// Helper for reading a 4-bit value from memory.
+/// Nibble offset 0 within a byte corresponds to its low 4 bits and nibble
+/// offset 1 corresponds to its high 4 bits.
+pub fn getNibble(
+    source: *volatile anyopaque,
+    nibble_offset: u32,
+) u4 {
+    const dest_8: [*]volatile u8 = @ptrCast(source);
+    const value_8 = dest_8[nibble_offset >> 1];
+    const dest_4_lo = nibble_offset & 1;
+    if(dest_4_lo == 0) {
+        return @intCast(value_8 & 0xf);
+    }
+    else {
+        return @intCast(value_8 >> 4);
+    }
+}
+
 /// Represents the structure of the internal memory control register.
 pub const InternalMemoryControl = packed struct(u32) {
     /// Disable IWRAM and EWRAM. When off: Empty/prefetch.

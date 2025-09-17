@@ -3,12 +3,12 @@
 const gba = @This();
 
 pub const bios = @import("bios.zig");
-pub const bitmap = @import("bitmap.zig");
 pub const ColorRgb555 = @import("color.zig").ColorRgb555;
 pub const debug = @import("debug.zig");
 pub const display = @import("display.zig");
 pub const format = @import("format.zig");
 pub const Header = @import("header.zig").Header;
+pub const image = @import("image.zig");
 pub const input = @import("input.zig");
 pub const interrupt = @import("interrupt.zig");
 pub const math = @import("math.zig");

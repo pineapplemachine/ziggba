@@ -22,6 +22,11 @@ pub fn Rect(comptime T: type) type {
             return .{ .x = x, .y = y, .width = width, .height = height };
         }
         
+        /// Initialize with bounds rather than size.
+        pub fn initBounds(x_min: T, y_min: T, x_max: T, y_max: T) Self {
+            return .init(x_min, y_min, x_max - x_min, y_max - y_min);
+        }
+        
         /// Get the product of width and height.
         pub fn area(self: Self) T {
             return self.width * self.height;

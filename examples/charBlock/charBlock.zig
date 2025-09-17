@@ -17,25 +17,25 @@ fn loadTiles() void {
     const tiles_4bpp: [*]align(4) const gba.display.Tile4Bpp = @ptrCast(&cbb_ids.ids_4_tiles);
     const tiles_8bpp: [*]align(4) const gba.display.Tile8Bpp = @ptrCast(&cbb_ids.ids_8_tiles);
 
-    // Loading tiles. 4-bit tiles to blocks 0 and 1
-    gba.display.charblocks[0].bpp_4[1] = tiles_4bpp[1];
-    gba.display.charblocks[0].bpp_4[2] = tiles_4bpp[2];
-    gba.display.charblocks[1].bpp_4[0] = tiles_4bpp[3];
-    gba.display.charblocks[1].bpp_4[1] = tiles_4bpp[4];
-
-    // and the 8-bit tiles to blocks 2 though 5
-    gba.display.charblocks[2].bpp_8[1] = tiles_8bpp[1];
-    gba.display.charblocks[2].bpp_8[2] = tiles_8bpp[2];
-    gba.display.charblocks[3].bpp_8[0] = tiles_8bpp[3];
-    gba.display.charblocks[3].bpp_8[1] = tiles_8bpp[4];
-    gba.display.charblocks[4].bpp_8[0] = tiles_8bpp[5];
-    gba.display.charblocks[4].bpp_8[1] = tiles_8bpp[6];
-    gba.display.charblocks[5].bpp_8[0] = tiles_8bpp[7];
-    gba.display.charblocks[5].bpp_8[1] = tiles_8bpp[8];
-
     // Load palette
     gba.display.memcpyBackgroundPalette(0, @ptrCast(&cbb_ids.ids_4_pal));
     gba.display.memcpyObjectPalette(0, @ptrCast(&cbb_ids.ids_4_pal));
+
+    // Loading tiles. Copy 4-bit tiles to charblocks 0 and 1.
+    gba.display.charblocks[0].tiles_4bpp[1] = tiles_4bpp[1];
+    gba.display.charblocks[0].tiles_4bpp[2] = tiles_4bpp[2];
+    gba.display.charblocks[1].tiles_4bpp[0] = tiles_4bpp[3];
+    gba.display.charblocks[1].tiles_4bpp[1] = tiles_4bpp[4];
+
+    // Copy 8-bit tiles to charblocks 2 though 5.
+    gba.display.charblocks[2].tiles_8bpp[1] = tiles_8bpp[1];
+    gba.display.charblocks[2].tiles_8bpp[2] = tiles_8bpp[2];
+    gba.display.charblocks[3].tiles_8bpp[0] = tiles_8bpp[3];
+    gba.display.charblocks[3].tiles_8bpp[1] = tiles_8bpp[4];
+    gba.display.charblocks[4].tiles_8bpp[0] = tiles_8bpp[5];
+    gba.display.charblocks[4].tiles_8bpp[1] = tiles_8bpp[6];
+    gba.display.charblocks[5].tiles_8bpp[0] = tiles_8bpp[7];
+    gba.display.charblocks[5].tiles_8bpp[1] = tiles_8bpp[8];
 }
 
 fn initMaps() void {

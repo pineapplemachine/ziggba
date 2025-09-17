@@ -28,7 +28,7 @@ pub export fn main() void {
 
     // Initialize graphics mode 4.
     gba.display.ctrl.* = .initMode4(.{});
-    const mode4_front = gba.display.getMode4Bitmap(0);
+    const mode4_front = gba.display.getMode4Surface(0).draw();
 
     // Fill the buffer initially with gray.
     mode4_front.fill(1);
@@ -39,22 +39,22 @@ pub export fn main() void {
     mode4_front.fillRect(132, 88, 96, 64, 4);
 
     // Draw rectangle frames.
-    mode4_front.drawRectOutline(132, 8, 96, 64, 5);
-    mode4_front.drawRectOutline(109, 73, 22, 14, 6);
-    mode4_front.drawRectOutline(12, 88, 96, 64, 7);
+    mode4_front.rectOutline(132, 8, 96, 64, 5);
+    mode4_front.rectOutline(109, 73, 22, 14, 6);
+    mode4_front.rectOutline(12, 88, 96, 64, 7);
 
     // Draw lines.
     for (0..9) |i| {
         const n: u8 = @intCast(i);
         // Draw lines in the top right frame.
-        mode4_front.drawLine(
+        mode4_front.line(
             132 + 11 * n,
             9,
             226,
             12 + 7 * n,
             8 + n,
         );
-        mode4_front.drawLine(
+        mode4_front.line(
             226 - 11 * n,
             70,
             133,
@@ -62,7 +62,7 @@ pub export fn main() void {
             8 + n,
         );
         // Draw lines in the bottom left frame.
-        mode4_front.drawLine(
+        mode4_front.line(
             15 + 11 * n,
             88,
             104 - 11 * n,
