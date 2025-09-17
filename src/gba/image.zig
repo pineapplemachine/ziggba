@@ -20,13 +20,21 @@ fn pxmemset(
 ) void {
     if(comptime(@sizeOf(Pixel) == 1)) {
         if(comptime(vram)) {
+            const lsb_mask: u32 = ~@as(u32, 1);
             const destination_u8: [*]volatile u8 = @ptrCast(destination);
             if((@intFromPtr(destination_u8) & 1) == 0) {
-                gba.mem.memset(destination_u8, @bitCast(px), len);
+                gba.mem.memset(destination_u8, @bitCast(px), len & lsb_mask);
+                if(len & 1 != 0) {
+                    gba.mem.setByteVram(&destination_u8[len - 1], @bitCast(px));
+                }
             }
             else if(len > 0) {
+                const l = len - 1;
                 gba.mem.setByteVram(destination_u8, @bitCast(px));
-                gba.mem.memset(&destination_u8[1], @bitCast(px), len - 1);
+                gba.mem.memset(&destination_u8[1], @bitCast(px), l & lsb_mask);
+                if(l & 1 != 0) {
+                    gba.mem.setByteVram(&destination_u8[len - 1], @bitCast(px));
+                }
             }
         }
         else {
@@ -70,9 +78,39 @@ pub fn SurfaceDraw(
         pub fn text(
             self: Self,
             string: []const u8,
-            options: gba.text.DrawTextOptions(Pixel),
+            /// Options for text appearance.
+            style_options: gba.text.TextStyleOptions(Pixel),
+            /// Options for text layout.
+            layout_options: gba.text.TextLayout.Options,
         ) void {
-            gba.text.drawText(SurfaceT, Pixel, self.surface, string, options);
+            gba.text.drawText(
+                SurfaceT,
+                Pixel,
+                self.surface,
+                string,
+                style_options,
+                layout_options,
+            );
+        }
+        
+        /// Draw text to the bitmap,
+        /// and get the bounding box rect of drawn pixels.
+        pub fn textGetBounds(
+            self: Self,
+            string: []const u8,
+            /// Options for text appearance.
+            style_options: gba.text.TextStyleOptions(Pixel),
+            /// Options for text layout.
+            layout_options: gba.text.TextLayout.Options,
+        ) gba.math.RectU32 {
+            return gba.text.drawTextGetBounds(
+                SurfaceT,
+                Pixel,
+                self.surface,
+                string,
+                style_options,
+                layout_options,
+            );
         }
         
         /// Draw a single pixel in the bitmap.
@@ -360,6 +398,19 @@ pub fn Surface(
             );
         }
         
+        /// Get a surface representing a sub-rectangle of this one.
+        /// Does not make a copy.
+        pub fn sub(self: Self, x: u32, y: u32, width: u32, height: u32) Self {
+            assert(x + width <= self.width and x + height <= self.height);
+            const i = self.getPixelIndex(x, y);
+            return .initPitch(
+                width,
+                height,
+                self.pitch,
+                @ptrCast(&self.data[i]),
+            );
+        }
+        
         /// Return a helper for drawing to this surface.
         pub fn draw(self: Self) SurfaceDraw(Self, Pixel) {
             return .init(self);
@@ -490,27 +541,27 @@ fn SurfaceTiles(
         pub const data_align = if(vram) @sizeOf(Tile) else @alignOf(Tile);
         
         /// Width of the bitmap, in tiles.
-        width_tiles: u16 = 0,
+        width_tiles: u32 = 0,
         /// Height of the bitmap, in tiles.
-        height_tiles: u16 = 0,
+        height_tiles: u32 = 0,
         /// Number of tiles in each row of bitmap data.
         /// This allows for the possibility of padding.
-        pitch_tiles: u16 = 0,
+        pitch_tiles: u32 = 0,
         /// Memory containing pixel data for this bitmap.
         data: [*]align(data_align) volatile Tile,
         
         pub fn init(
-            width_tiles: u16,
-            height_tiles: u16,
+            width_tiles: u32,
+            height_tiles: u32,
             data: [*]align(data_align) volatile Tile,
         ) Self {
             return .initPitch(width_tiles, height_tiles, width_tiles, data);
         }
         
         pub fn initPitch(
-            width_tiles: u16,
-            height_tiles: u16,
-            pitch_tiles: u16,
+            width_tiles: u32,
+            height_tiles: u32,
+            pitch_tiles: u32,
             data: [*]align(data_align) volatile Tile,
         ) Self {
             assert(width_tiles <= pitch_tiles);
@@ -526,9 +577,9 @@ fn SurfaceTiles(
         /// given allocator.
         pub fn create(
             allocator: std.mem.Allocator,
-            width_tiles: u16,
-            height_tiles: u16,
-            pitch_tiles: u16,
+            width_tiles: u32,
+            height_tiles: u32,
+            pitch_tiles: u32,
         ) !Self {
             const tiles = pitch_tiles * height_tiles;
             const data = try allocator.alloc(Tile, tiles);
@@ -549,6 +600,26 @@ fn SurfaceTiles(
                 self.height_tiles,
                 self.pitch_tiles,
                 @alignCast(self.data),
+            );
+        }
+        
+        /// Get a surface representing a sub-rectangle of tiles of this one.
+        /// Does not make a copy.
+        pub fn sub(
+            self: Self,
+            tile_x: u32,
+            tile_y: u32,
+            width_tiles: u32,
+            height_tiles: u32,
+        ) Self {
+            assert(tile_x + width_tiles <= self.width_tiles);
+            assert(tile_y + height_tiles <= self.height_tiles);
+            const i = self.getTileIndex(tile_x, tile_y);
+            return .initPitch(
+                width_tiles,
+                height_tiles,
+                self.pitch_tiles,
+                @ptrCast(&self.data[i]),
             );
         }
         
@@ -577,10 +648,10 @@ fn SurfaceTiles(
         /// counting in nibbles (4-bit units) for 4bpp tiles and
         /// counting in bytes for 8bpp tiles.
         fn getPixelOffset(self: Self, x: u32, y: u32) u32 {
-            const tile_x: u16 = @intCast(x >> 3);
-            const tile_y: u16 = @intCast(y >> 3);
+            const tile_x: u32 = @intCast(x >> 3);
+            const tile_y: u32 = @intCast(y >> 3);
             const tile_i = self.getTileIndex(tile_x, tile_y);
-            const tile_offset = (tile_i << 1) * @sizeOf(Tile);
+            const tile_offset = tile_i << 6; // 64 pixels per tile
             const tile_px_x = x & 0x7;
             const tile_px_y = y & 0x7;
             const tile_px_offset = tile_px_x + (tile_px_y << 3);
@@ -589,7 +660,7 @@ fn SurfaceTiles(
         
         /// Get offset of a tile within the bitmap data,
         /// counting by tiles (32-byte units).
-        pub fn getTileIndex(self: Self, tile_x: u16, tile_y: u16) u32 {
+        pub fn getTileIndex(self: Self, tile_x: u32, tile_y: u32) u32 {
             return tile_x + (tile_y * self.pitch_tiles);
         }
         
@@ -610,7 +681,7 @@ fn SurfaceTiles(
                 .bpp_8 => {
                     const data_8: [*]volatile u8 = @ptrCast(self.data);
                     if(vram) {
-                        gba.mem.setByteVram(data_8, i, px);
+                        gba.mem.setByteVram(&data_8[i], px);
                     }
                     else {
                         data_8[i] = px;
@@ -656,7 +727,7 @@ fn SurfaceTiles(
         }
         
         /// Fill one tile with a given pixel value.
-        pub fn fillTile(self: Self, tile_x: u16, tile_y: u16, px: Pixel) void {
+        pub fn fillTile(self: Self, tile_x: u32, tile_y: u32, px: Pixel) void {
             assert(tile_x < self.width_tiles and tile_y < self.height_tiles);
             const tile_i = self.getTileIndex(tile_x, tile_y);
             const px_8: u8 = @as(u8, px) | (@as(u8, px) << 4);
@@ -672,9 +743,9 @@ fn SurfaceTiles(
         /// Fill a row of tiles with a given pixel value.
         pub fn fillTileRow(
             self: Self,
-            tile_x: u16,
-            tile_y: u16,
-            len: u16,
+            tile_x: u32,
+            tile_y: u32,
+            len: u32,
             px: Pixel,
         ) void {
             assert(tile_x + len <= self.width_tiles);
@@ -693,9 +764,9 @@ fn SurfaceTiles(
         /// Fill a column of tiles with a given pixel value.
         pub fn fillTileColumn(
             self: Self,
-            tile_x: u16,
-            tile_y: u16,
-            len: u16,
+            tile_x: u32,
+            tile_y: u32,
+            len: u32,
             px: Pixel,
         ) void {
             assert(tile_x < self.width_tiles);
@@ -708,10 +779,10 @@ fn SurfaceTiles(
         /// Fill a rectangular region of the bitmap with a given pixel value.
         pub fn fillTileRect(
             self: Self,
-            tile_x: u16,
-            tile_y: u16,
-            width_tiles: u16,
-            height_tiles: u16,
+            tile_x: u32,
+            tile_y: u32,
+            width_tiles: u32,
+            height_tiles: u32,
             px: Pixel,
         ) void {
             assert(tile_x + width_tiles <= self.width_tiles);
