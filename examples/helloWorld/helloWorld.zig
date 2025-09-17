@@ -25,8 +25,7 @@ pub export fn main() void {
         "Привет, мир!\n" ++ // Russian
         "こんにちは、せかい！" // Japanese (Kana)
     );
-    text_surface.draw().text(text_hello, .{
-        .pixel = 1,
+    text_surface.draw().text(text_hello, .init(1), .{
         .x = 8,
         .y = 4,
         .line_height = 16,

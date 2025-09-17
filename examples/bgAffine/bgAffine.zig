@@ -49,13 +49,11 @@ pub export fn main() void {
     
     // Draw initial static text, which doesn't change from frame to frame.
     const text_surface = gba.display.bg_blocks.getSurface4Bpp(128, 32, 32);
-    text_surface.draw().text("Press left & right to rotate ↻", .{
-        .pixel = 15,
+    text_surface.draw().text("Press left & right to rotate ↻", .init(15), .{
         .x = 8,
         .y = 4,
     });
-    text_surface.draw().text("Angle:", .{
-        .pixel = 15,
+    text_surface.draw().text("Angle:", .init(15), .{
         .x = 8,
         .y = 14,
     });
@@ -117,8 +115,7 @@ pub export fn main() void {
         });
         text_buffer[fmt_len] = 0xc2; // Continuation byte (UTF-8 encoding)
         text_buffer[fmt_len + 1] = '°';
-        text_surface.draw().text(text_buffer[0..fmt_len + 2], .{
-            .pixel = 15,
+        text_surface.draw().text(text_buffer[0..fmt_len + 2], .init(15), .{
             .x = 40,
             .y = 14,
             .space_width = 6,

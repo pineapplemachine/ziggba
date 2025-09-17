@@ -27,8 +27,8 @@ fn drawInterruptNames() void {
     const text_surface = gba.display.bg_blocks.getSurface4Bpp(0, 32, 32);
     for(0..14) |i| {
         const frame_delta = frame_counter -% interrupt_last_frame[i];
-        text_surface.draw().text(interrupt_names[i], .{
-            .pixel = if(frame_delta <= 3) 1 else 2,
+        const pixel: u4 = if(frame_delta <= 3) 1 else 2;
+        text_surface.draw().text(interrupt_names[i], .init(pixel), .{
             .x = 8,
             .y = @intCast(4 + (8 * i)),
         });

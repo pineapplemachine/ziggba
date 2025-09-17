@@ -49,20 +49,17 @@ pub fn panic(location: ?[]const u8, message: []const u8) noreturn {
     );
     const text_surface = gba.display.bg_blocks.getSurface4Bpp(0, 32, 32);
     const text_header = if(location) |_| "PANIC @" else "PANIC";
-    text_surface.draw().text(text_header, .{
-        .pixel = 2,
+    text_surface.draw().text(text_header, .init(2), .{
         .x = 8,
         .y = 4,
     });
     if(location) |loc| {
-        text_surface.draw().text(loc, .{
-            .pixel = 2,
+        text_surface.draw().text(loc, .init(2), .{
             .x = 50,
             .y = 4,
         });
     }
-    text_surface.draw().text(message, .{
-        .pixel = 1,
+    text_surface.draw().text(message, .init(1), .{
         .x = 8,
         .y = 20,
         .max_width = 224,
