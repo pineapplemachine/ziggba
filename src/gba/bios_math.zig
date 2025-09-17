@@ -205,11 +205,45 @@ pub const BgAffineSetOptions = extern struct {
     /// Origin in screen space.
     display: gba.math.Vec2I16,
     /// Scaling on each axis.
-    scale: gba.math.Vec2FixedI16R8,
+    scale: gba.math.Vec2FixedI16R8 = .init(.one, .one),
     /// Angle of rotation.
     /// BIOS ignores the low 8 bits.
-    angle: gba.math.FixedU16R16,
+    angle: gba.math.FixedU16R16 = .zero,
 };
+
+/// Wraps a call to `bgAffineSet`.
+/// Computes an affine transform and assigns it to BG2 or BG3 via
+/// `gba.display.bg_affine`.
+pub fn bgAffineSetDisplay(options: BgAffineSetOptions, bg: u1) void {
+    bgAffineSetOne(options, &gba.display.bg_affine[bg]);
+}
+
+/// Wraps a call to `bgAffineSet`.
+/// Computes an affine transform and assigns it to BG2 via
+/// `gba.display.bg_2_affine`.
+pub fn bgAffineSetDisplay2(options: BgAffineSetOptions) void {
+    bgAffineSetOne(options, gba.display.bg_2_affine);
+}
+
+/// Wraps a call to `bgAffineSet`.
+/// Computes an affine transform and assigns it to BG3 via
+/// `gba.display.bg_3_affine`.
+pub fn bgAffineSetDisplay3(options: BgAffineSetOptions) void {
+    bgAffineSetOne(options, gba.display.bg_3_affine);
+}
+
+/// Wraps a call to `bgAffineSet`.
+/// Calculate an affine transform for one set of options and one destination.
+pub fn bgAffineSetOne(
+    /// Parameters for the affine transformation matrices and displacements
+    /// to be computed.
+    options: BgAffineSetOptions,
+    /// Write the computed affine transformations and displacements here.
+    destination: *volatile gba.math.Affine3x2,
+) void {
+    const options_array: [1]BgAffineSetOptions = .{ options };
+    bgAffineSet(&options_array, @ptrCast(destination));
+}
 
 /// Can be used to calculate rotation and scaling parameters
 /// for affine backgrounds, using the system's `BgAffineSet` BIOS call.
@@ -220,13 +254,13 @@ pub const BgAffineSetOptions = extern struct {
 pub fn bgAffineSet(
     /// Parameters for the affine transformation matrices and displacements
     /// to be computed.
-    options: []const volatile BgAffineSetOptions,
+    options: []const BgAffineSetOptions,
     /// Write the computed affine transformations and displacements here.
     destination: [*]volatile gba.math.Affine3x2,
 ) void {
     if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios
-        const sin_lut: [256]i16 = .{
+        const sin_lut: [256]u16 = .{
             0x0000, 0x0192, 0x0323, 0x04b5, 0x0645, 0x07d5, 0x0964, 0x0af1,
             0x0c7c, 0x0e05, 0x0f8c, 0x1111, 0x1294, 0x1413, 0x158f, 0x1708,
             0x187d, 0x19ef, 0x1b5d, 0x1cc6, 0x1e2b, 0x1f8b, 0x20e7, 0x223d,
@@ -261,29 +295,35 @@ pub fn bgAffineSet(
             0xf384, 0xf50f, 0xf69c, 0xf82b, 0xf9bb, 0xfb4b, 0xfcdd, 0xfe6e,
         };
         for(0..options.len) |i| {
-            const theta: u16 = options[i].angle >> 8;
-            const sin: i32 = sin_lut[theta];
-            const cos: i32 = sin_lut[(theta + 0x40) & 0xff];
-            const pa = (options[i].scale.x * cos) >> 14;
-            const pb = -((options[i].scale.x * sin) >> 14);
-            const pc = (options[i].scale.y * sin) >> 14;
-            const pd = (options[i].scale.y * cos) >> 14;
-            const dx = (
-                options[i].original.x -
-                (pa * options[i].display.x) +
-                (pb * options[i].display.y)
+            const theta: u16 = options[i].angle.value >> 8;
+            const sin: i32 = @as(i16, @bitCast(sin_lut[theta]));
+            const cos: i32 = @as(i16, @bitCast(sin_lut[(theta + 0x40) & 0xff]));
+            const pa: i16 = @truncate((options[i].scale.x.value * cos) >> 14);
+            const pb: i16 = @truncate(-((options[i].scale.x.value * sin) >> 14));
+            const pc: i16 = @truncate((options[i].scale.y.value * sin) >> 14);
+            const pd: i16 = @truncate((options[i].scale.y.value * cos) >> 14);
+            const dx: i32 = (
+                options[i].original.x.value -
+                (@as(i32, pa) * options[i].display.x) +
+                (@as(i32, pb) * options[i].display.y)
             );
-            const dy = (
-                options[i].original.y -
-                (pc * options[i].display.x) -
-                (pd * options[i].display.y)
+            const dy: i32 = (
+                options[i].original.y.value -
+                (@as(i32, pc) * options[i].display.x) -
+                (@as(i32, pd) * options[i].display.y)
             );
-            destination[i].pa = pa;
-            destination[i].pb = pb;
-            destination[i].pc = pc;
-            destination[i].pd = pd;
-            destination[i].dx = dx;
-            destination[i].dy = dy;
+            destination[i] = .init(
+                .initRowMajor(
+                    .initRaw(pa), 
+                    .initRaw(pb), 
+                    .initRaw(pc), 
+                    .initRaw(pd),
+                ),
+                .init(
+                    .initRaw(dx),
+                    .initRaw(dy),
+                ),
+            );
         }
     }
     else {
@@ -355,7 +395,7 @@ pub fn objAffineSet(
     assert((offset & 1) == 0);
     if(comptime(!isGbaTarget())) {
         // Reference: https://github.com/ez-me/gba-bios
-        const sin_lut: [256]i16 = .{
+        const sin_lut: [256]u16 = .{
             0x0000, 0x0192, 0x0323, 0x04b5, 0x0645, 0x07d5, 0x0964, 0x0af1,
             0x0c7c, 0x0e05, 0x0f8c, 0x1111, 0x1294, 0x1413, 0x158f, 0x1708,
             0x187d, 0x19ef, 0x1b5d, 0x1cc6, 0x1e2b, 0x1f8b, 0x20e7, 0x223d,
@@ -392,16 +432,16 @@ pub fn objAffineSet(
         const dest: *volatile gba.math.FixedI16R8 = @ptrCast(destination);
         const dest_offset = offset >> 1;
         for(0..options.len) |i| {
-            const theta: u16 = options[i].angle >> 8;
-            const sin: i32 = sin_lut[theta];
-            const cos: i32 = sin_lut[(theta + 0x40) & 0xff];
-            dest.* = (options[i].scale.x * cos) >> 14;
+            const theta: u16 = options[i].angle.value >> 8;
+            const sin: i32 = @as(i16, @bitCast(sin_lut[theta]));
+            const cos: i32 = @as(i16, @bitCast(sin_lut[(theta + 0x40) & 0xff]));
+            dest.* = .initRaw((options[i].scale.x.value * cos) >> 14);
             dest += dest_offset;
-            dest.* = -((options[i].scale.x * sin) >> 14);
+            dest.* = .initRaw(-((options[i].scale.x.value * sin) >> 14));
             dest += dest_offset;
-            dest.* = (options[i].scale.y * sin) >> 14;
+            dest.* = .initRaw((options[i].scale.y.value * sin) >> 14);
             dest += dest_offset;
-            dest.* = (options[i].scale.y * cos) >> 14;
+            dest.* = .initRaw((options[i].scale.y.value * cos) >> 14);
             dest += dest_offset;
         }
     }
