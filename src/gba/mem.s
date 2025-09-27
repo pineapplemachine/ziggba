@@ -6,15 +6,21 @@
     .global memcpy_thumb
     .global memcpy16_thumb
     .global memcpy32_thumb
+    .global memcpy8_thumb
     .global memset_thumb
     .global memset16_thumb
     .global memset32_thumb
+    .global memset8_thumb
+    .global memcmp8_thumb
     .type memcpy_thumb, %function
     .type memcpy16_thumb, %function
     .type memcpy32_thumb, %function
+    .type memcpy8_thumb, %function
     .type memset_thumb, %function
     .type memset16_thumb, %function
     .type memset32_thumb, %function
+    .type memset8_thumb, %function
+    .type memcmp8_thumb, %function
     .cpu arm7tdmi
     .thumb
 
@@ -30,6 +36,10 @@ memcpy32_thumb:
     ldr     r3, _memcpy32_arm_word
     bx      r3                  // Tail call into ARM code
 
+memcpy8_thumb:
+    ldr     r3, _memcpy8_arm_word
+    bx      r3                  // Tail call into ARM code
+
 memset_thumb:
     ldr     r3, _memset_arm_word
     bx      r3                  // Tail call into ARM code
@@ -42,36 +52,53 @@ memset32_thumb:
     ldr     r3, _memset32_arm_word
     bx      r3                  // Tail call into ARM code
 
+memset8_thumb:
+    ldr     r3, _memset8_arm_word
+    bx      r3                  // Tail call into ARM code
+
+memcmp8_thumb:
+    ldr     r3, _memcmp8_arm_word
+    bx      r3                  // Tail call into ARM code
+
 .align 4
     _memcpy_arm_word: .word memcpy_arm
     _memcpy16_arm_word: .word memcpy16_arm
     _memcpy32_arm_word: .word memcpy32_arm
+    _memcpy8_arm_word: .word memcpy8_arm
     _memset_arm_word: .word memset_arm
     _memset16_arm_word: .word memset16_arm
     _memset32_arm_word: .word memset32_arm
+    _memset8_arm_word: .word memset8_arm
+    _memcmp8_arm_word: .word memcmp8_arm
 
     .section .gba_mem_iwram, "ax"
     .global memcpy_arm
     .global memcpy16_arm
     .global memcpy32_arm
+    .global memcpy8_arm
     .global memset_arm
     .global memset16_arm
     .global memset32_arm
+    .global memset8_arm
+    .global memcmp8_arm
     .type memcpy_arm, %function
     .type memcpy16_arm, %function
     .type memcpy32_arm, %function
+    .type memcpy8_arm, %function
     .type memset_arm, %function
     .type memset16_arm, %function
     .type memset32_arm, %function
+    .type memset8_arm, %function
+    .type memcmp8_arm, %function
     .cpu arm7tdmi
     .arm
 
 // Copy memory.
 // For use with unaligned pointers, or pointers with uncertain alignment.
-// r0: dst Destination pointer in, end of destination buffer out
-// r1: src Source pointer in, end of source buffer out
+// r0: dst Destination pointer in, end of destination buffer out.
+// r1: src Source pointer in, end of source buffer out.
 // r2: n Count (bytes)
-// Clobbers r3 and r12
+// Clobbers r2, r3, and r12
 memcpy_arm:
     cmp     r2, #1
     bxlt    lr                  // return if n < 1
@@ -111,10 +138,10 @@ memcpy_arm:
     // Falls through to memcpy16_arm like a tail call
 
 // Copy half-word-aligned memory.
-// r0: dst Destination pointer in, end of destination buffer out (half-word-aligned)
-// r1: src Source pointer in, end of source buffer out (half-word-aligned)
+// r0: dst Destination pointer in, end of destination buffer out (half-word-aligned).
+// r1: src Source pointer in, end of source buffer out (half-word-aligned).
 // r2: n Count (half words)
-// Clobbers r3 and r12
+// Clobbers r2, r3, and r12
 memcpy16_arm:
     cmp     r2, #1
     bxlt    lr                  // return if n < 1
@@ -157,10 +184,10 @@ memcpy16_arm:
 // Performance running from IWRAM should be comparable to `gba.bios.cpuFastSet`,
 // and unlike `cpuFastSet` this function can handle data lengths that are not
 // a multiple of 8.
-// r0: dst Destination pointer in, end of destination buffer out (word-aligned)
-// r1: src Source pointer in, end of source buffer out (word-aligned)
+// r0: dst Destination pointer in, end of destination buffer out (word-aligned).
+// r1: src Source pointer in, end of source buffer out (word-aligned).
 // r2: n Count (words)
-// Clobbers r3 and r12
+// Clobbers r2, r3, and r12
 memcpy32_arm:
     and     r12, r2, #7         // var n_words = n & 7
     movs    r2, r2, lsr #3      // n >>= 3
@@ -179,11 +206,27 @@ memcpy32_arm:
     bhi     .memcpy32_arm_loop_words // branch if n_words != 0
     bx      lr                  // return
 
+// Copy memory, only in 8-bit units.
+// For use with regions of memory where only 8-bit reads or writes are
+// supported, i.e. SRAM.
+// r0: dst Destination pointer in, end of destination buffer out.
+// r1: src Source pointer in, end of source buffer out.
+// r2: n Count (bytes)
+// Clobbers r2 and r3
+memcpy8_arm:
+    subs    r2, r2, #1          // n_words -= 1
+    ldbcs   r3, r1              // load mem @ src to r3
+    stbcs   r3, r0              // store r3 to mem @ dst
+    add     r0, #1              // dst += 1
+    add     r1, #1              // src += 1
+    bhi     .memcpy8_arm        // branch if n_words != 0
+    bx      lr                  // return
+
 // Set memory.
-// r0: dst Destination pointer in, end of destination buffer out
+// r0: dst Destination pointer in, end of destination buffer out.
 // r1: src Value to write.
 // r2: n Count (bytes)
-// Clobbers r3 and r12
+// Clobbers r2, r3, and r12
 memset_arm:
     ands    r3, r0, #1          // var lsb = dst & 1
     beq     .memset_arm_dst_16_aligned // branch if lsb == 0
@@ -202,10 +245,10 @@ memset_arm:
     // Falls through to memset16_arm like a tail call
 
 // Set half-word-aligned memory.
-// r0: dst Destination pointer in, end of destination buffer out (half-word-aligned)
+// r0: dst Destination pointer in, end of destination buffer out (half-word-aligned).
 // r1: src Value to write.
 // r2: n Count (half words)
-// Clobbers r3 and r12
+// Clobbers r2, r3, and r12
 memset16_arm:
     ands    r3, r0, #3          // var lsb = dst & 3
     beq     .memset16_arm_dst_32_aligned // branch if lsb == 0
@@ -227,10 +270,10 @@ memset16_arm:
 // Performance running from IWRAM should be comparable to `gba.bios.cpuFastSet`,
 // and unlike `cpuFastSet` this function can handle data lengths that are not
 // a multiple of 8.
-// r0: dst Destination pointer in, end of destination buffer out (word-aligned)
+// r0: dst Destination pointer in, end of destination buffer out (word-aligned).
 // r1: src Value to write.
 // r2: n Count (words)
-// Clobbers r3 and r12
+// Clobbers r2, r3, and r12
 memset32_arm:
     and     r12, r2, #7         // var n_words = n & 7
     movs    r2, r2, lsr #3      // n >>= 3
@@ -255,3 +298,43 @@ memset32_arm:
     add     r0, #4              // dst += 4
     bhi     .memset32_arm_loop_words // branch if n_words != 0
     bx      lr                  // return
+
+// Set memory, only in 8-bit units.
+// For use with regions of memory where only 8-bit writes are
+// supported, i.e. SRAM.
+// r0: dst Destination pointer in, end of destination buffer out.
+// r1: src Value to write.
+// r2: n Count (bytes)
+// Clobbers r2
+memset8_arm:
+    subs    r2, r2, #1          // n -= 1
+    stbcs   r1, r0              // store r1 to mem @ dst
+    add     r0, #1              // dst += 1
+    bhi     .memset8_arm        // branch if n != 0
+    bx      lr                  // return
+
+// Compare memory, only in 8-bit units.
+// For use with regions of memory where only 8-bit reads or writes are
+// supported, i.e. SRAM.
+// Returns 0 when equal, a negative value when the first different byte
+// was lesser in src0 than src1, and a positive value otherwise.
+// r0: src0 First source pointer in, return value out.
+// r1: src1 Second source pointer in.
+// r2: n Count (bytes)
+// Clobbers r1, r2, r3, and r12
+memcmp8_arm:
+    cmp     r2, #0              // compare n == 0
+    beq     .memcmp8_arm_match  // branch if n == 0
+.memcmp8_arm_loop:
+    ldrb    r3, [r0], #1        // load mem @ src0 to r3; src0 += 1
+    ldrb    r12, [r1], #1       // load mem @ src1 to r12; src1 += 1
+    cmp     r3, r12
+    bne     .memcmp8_arm_diff   // branch if r3 != r12
+    subs    r2, r2, #1          // n -= 1
+    bne     .memcmp8_arm_loop   // branch if n != 0
+.memcmp8_arm_match:
+    mov     r0, #0
+    bx      lr                  // return 0
+.memcmp8_arm_diff:
+    sub     r0, r3, r12
+    bx      lr                  // return difference of last bytes (r3 - r12)

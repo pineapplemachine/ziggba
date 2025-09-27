@@ -28,9 +28,12 @@ pub const WaitControl = @import("mem_wait.zig").WaitControl;
 extern fn memcpy_thumb(dst: [*]volatile u8, src: [*]const volatile u8, n: u32) callconv(.c) void;
 extern fn memcpy16_thumb(dst: [*]volatile u16, src: [*]const volatile u16, n: u32) callconv(.c) void;
 extern fn memcpy32_thumb(dst: [*]volatile u32, src: [*]const volatile u32, n: u32) callconv(.c) void;
+extern fn memcpy8_thumb(dst: [*]volatile u8, src: [*]const volatile u8, n: u32) callconv(.c) void;
 extern fn memset_thumb(dst: [*]volatile u8, src: u8, n: u32) callconv(.c) void;
 extern fn memset16_thumb(dst: [*]volatile u16, src: u16, n: u32) callconv(.c) void;
 extern fn memset32_thumb(dst: [*]volatile u32, src: u32, n: u32) callconv(.c) void;
+extern fn memset8_thumb(dst: [*]volatile u8, src: u8, n: u32) callconv(.c) void;
+extern fn memcmp8_thumb(src0: [*]u8, src1: [*]u8, n: u32) callconv(.c) i32;
 
 /// Base address for external work RAM (EWRAM).
 pub const ewram_address = 0x02000000;
@@ -126,7 +129,9 @@ pub fn memcpy(
     count_bytes: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memcpy(destination[0..count_bytes], source[0..count_bytes]);
+        var dest_8: [*]volatile u8 = @ptrCast(destination);
+        var src_8: [*]volatile u8 = @ptrCast(source);
+        @memcpy(dest_8[0..count_bytes], src_8[0..count_bytes]);
     }
     else {
         memcpy_thumb(@ptrCast(destination), @ptrCast(source), count_bytes);
@@ -149,7 +154,9 @@ pub fn memcpy16(
     count_half_words: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memcpy(destination[0..count_half_words], source[0..count_half_words]);
+        var dest_16: [*]volatile u16 = @ptrCast(destination);
+        var src_16: [*]volatile u16 = @ptrCast(source);
+        @memcpy(dest_16[0..count_half_words], src_16[0..count_half_words]);
     }
     else {
         memcpy16_thumb(@ptrCast(destination), @ptrCast(source), count_half_words);
@@ -172,10 +179,39 @@ pub fn memcpy32(
     count_words: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memcpy(destination[0..count_words], source[0..count_words]);
+        var dest_32: [*]volatile u32 = @ptrCast(destination);
+        var src_32: [*]volatile u32 = @ptrCast(source);
+        @memcpy(dest_32[0..count_words], src_32[0..count_words]);
     }
     else {
         memcpy32_thumb(@ptrCast(destination), @ptrCast(source), count_words);
+    }
+}
+
+/// Copy memory from a source to a destination pointer.
+/// Uses only 8-bit reads and writes. This is slower than `memcpy` in most
+/// cases. Use this only when strictly necessary, i.e. when reading from or
+/// writing to SRAM.
+/// May behave unpredictably if the source and destination buffers overlap.
+///
+/// Normally uses a function stored in the GBA's IWRAM, but also implements
+/// a fallback to run as you would expect in tests and at comptime where this
+/// is not available.
+pub fn memcpy8(
+    /// Write copied memory here.
+    destination: *volatile anyopaque,
+    /// Read memory from here.
+    source: *const volatile anyopaque,
+    /// Number of bytes to copy.
+    count_bytes: u32,
+) void {
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        var dest_8: [*]volatile u8 = @ptrCast(destination);
+        var src_8: [*]volatile u8 = @ptrCast(source);
+        @memcpy(dest_8[0..count_bytes], src_8[0..count_bytes]);
+    }
+    else {
+        memcpy8_thumb(@ptrCast(destination), @ptrCast(source), count_bytes);
     }
 }
 
@@ -195,7 +231,8 @@ pub fn memset(
     count_bytes: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memset(destination[0..count_bytes], value);
+        var dest_8: [*]volatile u8 = @ptrCast(destination);
+        @memset(dest_8[0..count_bytes], value);
     }
     else {
         memset_thumb(@ptrCast(destination), value, count_bytes);
@@ -218,7 +255,8 @@ pub fn memset16(
 ) void {
     assert((@intFromPtr(destination) & 1) == 0); // Check alignment
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memset(destination[0..count_half_words], value);
+        var dest_16: [*]volatile u16 = @ptrCast(destination);
+        @memset(dest_16[0..count_half_words], value);
     }
     else {
         memset16_thumb(@ptrCast(destination), value, count_half_words);
@@ -241,10 +279,68 @@ pub fn memset32(
 ) void {
     assert((@intFromPtr(destination) & 3) == 0); // Check alignment
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        @memset(destination[0..count_words], value);
+        var dest_32: [*]volatile u32 = @ptrCast(destination);
+        @memset(dest_32[0..count_words], value);
     }
     else {
         memset32_thumb(@ptrCast(destination), value, count_words);
+    }
+}
+
+/// Fill memory at a destination pointer with a given value.
+/// Uses only 8-bit writes. This is slower than `memcpy` in most
+/// cases. Use this only when strictly necessary, i.e. when reading from or
+/// writing to SRAM.
+///
+/// Normally uses a function stored in the GBA's IWRAM, but also implements
+/// a fallback to run as you would expect in tests and at comptime where this
+/// is not available.
+pub fn memset8(
+    /// Write copied memory here.
+    destination: *volatile anyopaque,
+    /// Value to store in the destination buffer.
+    value: u8,
+    /// Number of bytes to copy.
+    count_bytes: u32,
+) void {
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        var dest_8: [*]volatile u8 = @ptrCast(destination);
+        @memset(dest_8[0..count_bytes], value);
+    }
+    else {
+        memset8_thumb(@ptrCast(destination), value, count_bytes);
+    }
+}
+
+/// Compare memory at two locations and determing lexicographic ordering.
+/// Returns 0 when both regions of memory are equal.
+/// Returns a negative value when the first different byte was lesser in
+/// `source_0` than `source_`. Returns a positive value otherwise.
+/// Uses only 8-bit reads.
+///
+/// Normally uses a function stored in the GBA's IWRAM, but also implements
+/// a fallback to run as you would expect in tests and at comptime where this
+/// is not available.
+pub fn memcmp8(
+    /// First buffer to compare.
+    source_0: *volatile anyopaque,
+    /// Second buffer to compare.
+    source_1: *volatile anyopaque,
+    /// Number of bytes to compare.
+    count_bytes: u32,
+) i32 {
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        var source_0_8: [*]volatile u8 = @ptrCast(source_0);
+        var source_1_8: [*]volatile u8 = @ptrCast(source_1);
+        for(0..count_bytes) |byte_i| {
+            if(source_0_8[byte_i] != source_1_8[byte_i]) {
+                return @as(i32, source_0_8[byte_i]) - @as(i32, source_1_8[byte_i]);
+            }
+            return 0;
+        }
+    }
+    else {
+        return memcmp8_thumb(@ptrCast(source_0), @ptrCast(source_1), count_bytes);
     }
 }
 
