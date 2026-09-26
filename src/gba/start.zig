@@ -33,13 +33,13 @@ export fn _start_zig() noreturn {
     gba.bios.cpuSetCopy32(
         @alignCast(@ptrCast(&__iwram_lma)),
         @alignCast(@ptrCast(&__iwram_start__)),
-        @truncate(@intFromPtr(&__iwram_end__) - @intFromPtr(&__iwram_start__)),
+        @truncate((@intFromPtr(&__iwram_end__) - @intFromPtr(&__iwram_start__)) >> 2),
     );
     // Copy .data section to EWRAM.
     gba.bios.cpuSetCopy32(
         @alignCast(@ptrCast(&__data_lma)),
         @alignCast(@ptrCast(&__data_start__)),
-        @truncate(@intFromPtr(&__data_end__) - @intFromPtr(&__data_start__)),
+        @truncate((@intFromPtr(&__data_end__) - @intFromPtr(&__data_start__)) >> 2),
     );
     // Initialize default ISR.
     // TODO: Consider putting isr_default in IWRAM?
