@@ -16,6 +16,11 @@ pub fn build(std_b: *std.Build) void {
     // Build examples.
     
     _ = b.addExecutable(.{
+        .name = "biosCpuTest",
+        .root_source_file = b.path("examples/biosCpuTest/biosCpuTest.zig"),
+        .build_options = .{ .text_charsets = .all },
+    });
+    _ = b.addExecutable(.{
         .name = "charBlock",
         .root_source_file = b.path("examples/charBlock/charBlock.zig"),
     });
