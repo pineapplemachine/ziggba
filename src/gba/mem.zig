@@ -5,8 +5,11 @@ const std = @import("std");
 const gba = @import("gba.zig");
 const assert = @import("std").debug.assert;
 
-/// Named definitions for all the system's hardware registers.
-pub const io = @import("mem_io.zig");
+const build_options = @import("ziggba_build_options");
+
+// Allocator-related imports.
+pub const getUnreservedEwram = @import("mem_alloc.zig").getUnreservedEwram;
+pub const StackAllocator = @import("mem_alloc.zig").StackAllocator;
 
 // Imports for DMA-related API.
 pub const Dma = @import("mem_dma.zig").Dma;
@@ -16,24 +19,45 @@ pub const memcpyDma32 = @import("mem_dma.zig").memcpyDma32;
 pub const memsetDma16 = @import("mem_dma.zig").memsetDma16;
 pub const memsetDma32 = @import("mem_dma.zig").memsetDma32;
 
-// Allocator-related imports.
-pub const getUnreservedEwram = @import("mem_alloc.zig").getUnreservedEwram;
-pub const StackAllocator = @import("mem_alloc.zig").StackAllocator;
+/// Named definitions for all the system's hardware registers.
+pub const io = @import("mem_io.zig");
+
+// Imports related to managing save data in SRAM/FRAM.
+pub const sramInit = @import("mem_sram.zig").sramInit;
+pub const sramRead = @import("mem_sram.zig").sramRead;
+pub const sramReadByte = @import("mem_sram.zig").sramReadByte;
+pub const sramWrite = @import("mem_sram.zig").sramWrite;
+pub const sramWriteByte = @import("mem_sram.zig").sramWriteByte;
+pub const sramFill = @import("mem_sram.zig").sramFill;
+pub const sramCompare = @import("mem_sram.zig").sramCompare;
 
 // Imports related to wait state control (memory access timings).
 pub const wait_ctrl = @import("mem_wait.zig").wait_ctrl;
 pub const WaitControl = @import("mem_wait.zig").WaitControl;
 
 // These functions are implemented in assembly in `mem.s`.
-extern fn memcpy_thumb(dst: [*]volatile u8, src: [*]const volatile u8, n: u32) callconv(.c) void;
-extern fn memcpy16_thumb(dst: [*]volatile u16, src: [*]const volatile u16, n: u32) callconv(.c) void;
-extern fn memcpy32_thumb(dst: [*]volatile u32, src: [*]const volatile u32, n: u32) callconv(.c) void;
-extern fn memcpy8_thumb(dst: [*]volatile u8, src: [*]const volatile u8, n: u32) callconv(.c) void;
+extern fn memcpy_thumb(dst: [*]volatile u8, src: [*]const u8, n: u32) callconv(.c) void;
+extern fn memcpy16_thumb(dst: [*]volatile u16, src: [*]const u16, n: u32) callconv(.c) void;
+extern fn memcpy32_thumb(dst: [*]volatile u32, src: [*]const u32, n: u32) callconv(.c) void;
+extern fn memcpy8_thumb(dst: [*]volatile u8, src: [*]const u8, n: u32) callconv(.c) void;
 extern fn memset_thumb(dst: [*]volatile u8, src: u8, n: u32) callconv(.c) void;
 extern fn memset16_thumb(dst: [*]volatile u16, src: u16, n: u32) callconv(.c) void;
 extern fn memset32_thumb(dst: [*]volatile u32, src: u32, n: u32) callconv(.c) void;
 extern fn memset8_thumb(dst: [*]volatile u8, src: u8, n: u32) callconv(.c) void;
 extern fn memcmp8_thumb(src0: [*]u8, src1: [*]u8, n: u32) callconv(.c) i32;
+extern fn memwait8_thumb(i: u32, src: *volatile u8, value: u8) callconv(.c) u32;
+
+/// Emulators detect save data type by embedding a special string
+/// in ROM, aligned on a word boundary and padded to a multiple of 4 bytes
+/// in length.
+pub export const SaveId: align(4) []const u8 = switch(build_options.save_type) {
+    .none => "",
+    // .eeprom_512b => "EEPROM_Vnnn\x00", // TODO: Currently unsupported
+    // .eeprom_8kb => "EEPROM_Vnnn\x00", // TODO: Currently unsupported
+    .sram_32kb => "SRAM_Vnnn\x00\x00\x00",
+    .flash_64kb => "FLASH512_Vnnn\x00\x00\x00", // FLASH_Vnnn in older ROMs
+    .flash_128kb => "FLASH1M_Vnnn",
+};
 
 /// Base address for external work RAM (EWRAM).
 pub const ewram_address = 0x02000000;
@@ -106,7 +130,10 @@ pub const rom_wait_1: *align(0x01000000) volatile [0x2000000]u8 = @ptrFromInt(ro
 pub const rom_wait_2: *align(0x01000000) volatile [0x2000000]u8 = @ptrFromInt(rom_wait_2_address);
 
 /// Pointer to the contents of save RAM (SRAM).
-pub const sram: *align(0x01000000) volatile [0x10000]u8 = @ptrFromInt(sram_address);
+pub const sram: *align(0x01000000) volatile [0x8000]u8 = @ptrFromInt(sram_address);
+
+/// Pointer to the contents of save RAM (SRAM) when used with a flash chip.
+pub const sram_flash: *align(0x01000000) volatile [0x10000]u8 = @ptrFromInt(sram_address);
 
 /// Copy memory from a source to a destination pointer.
 /// Use this function for pointers that aren't certain to be aligned on
@@ -124,13 +151,13 @@ pub fn memcpy(
     /// Write copied memory here.
     destination: *volatile anyopaque,
     /// Read memory from here.
-    source: *const volatile anyopaque,
+    source: *const anyopaque,
     /// Number of bytes to copy.
     count_bytes: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
         var dest_8: [*]volatile u8 = @ptrCast(destination);
-        var src_8: [*]volatile u8 = @ptrCast(source);
+        var src_8: [*]u8 = @ptrCast(source);
         @memcpy(dest_8[0..count_bytes], src_8[0..count_bytes]);
     }
     else {
@@ -149,13 +176,13 @@ pub fn memcpy16(
     /// Write copied memory here. Must be half-word-aligned.
     destination: *align(2) volatile anyopaque,
     /// Read memory from here. Must be half-word-aligned.
-    source: *align(2) const volatile anyopaque,
+    source: *align(2) const anyopaque,
     /// Number of 16-bit half words to copy.
     count_half_words: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
         var dest_16: [*]volatile u16 = @ptrCast(destination);
-        var src_16: [*]volatile u16 = @ptrCast(source);
+        var src_16: [*]u16 = @ptrCast(source);
         @memcpy(dest_16[0..count_half_words], src_16[0..count_half_words]);
     }
     else {
@@ -174,13 +201,13 @@ pub fn memcpy32(
     /// Write copied memory here. Must be word-aligned.
     destination: *align(4) volatile anyopaque,
     /// Read memory from here. Must be word-aligned.
-    source: *align(4) const volatile anyopaque,
+    source: *align(4) const anyopaque,
     /// Number of 32-bit words to copy.
     count_words: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
         var dest_32: [*]volatile u32 = @ptrCast(destination);
-        var src_32: [*]volatile u32 = @ptrCast(source);
+        var src_32: [*]u32 = @ptrCast(source);
         @memcpy(dest_32[0..count_words], src_32[0..count_words]);
     }
     else {
@@ -201,13 +228,13 @@ pub fn memcpy8(
     /// Write copied memory here.
     destination: *volatile anyopaque,
     /// Read memory from here.
-    source: *const volatile anyopaque,
+    source: *const anyopaque,
     /// Number of bytes to copy.
     count_bytes: u32,
 ) void {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
         var dest_8: [*]volatile u8 = @ptrCast(destination);
-        var src_8: [*]volatile u8 = @ptrCast(source);
+        var src_8: [*]u8 = @ptrCast(source);
         @memcpy(dest_8[0..count_bytes], src_8[0..count_bytes]);
     }
     else {
@@ -315,7 +342,8 @@ pub fn memset8(
 /// Compare memory at two locations and determing lexicographic ordering.
 /// Returns 0 when both regions of memory are equal.
 /// Returns a negative value when the first different byte was lesser in
-/// `source_0` than `source_`. Returns a positive value otherwise.
+/// `source_0` than `source_1`, via an unsigned comparison of 8-bit values.
+/// Returns a positive value otherwise.
 /// Uses only 8-bit reads.
 ///
 /// Normally uses a function stored in the GBA's IWRAM, but also implements
@@ -323,15 +351,15 @@ pub fn memset8(
 /// is not available.
 pub fn memcmp8(
     /// First buffer to compare.
-    source_0: *volatile anyopaque,
+    source_0: *anyopaque,
     /// Second buffer to compare.
-    source_1: *volatile anyopaque,
+    source_1: *anyopaque,
     /// Number of bytes to compare.
     count_bytes: u32,
 ) i32 {
     if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
-        var source_0_8: [*]volatile u8 = @ptrCast(source_0);
-        var source_1_8: [*]volatile u8 = @ptrCast(source_1);
+        var source_0_8: [*]u8 = @ptrCast(source_0);
+        var source_1_8: [*]u8 = @ptrCast(source_1);
         for(0..count_bytes) |byte_i| {
             if(source_0_8[byte_i] != source_1_8[byte_i]) {
                 return @as(i32, source_0_8[byte_i]) - @as(i32, source_1_8[byte_i]);
@@ -343,6 +371,35 @@ pub fn memcmp8(
         return memcmp8_thumb(@ptrCast(source_0), @ptrCast(source_1), count_bytes);
     }
 }
+
+/// Repeatedly load the byte at an address until the read byte matches an
+/// expected value, or until a timeout expires.
+/// Returns 0 when the timeout expired without ever finding the expected byte.
+/// Returns a nonzero value otherwise.
+///
+/// This function is used by `gba.mem.FlashSave`.
+pub fn memwait8(
+    /// Number of iterations before timeout.
+    /// Each iteration should be 8 cycles plus however many cycles to
+    /// read from the source address, given the status of `gba.mem.wait_ctrl`.
+    timeout: u32,
+    /// Check byte at this memory location.
+    source: *volatile u8,
+    /// Wait until the `source` value matches this value.
+    expected_value: u8,
+) i32 {
+    // TODO: Verify docs on timeout cycles are accurate
+    // Basis: https://github.com/Lorenzooone/Pokemon-Gen3-to-Gen-X/blob/11bf35dfced32b02c7458d7488079af259224040/source/delays.c#L25
+    if(@inComptime() or comptime(builtin.cpu.model != &std.Target.arm.cpu.arm7tdmi)) {
+        return if(source.* == expected_value) timeout else 0;
+    }
+    else {
+        return memwait8_thumb(timeout, @ptrCast(source), expected_value);
+    }
+}
+
+
+extern fn memwait8_thumb(i: u32, src: *u8, value: u8) callconv(.c) u32;
 
 /// Helper for writing a single byte to VRAM, which only supports 16-bit writes.
 /// First reads the half-word at the destination, modifies it according to the

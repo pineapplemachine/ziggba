@@ -12,6 +12,7 @@
     .global memset32_thumb
     .global memset8_thumb
     .global memcmp8_thumb
+    .global memwait8_thumb
     .type memcpy_thumb, %function
     .type memcpy16_thumb, %function
     .type memcpy32_thumb, %function
@@ -21,6 +22,7 @@
     .type memset32_thumb, %function
     .type memset8_thumb, %function
     .type memcmp8_thumb, %function
+    .type memwait8_thumb, %function
     .cpu arm7tdmi
     .thumb
 
@@ -60,6 +62,10 @@ memcmp8_thumb:
     ldr     r3, _memcmp8_arm_word
     bx      r3                  // Tail call into ARM code
 
+memwait8_thumb:
+    ldr     r3, _memwait8_arm_word
+    bx      r3                  // Tail call into ARM code
+
 .align 4
     _memcpy_arm_word: .word memcpy_arm
     _memcpy16_arm_word: .word memcpy16_arm
@@ -70,6 +76,7 @@ memcmp8_thumb:
     _memset32_arm_word: .word memset32_arm
     _memset8_arm_word: .word memset8_arm
     _memcmp8_arm_word: .word memcmp8_arm
+    _memwait8_arm_word: .word memwait8_arm
 
     .section .gba_mem_iwram, "ax"
     .global memcpy_arm
@@ -81,6 +88,7 @@ memcmp8_thumb:
     .global memset32_arm
     .global memset8_arm
     .global memcmp8_arm
+    .global memwait8_arm
     .type memcpy_arm, %function
     .type memcpy16_arm, %function
     .type memcpy32_arm, %function
@@ -90,6 +98,7 @@ memcmp8_thumb:
     .type memset32_arm, %function
     .type memset8_arm, %function
     .type memcmp8_arm, %function
+    .type memwait8_arm, %function
     .cpu arm7tdmi
     .arm
 
@@ -338,3 +347,20 @@ memcmp8_arm:
 .memcmp8_arm_diff:
     sub     r0, r3, r12
     bx      lr                  // return difference of last bytes (r3 - r12)
+
+// Wait for a given number of iterations until reading a memory address
+// produces an expected value.
+// Returns 0 when the operation timed out before finding the expected
+// value at the given address. Returns a nonzero value otherwise.
+// r0: n Iteration count (timeout). Contains return value.
+// r1: src Source pointer to byte.
+// r2: value Expected value.
+// Clobbers r3
+memwait8_arm:
+    ldrb    r3, [r1]
+    cmp     r3, r2
+    beq     .memwait8_arm_end
+    subs    r0, r0, #1          // n -= 1
+    bne     memwait8_arm
+.memwait8_arm_end:
+    bx      lr                  // return n
