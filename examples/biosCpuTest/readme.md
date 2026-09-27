@@ -1,4 +1,4 @@
-# Panic
+# BIOS CPU Test
 
 ![Screenshot](./screenshot.png)
 
